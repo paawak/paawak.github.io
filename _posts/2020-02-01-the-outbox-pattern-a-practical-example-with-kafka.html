@@ -1,0 +1,275 @@
+---
+layout: post
+status: publish
+published: true
+title: 'The Outbox Pattern: A practical example with Kafka'
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 1087
+wordpress_url: http://palashray.com/?p=1087
+date: '2020-02-01 12:36:34 +0530'
+date_gmt: '2020-02-01 17:36:34 +0530'
+categories:
+- java
+- java11
+- kafka
+- spring
+- camel
+tags:
+- camel
+- java11
+- kafka
+- spring-boot
+comments: []
+---
+<h1><a id="post-1087-_797gj1wxak3u"></a>Prelude</h1>
+<p>I have a Spring Boot based <a href="http://palashray.com/kafka-message-aggregation-using-camel-and-spring-boot/">simple message aggregator</a> based on Kafka. It aggregates a batch of messages from a Kafka Topic and publishes the aggregated result on a new Topic.</p>
+<h1><a id="post-1087-_gec5mqtjou0c"></a>Problem Statement</h1>
+<p>I have deployed 2 instances of this application, and both of them are active at any given point. When I start publishing messages on Kafka, only one of these would latch on to the message batch (as all messages of the same batch have the same Kafka.Key) and then start aggregating. Now if that instance crashes, what happens?</p>
+<ol>
+<li>Kafka rebalances its consumers and the 2nd instance picks up the remaining messages of the same batch</li>
+<li>The 2nd instance does not know that it has missed many messages, so after getting the end signal to complete the aggregation, it publishes the aggregated result on to the Kafka Topic</li>
+<li>However, this aggregated result is incorrect, as it has missed a number of messages from the batch which were consumed by the 1st instance</li>
+</ol>
+<h1><a id="post-1087-_u5al486d0m68"></a>Solution</h1>
+<p>One of the ways of solving this is through the Outbox Pattern.</p>
+<h2><a id="post-1087-_vchfu1myqc7a"></a>High Level Design</h2>
+<h3><a id="post-1087-_ry8wdkittk83"></a>The Outbox Persister</h3>
+<p><img class="wp-image-1088" src="http://localhost/tech-blog/wp-content/uploads/2020/02/word-image.png" /></p>
+<ol>
+<li>Messages are consumed by the Aggregtor from a given Kafka Topic</li>
+<li>The Aggregator saves a reference of the 1st Message (the CorrelationId for the batch, the Kafka Topic, Partition ID, Message Offset and the Timestamp) of a given batch into a Persistent Data Store, called the Outbox</li>
+<li>If the aggregation operation is successful, this message reference is deleted and the aggregated result is published on a Kafka Topic</li>
+<li>If the Aggregator instance crashes before the aggregation is completed, the reference of the 1st message of the batch remains in the Data Store</li>
+</ol>
+<h3><a id="post-1087-_16gv3rynkfg1"></a>The Message Replayer</h3>
+<p><img class="wp-image-1089" src="http://localhost/tech-blog/wp-content/uploads/2020/02/word-image-1.png" /></p>
+<ol>
+<li>The Message Replayer is a scheduled job that runs every N seconds</li>
+<li>It polls the Persistent Data Store to see if any records exists</li>
+<li>If it finds any records, it looks to see if the Timestamp of the message is older by X seconds from the current time</li>
+<li>If YES, it latches on to the specific Topic and Partition in Kafka and starts replaying all the messages from the given offset of the 1st Message</li>
+<li>The Replayer also sets a special header in the message to indicate that a Message Replay is in progress</li>
+<li>It stops when it finds a different CorrelationId in a message</li>
+<li>Thus, the Aggregator receives all the messages from the same batch</li>
+<li>The Aggregator also can differentiate a normal operation from a <em>Replay Operation</em></li>
+</ol>
+<h2><a id="post-1087-_wepsgrnzqo6g"></a>Low Level Design</h2>
+<p>For a quick start, we have taken the entire source code of the <a href="https://github.com/paawak/spring-boot-demo/tree/master/kafka-spring/kafka-camel-aggregation-simple">kafka-camel-aggregation-simple</a>. We rename this to <a href="https://github.com/paawak/spring-boot-demo/tree/master/kafka-spring/kafka-camel-aggregation-with-replay">kafka-camel-aggregation-with-replay</a>. Since the 2 code bases are identical, we will refer a lot to <a href="http://palashray.com/kafka-message-aggregation-using-camel-and-spring-boot/">this blog entry</a>, which has the details of the basic structure. Here, I will only highlight the changes that we have to bring in to cater to the Outbox Pattern.</p>
+<h3><a id="post-1087-_aogqcm1xpemh"></a>The Persistent Data Store</h3>
+<p>First of all, we would need a Data Store to persist the message details. We would be using MySql. The schema looks like this:</p>
+<pre class="lang:mysql decode:true">CREATE TABLE message_outbox (
+  correlation_id varchar(50) PRIMARY KEY NOT NULL,
+  processor_id varchar(50) NOT NULL,
+  topic_name varchar(200) NOT NULL,
+  partition_id smallint NOT NULL,
+  offset bigint NOT NULL,
+  insert_time timestamp NOT NULL DEFAULT NOW()
+);</pre>
+<h3><a id="post-1087-_jqdpx8cv52sb"></a>Replay Scheduler</h3>
+<p>Every fixed time interval, a scheduler polls the Data Store for new message reference to process.</p>
+<pre class="lang:java decode:true">@Service
+public class BackfillScheduler {
+	private final KafkaMessageReplayer kafkaMessageReplayer;
+	@Scheduled(initialDelay = 5000, fixedDelay = 60000)
+	public void checkForBackill() {
+    LOG.info("checking for backfill...");
+    String sql =
+   	 "SELECT * FROM message_outbox WHERE TIMESTAMPDIFF(MINUTE, insert_time, NOW()) > :intervalInMinutes";
+    Map<String, Object> params = new HashMap<>();
+    params.put("intervalInMinutes", MIN_INTERVAL_MINUTES);
+    List<MessageOutBox> outbox =
+   	 jdbcTemplate.query(sql, params, (ResultSet resultSet, int rowNum) -> {
+   	 	String correlationId = resultSet.getString("correlation_id");
+   	 	String topicName = resultSet.getString("topic_name");
+   	 	int partitionId = resultSet.getInt("partition_id");
+   	 	long offset = resultSet.getLong("offset");
+   	 	LOG.trace("topicName: {}, partitionId: {}, offset: {}, correlationId: {}",
+   		 	topicName, partitionId, offset, correlationId);
+   	 	return new MessageOutBox(correlationId, topicName, partitionId, offset);
+   	 });
+    if (outbox.isEmpty()) {
+    	LOG.info("No backfill found");
+    	return;
+    } else {
+    	LOG.info("{} records found for backfill", outbox.size());
+    }
+    outbox.forEach(messageOutBox -> kafkaMessageReplayer.replayMessages(messageOutBox.topicName,
+   	 messageOutBox.partitionId, messageOutBox.offset, messageOutBox.correlationId));
+	}
+}</pre>
+<h3><a id="post-1087-_aey48875uh3d"></a>Kafka Message Replayer</h3>
+<p>This component is responsible for reading messages from a particular message-offset in a given Kafka Topic and Partition ID, and having the given CorrelationID. The Replayer keeps reading the messages till it hits a message which has a different CorrelationID. Thus, it replays all the messages that belongs to the same batch, indicated by the same CorrelationID.</p>
+<pre class="lang:java decode:true">@Service
+public class KafkaMessageReplayer {
+	private static final Logger LOG = LoggerFactory.getLogger(KafkaMessageReplayer.class);
+	private final ProducerTemplate producerTemplate;
+	private final String kafkaBrokers;
+	public KafkaMessageReplayer(ProducerTemplate producerTemplate,
+    	@Value("${spring.kafka.bootstrap-servers}") String kafkaBrokers) {
+    this.producerTemplate = producerTemplate;
+    this.kafkaBrokers = kafkaBrokers;
+	}
+	public void replayMessages(String topicName, int partitionId, long offset,
+    	String correlationId) {
+    LOG.info(
+   	 "Kafka message replay in progress: topicName: {}, partitionId: {}, offset: {}, correlationId: {}",
+   	 topicName, partitionId, offset, correlationId);
+    KafkaConsumer<String, String> kafkaConsumer = getKafkaConsumer();
+    TopicPartition topicPartition = new TopicPartition(topicName, partitionId);
+    kafkaConsumer.assign(Arrays.asList(topicPartition));
+    kafkaConsumer.seek(topicPartition, offset);
+    while (true) {
+    	ConsumerRecords<String, String> records = kafkaConsumer.poll(Duration.ofMillis(500));
+    	for (ConsumerRecord<String, String> record : records) {
+   	 String key = record.key();
+   	 if (!key.equals(correlationId)) {
+   	 	return;
+   	 }
+   	 String value = record.value();
+   	 LOG.trace("correlationId: {}, value: {}", correlationId, value);
+   	 Map<String, Object> headers = new HashMap<>();
+   	 headers.put(RouteConstants.BACKFILL_IN_PROGRESS, Boolean.TRUE);
+   	 headers.put(KafkaConstants.KEY, correlationId);
+   	 headers.putAll(StreamSupport.stream(record.headers().spliterator(), false)
+   		 .collect(Collectors.toMap(header -> header.key(),
+   			 header -> new String(header.value()))));
+   	 producerTemplate.sendBodyAndHeaders(RouteConstants.AGGREGATION_CHANNEL, value,
+   		 headers);
+    	}
+    }
+	}
+	private KafkaConsumer<String, String> getKafkaConsumer() {
+    Properties props = new Properties();
+    props.put("bootstrap.servers", kafkaBrokers);
+    props.put("group.id", "bank-detail-backfill");
+    props.put("key.deserializer", StringDeserializer.class);
+    props.put("value.deserializer", StringDeserializer.class);
+    return new KafkaConsumer<>(props);
+	}
+}
+</pre>
+<h3><a id="post-1087-_v6ngrg9laf9h"></a>Changes in the BankDetailAggregationStrategy</h3>
+<p>The BankDetailAggregationStrategy is the component which persists the first message reference to the Data Store. This happens in the <em>aggregate()</em> method when the <em>oldExchange</em> is <em>null</em>, it knows that this is the first message.<br />
+However, it has to also check whether the first message is <em>dirty</em>, i.e., partial messages due to an Aggregator crash. This is done by checking the Data Store for a message with the same CorrelationId. If one is found, it means that this operation is <em>dirty</em>, the result of which should be ignored.<br />
+For all the subsequent messages, the <em>oldExchange</em> and the <em>newExchange</em> are added up to return a partially aggregated result. Care should be taken to merge the headers as well in the partial result that is returned.</p>
+<pre class="lang:java decode:true">	@Override
+	public Exchange aggregate(Exchange oldExchange, Exchange newExchange) {
+    if (oldExchange == null) {
+    	if (Boolean.TRUE.equals(newExchange.getIn()
+   	 	.getHeader(RouteConstants.BACKFILL_IN_PROGRESS, Boolean.class))) {
+   	 LOG.debug("++++ Message replay in progress");
+   	 return newExchange;
+    	}
+    	// insert only the first message in the group
+    	if (checkforDirtyAggregation(newExchange)) {
+   	 newExchange.getIn().setHeader(PRECOMPLETE_DIRTY_AGGREGATION, Boolean.TRUE);
+   	 return newExchange;
+    	}
+    	persistMessageOffsetDetails(newExchange);
+    	return newExchange;
+    }
+    JobCount partialResults = oldExchange.getIn().getBody(JobCount.class);
+    JobCount newMessage = newExchange.getIn().getBody(JobCount.class);
+    oldExchange.getIn().setBody(doAggregation(newMessage, partialResults), JobCount.class);
+    // any header that is used by the predicate should be set in the message
+    // returned from this method
+    Map<String, Object> headers = new HashMap<>();
+    headers.putAll(oldExchange.getIn().getHeaders());
+    headers.putAll(newExchange.getIn().getHeaders());
+    oldExchange.getIn().setHeaders(headers);
+    return oldExchange;
+	}
+	private JobCount doAggregation(JobCount newMessage, JobCount partialResults) {
+    JobCount aggregate = new JobCount();
+    aggregate.setAdminCount(newMessage.getAdminCount() + partialResults.getAdminCount());
+    aggregate.setBlueCollarCount(
+   	 newMessage.getBlueCollarCount() + partialResults.getBlueCollarCount());
+    aggregate.setEntrepreneurCount(
+   	 newMessage.getEntrepreneurCount() + partialResults.getEntrepreneurCount());
+    aggregate.setHouseMaidCount(
+   	 newMessage.getHouseMaidCount() + partialResults.getHouseMaidCount());
+    aggregate.setManagementCount(
+   	 newMessage.getManagementCount() + partialResults.getManagementCount());
+    aggregate.setRetiredCount(newMessage.getRetiredCount() + partialResults.getRetiredCount());
+    aggregate.setSelfEmployedCount(
+   	 newMessage.getSelfEmployedCount() + partialResults.getSelfEmployedCount());
+    aggregate.setServicesCount(
+   	 newMessage.getServicesCount() + partialResults.getServicesCount());
+    aggregate.setStudentCount(newMessage.getStudentCount() + partialResults.getStudentCount());
+    aggregate.setTechnicianCount(
+   	 newMessage.getTechnicianCount() + partialResults.getTechnicianCount());
+    aggregate.setUnemployedCount(
+   	 newMessage.getUnemployedCount() + partialResults.getUnemployedCount());
+    aggregate.setUnknownCount(newMessage.getUnknownCount() + partialResults.getUnknownCount());
+    return aggregate;
+	}
+	private void persistMessageOffsetDetails(Exchange message) {
+    if (Boolean.TRUE.equals(
+   	 message.getIn().getHeader(RouteConstants.BACKFILL_IN_PROGRESS, Boolean.class))) {
+    	return;
+    }
+    String sql =
+   	 "INSERT INTO message_outbox (correlation_id, processor_id, topic_name, partition_id, offset) VALUES (:correlationId, :processorId, :topicName, :partitionId, :offset)";
+    Map<String, Object> params = new HashMap<>();
+    params.put("correlationId", getCorrelationId(message));
+    String topicName = message.getIn().getHeader(KafkaConstants.TOPIC, String.class);
+    params.put("topicName", topicName);
+    params.put("partitionId",
+   	 message.getIn().getHeader(KafkaConstants.PARTITION, Integer.class));
+    params.put("offset", message.getIn().getHeader(KafkaConstants.OFFSET, Long.class));
+    params.put("processorId", System.getenv("processorId"));
+    jdbcTemplate.update(sql, params);
+	}
+</pre>
+<p>The <em>matches()</em> method should now return false if the operation is <em>dirty</em>, so that it <em>times-out</em> without removing the message reference from the Data Store.</p>
+<pre class="lang:java decode:true">	@Override
+	public void onCompletion(Exchange exchange) {
+    String correlationId = getCorrelationId(exchange);
+    LOG.info("########### Aggregation is complete for {}", correlationId);
+    String sql = "DELETE FROM message_outbox WHERE correlation_id = :correlationId";
+    Map<String, Object> params = new HashMap<>();
+    params.put("correlationId", correlationId);
+    jdbcTemplate.update(sql, params);
+    LOG.info("Record from *message_outbox* table deleted for {}", correlationId);
+	}
+</pre>
+<p>Lastly, the <em>onCompletion()</em> method, which is called when the aggregation operation is successful, removes the message reference from the Data Store.</p>
+<pre class="lang:java decode:true ">@Override
+public void onCompletion(Exchange exchange) {
+String correlationId = getCorrelationId(exchange);
+LOG.info("########### Aggregation is complete for {}", correlationId);
+String sql = "DELETE FROM message_outbox WHERE correlation_id = :correlationId";
+Map<String, Object> params = new HashMap<>();
+params.put("correlationId", correlationId);
+jdbcTemplate.update(sql, params);
+LOG.info("Record from *message_outbox* table deleted for {}", correlationId);
+}</pre>
+<h2><a id="post-1087-_xei0dho5sp3o"></a>Drawbacks Of The Current Design</h2>
+<p>The main drawback is the time needed for the message replay. When an instance of the aggregator dies, we need to wait till all the messages of the same batch are published by the producer before we can replay.<br />
+There is also a chance that the replay and the consumption of messages from Kafka overlaps with each other, and happens at the same time. This is a real possibility in cases where the no. of messages in a batch are very high.</p>
+<h1><a id="post-1087-_sln0etwu9h2a"></a>Source Code</h1>
+<p>The fully working source code can be found here:<br />
+<a href="https://github.com/paawak/spring-boot-demo/tree/master/kafka-spring/kafka-camel-aggregation-with-replay">https://github.com/paawak/spring-boot-demo/tree/master/kafka-spring/kafka-camel-aggregation-with-replay</a></p>
+<h1><a id="post-1087-_aqc6d67qeech"></a>Running The Example</h1>
+<h2><a id="post-1087-_1p7g24mnizvp"></a>As Simple Java App</h2>
+<p>This is a Spring Boot application, so running it locally as a Java Application is just about running the main class KafkaCamelDemoApplication.<br />
+However, the below environment variable should be set to uniquely identify this node.<br />
+-DprocessorId=camel_8080<br />
+You can run another instance by changing the port<br />
+-Dserver.port=8080</p>
+<h2><a id="post-1087-_8fkil5svw6ad"></a>As Docker Image</h2>
+<p>docker run -it -p 8080:8080 -e server.port=8080 -e processorId=camel_8080 -e spring.profiles.active=default paawak/kafka-camel-aggregation-with-replay:latest</p>
+<h3><a id="post-1087-_huppfko1o8ni"></a>Allowing docker host to access MySql</h3>
+<p>When running this as a Docker image, in order for MySql to give access to it, we would have to run the below commands on the MySql command prompt:</p>
+<pre class="lang:mysql decode:true">CREATE USER 'root'@'172.17.0.9' IDENTIFIED BY 'my_pswd';
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'172.17.0.9' WITH GRANT OPTION;
+FLUSH PRIVILEGES;</pre>
+<h1><a id="post-1087-_6qe2xdmsr9vo"></a>Further Reading</h1>
+<p><a href="https://dzone.com/articles/implementing-the-outbox-pattern">https://dzone.com/articles/implementing-the-outbox-pattern</a><br />
+<a href="https://microservices.io/patterns/data/transactional-outbox.html">https://microservices.io/patterns/data/transactional-outbox.html</a></p>

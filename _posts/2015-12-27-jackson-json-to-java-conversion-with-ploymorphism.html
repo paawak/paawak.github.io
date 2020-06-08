@@ -1,0 +1,174 @@
+---
+layout: post
+status: publish
+published: true
+title: "[Jackson] Json to Java Conversion with Ploymorphism"
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 792
+wordpress_url: http://palashray.com/?p=792
+date: '2015-12-27 23:57:20 +0530'
+date_gmt: '2015-12-28 04:57:20 +0530'
+categories:
+- java
+tags:
+- jackson
+- json
+comments: []
+---
+<p>Converting Json String to Java Object is never straight forward, especially when polymorphism is involved. Consider the below interface:</p>
+<pre class="lang:java decode:true ">public interface Animal {
+    int getLegs();
+    String getSpecies();
+    String getCommonName();
+}</pre>
+<p>It has two sub classes:</p>
+<pre class="lang:java decode:true ">public class Bird implements Animal {
+    private final String species;
+    private final String commonName;
+    private final int legs;
+    public Bird(String species, String commonName, int legs) {
+	this.species = species;
+	this.commonName = commonName;
+	this.legs = legs;
+    }
+    public Bird() {
+	this(null, null, 0);
+    }
+    @Override
+    public int getLegs() {
+	return legs;
+    }
+    @Override
+    public String getSpecies() {
+	return species;
+    }
+    @Override
+    public String getCommonName() {
+	return commonName;
+    }
+    @Override
+    public int hashCode() {
+	final int prime = 31;
+	int result = 1;
+	result = prime * result + ((commonName == null) ? 0 : commonName.hashCode());
+	result = prime * result + legs;
+	result = prime * result + ((species == null) ? 0 : species.hashCode());
+	return result;
+    }
+    @Override
+    public boolean equals(Object obj) {
+	if (this == obj)
+	    return true;
+	if (obj == null)
+	    return false;
+	if (getClass() != obj.getClass())
+	    return false;
+	Bird other = (Bird) obj;
+	if (commonName == null) {
+	    if (other.commonName != null)
+		return false;
+	} else if (!commonName.equals(other.commonName))
+	    return false;
+	if (legs != other.legs)
+	    return false;
+	if (species == null) {
+	    if (other.species != null)
+		return false;
+	} else if (!species.equals(other.species))
+	    return false;
+	return true;
+    }
+}</pre>
+<pre class="lang:java decode:true ">public class Lizard implements Animal {
+    private final String species;
+    private final String commonName;
+    private final int legs;
+    public Lizard(String species, String commonName, int legs) {
+	this.species = species;
+	this.commonName = commonName;
+	this.legs = legs;
+    }
+    public Lizard() {
+	this(null, null, 0);
+    }
+    @Override
+    public int getLegs() {
+	return legs;
+    }
+    @Override
+    public String getSpecies() {
+	return species;
+    }
+    @Override
+    public String getCommonName() {
+	return commonName;
+    }
+    @Override
+    public int hashCode() {
+	final int prime = 31;
+	int result = 1;
+	result = prime * result + ((commonName == null) ? 0 : commonName.hashCode());
+	result = prime * result + legs;
+	result = prime * result + ((species == null) ? 0 : species.hashCode());
+	return result;
+    }
+    @Override
+    public boolean equals(Object obj) {
+	if (this == obj)
+	    return true;
+	if (obj == null)
+	    return false;
+	if (getClass() != obj.getClass())
+	    return false;
+	Lizard other = (Lizard) obj;
+	if (commonName == null) {
+	    if (other.commonName != null)
+		return false;
+	} else if (!commonName.equals(other.commonName))
+	    return false;
+	if (legs != other.legs)
+	    return false;
+	if (species == null) {
+	    if (other.species != null)
+		return false;
+	} else if (!species.equals(other.species))
+	    return false;
+	return true;
+    }
+}</pre>
+<p>We now will try to convert a Json String to a Java Object:</p>
+<pre class="lang:java decode:true">	String lizardJson = "{"species":"Varanus bengalensis","commonName":"Bengal monitor","legs":4}";
+	ObjectMapper mapper = new ObjectMapper();
+	    mapper.readValue(lizardJson, Animal.class);</pre>
+<p>The full test can be found here: <a href="https://github.com/paawak/blog/blob/master/code/json-inheritance-demo/src/test/java/com/swayam/demo/json/polymorphic/noannotation/PolymorphicJsonTest.java">https://github.com/paawak/blog/blob/master/code/json-inheritance-demo/src/test/java/com/swayam/demo/json/polymorphic/noannotation/PolymorphicJsonTest.java</a><br />
+This will immediately throw the below exception:</p>
+<pre class="lang:java decode:true ">com.fasterxml.jackson.databind.JsonMappingException: Can not construct instance of com.swayam.demo.json.polymorphic.noannotation.Animal, problem: abstract types either need to be mapped to concrete types, have custom deserializer, or be instantiated with additional type information
+ at [Source: {"species":"Copsychus saularis","commonName":"Doel, Oriental magpie-robin","legs":2}; line: 1, column: 1]
+	at com.fasterxml.jackson.databind.JsonMappingException.from(JsonMappingException.java:148)
+	at com.fasterxml.jackson.databind.DeserializationContext.instantiationException(DeserializationContext.java:857)
+	at com.fasterxml.jackson.databind.deser.AbstractDeserializer.deserialize(AbstractDeserializer.java:139)
+	at com.fasterxml.jackson.databind.ObjectMapper._readMapAndClose(ObjectMapper.java:3564)
+	at com.fasterxml.jackson.databind.ObjectMapper.readValue(ObjectMapper.java:2580)
+</pre>
+<p>The reason is, the Json String does not have any information about the specific subclass. This can be very easily overcome by forcing the type information while serializing Java to Json, by using the <strong>@JsonTypeInfo</strong> annotation. This should be placed on the interface or the abstract class as shown below:</p>
+<pre class="lang:java decode:true ">@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, include = JsonTypeInfo.As.PROPERTY, property = "type")
+public interface Animal {
+    int getLegs();
+    String getSpecies();
+    String getCommonName();
+}</pre>
+<p>Now, the below code would work:</p>
+<pre class="lang:java decode:true ">Animal expectedLizard = new Lizard("Varanus bengalensis", "Bengal monitor", 4);
+	String lizardJson = "{"type":"com.swayam.demo.json.polymorphic.withannotation.Lizard","species":"Varanus bengalensis","commonName":"Bengal monitor","legs":4}";
+	ObjectMapper mapper = new ObjectMapper();
+	Animal lizard = mapper.readValue(lizardJson, Animal.class);
+	assertEquals(expectedLizard, lizard);</pre>
+<p>The full test can be found here: <a href="https://github.com/paawak/blog/blob/master/code/json-inheritance-demo/src/test/java/com/swayam/demo/json/polymorphic/withannotation/PolymorphicJsonTest.java">https://github.com/paawak/blog/blob/master/code/json-inheritance-demo/src/test/java/com/swayam/demo/json/polymorphic/withannotation/PolymorphicJsonTest.java</a><br />
+The entire source code for this can be found here: <a href="https://github.com/paawak/blog/tree/master/code/json-inheritance-demo">https://github.com/paawak/blog/tree/master/code/json-inheritance-demo</a><br />
+&nbsp;</p>

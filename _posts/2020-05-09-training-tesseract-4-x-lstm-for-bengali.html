@@ -1,0 +1,75 @@
+---
+layout: post
+status: publish
+published: true
+title: Training Tesseract 4.x (LSTM) For Bengali
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 1159
+wordpress_url: http://palashray.com/?p=1159
+date: '2020-05-09 14:03:25 +0530'
+date_gmt: '2020-05-09 18:03:25 +0530'
+categories:
+- tesseract
+tags:
+- ocr
+- tesseract
+comments: []
+---
+<h1><a id="post-1159-_xi6w4v5jh51n"></a>Introduction</h1>
+<p>Well, I guess <a href="https://github.com/tesseract-ocr/tesseract">Tesseract</a> needs no introduction, suffice to say that, it is the best open source OCR out there, with a huge number of supported languages. Especially after the 4.x release, the Tesseract Engine has become more accurate than ever. However, it still has room for improvement in Bengali, especially when we feed in books with old print. I was trying to OCR a few scanned pages from <a href="https://www.flipkart.com/mahabharat/p/itmezyv8p9d8mn4k">Mahabharat by Rajshekhar Basu</a>. I was pretty disappointed when I saw the accuracy was around only 40%, even when I used the <a href="https://github.com/tesseract-ocr/tessdata_best">tessdata_best</a> for lstm. So, I decided to train and improve the existing model: easier said than done. Even though there is an excellent and exhaustive <a href="https://tesseract-ocr.github.io/tessdoc/TrainingTesseract-4.00.html">tutorial</a>, on this subject, I was kind of lost in the deluge of terms and details. Yes, the tutorial is too detailed. And it's very difficult to sift through the information to arrive at the magical commands that will get the job done. So, finally, after a lot of struggle, I have kind of figured out how to train the existing <em>tessdata</em> for Bengali with a scanned image from Mahabharat by Rajshekhar Basu, in <strong>5 simple steps</strong> as described below.</p>
+<h1><a id="post-1159-_5ygl3g3788ml"></a>Step 1: Extract recognition model</h1>
+<p>Well, like I said, I was planning to improve the existing model. So, we need to start with the existing tessdata. Since this is aimed at Tesseract 4.x with LSTM, it would only work with the tessdata_best: <a href="https://github.com/tesseract-ocr/tessdata_best">https://github.com/tesseract-ocr/tessdata_best</a>.<br />
+We would need to extract the recognition model. A recognition model can be extracted from an existing traineddata file. The output of this would be a lstm file.</p>
+<pre class="wrap:true lang:sh decode:true">combine_tessdata -e /kaaj/installs/tesseract/tessdata_best-4.0.0/ben.traineddata ./ben.lstm</pre>
+<h1><a id="post-1159-_y2gh101d6b59"></a>Step 2: Creating lstmf file from a tiff/box pair</h1>
+<p>We would need to obtain a <em>lstmf</em> binary file from a tiff image and its corresponding box file. The below command will create a lstmf binary file, given a tiff and box file pair:</p>
+<pre class="wrap:true lang:sh decode:true">tesseract -l ben ben.rajshekhar_mahabharat.exp0.jpg ben.rajshekhar_mahabharat.exp0 --psm 6 lstm.train</pre>
+<p>You can create multiple <em>lstmf</em> files from several tiff/box pairs.</p>
+<h1><a id="post-1159-_vb0swqbhzodr"></a>Step 3: Creating a list of lstmf files</h1>
+<p>Create a <em>ben.training_files.txt</em> containing all the <em>lstmf</em> files that you have created in the previous step. The contents of this file will be the full path of each of the lstmf file:</p>
+<pre class="lang:vim decode:true">/mydir/ben.rajshekhar_mahabharat.exp0.lstmf
+/mydir/ben.rajshekhar_mahabharat.exp1.lstmf
+/mydir/ben.rajshekhar_mahabharat.exp2.lstmf</pre>
+<h1><a id="post-1159-_eebjer5f6iho"></a>Step 4: Run the training command</h1>
+<p>Then run the below command to train:</p>
+<pre class="wrap:true lang:sh decode:true">lstmtraining --model_output ./my_output \
+--continue_from ./ben.lstm \
+--traineddata /kaaj/installs/tesseract/tessdata_best-4.0.0/ben.traineddata \
+--train_listfile ./ben.training_files.txt \
+--max_iterations 400</pre>
+<p>The output from the above will be a <em>my_output_checkpoint</em> file.</p>
+<h1><a id="post-1159-_rqzpfeyu51yq"></a>Step 5: Combining the outputs</h1>
+<p>In the final step, we have to combine the <em>my_output_checkpoint</em> file, which we obtain in the previous step, with the existing traineddata file:</p>
+<pre class="wrap:true lang:java decode:true">lstmtraining --stop_training \
+--continue_from ./my_output_checkpoint \
+--traineddata /kaaj/installs/tesseract/tessdata_best-4.0.0/ben.traineddata \
+--model_output /kaaj/source/tessdata_best/ben.traineddata</pre>
+<p>You can now use the new traineddata file by pointing the <em>TESSDATA_PREFIX</em> environment variable to the new <em>tessdata_best</em> directory.</p>
+<h1><a id="post-1159-_qz3lwwrhnoz0"></a>Source Files</h1>
+<p>The image and the box files can be found here:<br />
+<a href="https://github.com/paawak/blog/tree/master/docs/tesseract/training-bengali">https://github.com/paawak/blog/tree/master/docs/tesseract/training-bengali</a><br />
+I have also checked in the <a href="https://github.com/paawak/blog/blob/master/docs/tesseract/training-bengali/ocr-text-before.txt">ocr-text-before.txt</a> and <a href="https://github.com/paawak/blog/blob/master/docs/tesseract/training-bengali/ocr-text-after.txt">ocr-text-after.txt</a>, which are the OCR generated text <em>before</em> and <em>after</em> the training respectively.</p>
+<h1><a id="post-1159-_stblybcyykcv"></a>Addendum: Generating the Box File</h1>
+<p>For training Tesseract, creating <em>box files</em> is the first step. A <em>box file</em> is a <em>plain-text</em> file that is used to specify the text, or a character, at a given coordinate in the image. For the <em>lstm</em> system, the coordinates of an entire line is considered and <strong>NOT</strong> the individual coordinates of the character in the image. Note that this is <a href="https://github.com/tesseract-ocr/tesseract/issues/2357#issuecomment-477239316">significantly different</a> from the earlier <em>Tesseract 3.x</em>, where the coordinates of a given character was needed. The format of the box file is:</p>
+<pre class="wrap:true lang:vim decode:true"><character> <LeftBottom x1> <LeftBottom y1> <RightTop x2> <RightTop y2> <tiff image page number></pre>
+<p>The coordinate system used in the box file has <strong>(0,0)</strong> at the <strong>bottom-left</strong> as shown below:<br />
+<img class="wp-image-1160" src="http://localhost/tech-blog/wp-content/uploads/2020/05/word-image.png" /><br />
+In a box file, every end of a word is marked with:</p>
+<pre class="wrap:true lang:vim decode:true"><space> <LeftBottom x1> <LeftBottom y1> <RightTop x2> <RightTop y2> <tiff image page number></pre>
+<p>Similarly, every end of a line is marked with:</p>
+<pre class="wrap:true lang:vim decode:true"><tab> <LeftBottom x1> <LeftBottom y1> <RightTop x2> <RightTop y2> <tiff image page number></pre>
+<p>The below command will generate a box file called my-box-file.box from an image:</p>
+<pre class="wrap:true lang:sh decode:true">tesseract -l ben bangla-mahabharat-1-page_2.jpg my-box-file lstmbox</pre>
+<p>Please note that you might have to manually edit the box file for the correctness of the text.</p>
+<h1><a id="post-1159-_kvi5uoq49rim"></a>Reference</h1>
+<ol>
+<li><a href="https://tesseract-ocr.github.io/tessdoc/TrainingTesseract-4.00.html">https://tesseract-ocr.github.io/tessdoc/TrainingTesseract-4.00.html</a></li>
+<li><a href="https://github.com/tesseract-ocr/tesseract/issues/2357#issuecomment-477239316">https://github.com/tesseract-ocr/tesseract/issues/2357#issuecomment-477239316</a></li>
+</ol>
+<p>&nbsp;</p>

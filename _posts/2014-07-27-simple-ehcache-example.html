@@ -1,0 +1,91 @@
+---
+layout: post
+status: publish
+published: true
+title: Simple ehCache Example
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 602
+wordpress_url: http://palashray.com/?p=602
+date: '2014-07-27 03:37:35 +0530'
+date_gmt: '2014-07-27 03:37:35 +0530'
+categories:
+- ehcache
+tags:
+- ehcache
+comments: []
+---
+<h1>Problem Statement</h1>
+<p>I have a data provider (basically, <a title="System Od Record" href="http://en.wikipedia.org/wiki/System_of_record" target="_blank">system-of-record</a>) which can return me a huge data set. What I want to do is, write these records in a cache, and then, return a set of records page-by-page from the cache. The cache here acts like a buffer to ensure that there is no strain on the memory. In the following example, I have just stopped short of the actual paging solution. Instead I have tried to illustrate how its possible using EhCache.</p>
+<h1>Maven Configuration</h1>
+<p>Just putting <em>ehcache</em> and <em>slf4j</em> should be good enough.</p>
+<pre class="lang:java decode:true">      <dependency>
+			<groupId>net.sf.ehcache</groupId>
+			<artifactId>ehcache</artifactId>
+			<version>2.8.3</version>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+			<version>${slf4j.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-log4j12</artifactId>
+			<version>${slf4j.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>log4j</groupId>
+			<artifactId>log4j</artifactId>
+			<version>1.2.14</version>
+		</dependency></pre>
+<h1>EhCache Configuration</h1>
+<p>The ehCache configuration file, <em>my-demo-ehcache.xml</em> in this case, looks like:</p>
+<pre class="lang:java decode:true "><?xml version="1.0" encoding="UTF-8"?>
+<ehcache xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="ehcache.xsd"
+         updateCheck="true" monitoring="autodetect"
+         dynamicConfig="true">
+    <diskStore path="java.io.tmpdir"/>
+    <defaultCache
+            maxEntriesLocalHeap="1000"
+            eternal="false"
+            timeToIdleSeconds="120"
+            timeToLiveSeconds="120"
+            diskSpoolBufferSizeMB="30"
+            maxEntriesLocalDisk="10000000"
+            diskExpiryThreadIntervalSeconds="120"
+            memoryStoreEvictionPolicy="LRU">
+        <persistence strategy="localTempSwap"/>
+    </defaultCache>
+    <cache name="myCache1"
+           maxEntriesLocalHeap="10000"
+           maxEntriesLocalDisk="1000"
+           eternal="false"
+           diskSpoolBufferSizeMB="20"
+           timeToIdleSeconds="300"
+           timeToLiveSeconds="600"
+           memoryStoreEvictionPolicy="LFU"
+           transactionalMode="off">
+        <persistence strategy="localTempSwap"/>
+    </cache>
+</ehcache>
+</pre>
+<h1>Getting a handle to the Cache</h1>
+<pre line="1" escaped="true" lang="java">CacheManager cacheManager = CacheManager.newInstance(CacheBackedRssReader.class.getResource("/my-demo-ehcache.xml"));
+Cache cache = cacheManager.getCache("myCache1");</pre>
+<p>Note that we are loading the ehCache configuration file and then retrieving a cache named <em>myCache1</em>, which I had defined in the configuartion xml.</p>
+<h1>&nbsp;Putting stuff into the cache</h1>
+<p>If you are planning to write this cache on a disk, then you need to make sure that the object that you are storing is Serializable.</p>
+<pre line="1" escaped="true" lang="java">        Element cacheElement = new Element("MyIdentifier", mySerializableObject);
+        cache.put(cacheElement);</pre>
+<h1>Retrieving stuff from the cache</h1>
+<pre line="1" escaped="true" lang="java">       Element element = cache.get("MyIdentifier");
+       MySerializableObject myObject = (MySerializableObject) element.getObjectValue();</pre>
+<h1>Resources</h1>
+<p>The sources for this can be found here: <a href="https://github.com/paawak/blog/tree/master/code/ehcache-simple" target="_blank">https://github.com/paawak/blog/tree/master/code/ehcache-simple</a></p>

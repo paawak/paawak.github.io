@@ -1,0 +1,74 @@
+---
+layout: post
+status: publish
+published: true
+title: JAX-WS with JBoss
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 272
+wordpress_url: http://puretech.paawak.com/?p=272
+date: '2010-05-08 18:39:01 +0530'
+date_gmt: '2010-05-08 13:09:01 +0530'
+categories:
+- java
+tags:
+- jax-ws
+- jaxws
+- jboss
+- web service
+comments: []
+---
+<p>JBoss supports JAX-WS out of the box. There is not much configuration files needed, only a servlet-mapping in the <em>web.xml</em>. This is how the web-service java file looks like:</p>
+<pre lang="java">
+package com.swayam.demo.webservice;
+import javax.jws.WebMethod;
+import javax.jws.WebParam;
+import javax.jws.WebService;
+/**
+ *
+ * @author paawak
+ */
+@WebService()
+public class UserService {
+    /**
+     * Web service operation
+     */
+    @WebMethod(operationName = "addUser")
+    public Boolean addUser(@WebParam(name = "userName")
+    String userName) {
+        System.out.println("add user");
+        return Boolean.TRUE;
+    }
+}
+</pre>
+<p>Its a POJO with a <em>@WebService</em> annotation. All you have to do is map this as a servlet in the desired context. Though this is not a servlet per-se, the JBoss web container does the rest. This is how the <em>web.xml</em> looks like:</p>
+<pre lang="xml">
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app version="2.5" xmlns="http://java.sun.com/xml/ns/javaee" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd">
+    <servlet>
+        <servlet-name>UserService</servlet-name>
+        <servlet-class>com.swayam.demo.webservice.UserService</servlet-class>
+        <load-on-startup>1</load-on-startup>
+        </servlet>
+    <servlet-mapping>
+        <servlet-name>UserService</servlet-name>
+        <url-pattern>/UserService</url-pattern>
+    </servlet-mapping>
+    <session-config>
+        <session-timeout>
+            30
+        </session-timeout>
+    </session-config>
+    <welcome-file-list>
+        <welcome-file>index.jsp</welcome-file>
+        </welcome-file-list>
+    </web-app>
+</pre>
+<p>After deploying, you can access the webservice by <a href="http://localhost:8080/JBossWebServiceTest/UserService?wsdl">http://localhost:8080/JBossWebServiceTest/UserService?wsdl</a>.<br />
+You can find the sources&nbsp;<a href="https://github.com/paawak/blog/tree/master/code/JBossWebServiceTest">https://github.com/paawak/blog/tree/master/code/JBossWebServiceTest</a><br />
+And the war&nbsp;<a href="https://github.com/paawak/blog/tree/master/code/JBossWebServiceTest/dist">https://github.com/paawak/blog/tree/master/code/JBossWebServiceTest/dist</a></p>

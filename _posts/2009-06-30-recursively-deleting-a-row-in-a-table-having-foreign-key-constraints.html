@@ -1,0 +1,177 @@
+---
+layout: post
+status: publish
+published: true
+title: Recursively deleting a row in a table having Foreign Key Constraints
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 118
+wordpress_url: http://puretech.paawak.com/?p=118
+date: '2009-06-30 23:32:51 +0530'
+date_gmt: '2009-06-30 18:02:51 +0530'
+categories:
+- database
+tags:
+- java
+comments: []
+---
+<p>An oft encountered and irritating scenario while working with a database is when we come across a certain row which we want to delete, but cannot as it has recursive Foreign Key Constraints. Today I got a particularly nasty scenario as we are using Teneo. It has around four levels of Foreign Key Constraints. So, I decided to write this utility so that given a table name, column name and value, it deletes the row and all the Foreign Key Constrained data in order.  I do this by making sense of the error message that I get when trying to delete a row with Foreign Key Constraints.<br />
+It looks something like this with MySQL:<br />
+<em><span style="color: #ff0000;">Cannot delete or update a parent row: a foreign key constraint fails (`some_database/user`, CONSTRAINT `my_constraint` FOREIGN KEY (`id`) REFERENCES `employee`&nbsp; (`id`))</span></em><br />
+To deal with this, I have defined this interface to extract meaningful information from the error message, so that I can delete the rogue row of the rogue table first.</p>
+<pre lang="java">package com.swayam.db.tools;
+/**
+ *@author paawak
+ */
+public interface ConstraintViolationExceptionInterpretor {
+    void setExceptionMessage(String message);
+    String getConstrainedTableName();
+    String getForeignKeyColumnName();
+    String getReferencedTableName();
+    String getReferencedColumnName();
+}</pre>
+<p>This is the implemenetation for MySQL:</p>
+<pre lang="java">package com.swayam.db.tools;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+/**
+ *
+ * @author paawak
+ */
+public class MySQLConstraintViolationExceptionInterpretor implements
+        ConstraintViolationExceptionInterpretor {
+    private String message;
+    public MySQLConstraintViolationExceptionInterpretor() {
+    }
+    public String getConstrainedTableName() {
+        String match = getFirstMatch("/w+");
+        if (match != null) {
+            match = match.substring(1);
+        }
+        return match;
+    }
+    public String getForeignKeyColumnName() {
+        String match = getFirstMatch("(`w+`)");
+        if (match != null) {
+            match = match.substring(2, match.length() - 2);
+        }
+        return match;
+    }
+    public String getReferencedColumnName() {
+        String match = getFirstMatch("(`w+`))");
+        if (match != null) {
+            match = match.substring(2, match.length() - 3);
+        }
+        return match;
+    }
+    public String getReferencedTableName() {
+        String prefix = "REFERENCES `";
+        String match = getFirstMatch(prefix + "w+`");
+        if (match != null) {
+            match = match.substring(prefix.length(), match.length() - 1);
+        }
+        return match;
+    }
+    public void setExceptionMessage(String message) {
+        this.message = message;
+    }
+    private String getFirstMatch(String regex) {
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(message);
+        if (matcher.find()) {
+            String match = matcher.group();
+            return match;
+        }
+        return null;
+    }
+}</pre>
+<p>And finally the class that does the dirty job of recursively executing all the deletes:</p>
+<pre lang="java">package com.swayam.db.tools;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
+/**
+ *@author paawak
+ */
+public class RecursiveDeleteUtil {
+    private final Connection con;
+    private final List deleteStatements;
+    private final ConstraintViolationExceptionInterpretor interpretor;
+    private String idColumn;
+    private String idValue;
+    public RecursiveDeleteUtil(Connection con,
+            ConstraintViolationExceptionInterpretor interpretor) {
+        this.con = con;
+        this.interpretor = interpretor;
+        deleteStatements = new ArrayList(1);
+    }
+    public void delete(String tableName, String column, String value) {
+        if (idColumn == null) {
+            idColumn = column;
+            idValue = value;
+        }
+        String delQuery = "DELETE FROM " + tableName + " WHERE " + column
+                + "='" + value + "'";
+        deleteStatements.add(delQuery);
+        try {
+            Statement stat = con.createStatement();
+            int rowsAffected = stat.executeUpdate(delQuery);
+            if (rowsAffected > 0) {
+                // execute all stats on the stack
+                int lastIndex = deleteStatements.size() - 1;
+                for (int count = lastIndex; count >= 0; count--) {
+                    stat.executeUpdate(deleteStatements.get(count));
+                }
+            }
+            stat.close();
+        } catch (SQLException e) {
+            String message = e.getMessage();
+            interpretor.setExceptionMessage(message);
+            String constrainedTableName = interpretor.getConstrainedTableName();
+            String foreignKeyColumnName = interpretor.getForeignKeyColumnName();
+            String referencedTableName = interpretor.getReferencedTableName();
+            String referencedColumnName = interpretor.getReferencedColumnName();
+            System.out.println("################# message = " + message
+                    + "nconstrainedTableName = " + constrainedTableName
+                    + ", foreignKeyColumnName = " + foreignKeyColumnName
+                    + ", referencedTableName = " + referencedTableName
+                    + ", referencedColumnName = " + referencedColumnName);
+            // select the offending value
+            String sel = "SELECT " + referencedColumnName + " FROM "
+                    + referencedTableName + " WHERE " + idColumn + "='"
+                    + idValue + "'";
+            System.out.println("################ select = " + sel);
+            try {
+                Statement selectStat = con.createStatement();
+                ResultSet res = selectStat.executeQuery(sel);
+                while (res.next()) {
+                    String constraintVal = res.getString(1);
+                    delete(constrainedTableName, foreignKeyColumnName,
+                            constraintVal);
+                }
+                res.close();
+                selectStat.close();
+            } catch (SQLException ex) {
+                ex.printStackTrace();
+            }
+        }
+    }
+    public static void main(String[] args) throws Exception {
+        Class.forName("com.mysql.jdbc.Driver").newInstance();
+        String conStr = "jdbc:mysql://localhost/dummy?user=root&password=dummy";
+        Connection con = DriverManager.getConnection(conStr);
+        new RecursiveDeleteUtil(con,
+                new MySQLConstraintViolationExceptionInterpretor()).delete(
+                "some_table", "id", "118");
+    }
+}</pre>
+<p>I don't claim this to be very generic, but it works pretty well for me :). A great time saver for sure.</p>

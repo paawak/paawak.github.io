@@ -1,0 +1,309 @@
+---
+layout: post
+status: publish
+published: true
+title: "[Jaspersoft] Creating custom Spring managed DataSource"
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 588
+wordpress_url: http://palashray.com/?p=588
+date: '2014-07-20 02:31:15 +0530'
+date_gmt: '2014-07-20 02:31:15 +0530'
+categories:
+- jasper
+tags:
+- jasper
+- jaspersoft
+comments:
+- id: 62
+  author: Radha Krishna
+  author_email: udayabhanu1984@hotmail.com
+  author_url: ''
+  date: '2014-11-24 12:01:25 +0530'
+  date_gmt: '2014-11-24 12:01:25 +0530'
+  content: |-
+    This is great work. I am trying to follow the steps given above. When I run the jasper report, it asks to pick the datasource. I have configured bean data source as : customDataSource bean_name as BEAN_NAME and Bean Method as METHOD_NAME. It throws an exception that bean_name is not defined and invalid.
+    If I do not use the data source, then it throws a null pointer exception.
+- id: 63
+  author: palash
+  author_email: paawak@gmail.com
+  author_url: ''
+  date: '2014-11-24 12:56:19 +0530'
+  date_gmt: '2014-11-24 12:56:19 +0530'
+  content: I would suspect that you forgot to include your custom spring xml inside
+    of the Tomcat's WEB-INF directory.
+- id: 64
+  author: Radha Krishna
+  author_email: udayabhanu1984@hotmail.com
+  author_url: ''
+  date: '2014-11-28 07:13:45 +0530'
+  date_gmt: '2014-11-28 07:13:45 +0530'
+  content: 'Thanks. The custom spring xml file exists in tomcat web-inf directory.  We
+    could see the SpringBeanDataSource being listed as part of datasource selection
+    in Jasper. We have given Bean name as the class name/bean ID defined in Custom
+    Spring XML and method name which is available under Java Class. Method Name is
+    : createService. But, when executing the jasper report, it is giving Method Not
+    found exceptions. Could you please let us know what we are doing wrong here.'
+- id: 65
+  author: Radha Krishna
+  author_email: udayabhanu1984@hotmail.com
+  author_url: ''
+  date: '2014-11-28 09:10:42 +0530'
+  date_gmt: '2014-11-28 09:10:42 +0530'
+  content: It works. now I am able to get the beam name and method names defined..
+    and able to associate the data source. The beam name and method names could be
+    the new class / methods created to invoke the dummy service created and included
+    as part of custom data spring xml. Now, we integrated the datasource with jrxml..
+    there are further steps to define input, etc. which are missing.
+---
+<h1>Problem Statement</h1>
+<p>Often for reporting, we need to gather data from many diverse resources. In case we are using Jaspersoft server, its sometimes not possible to manage with the existing DataSources provided by Jaspersoft. In this article, we will explore step by step how to write our custom DataSource. The main challenge is that in the given examples like the <strong>WebScraperDataSource</strong>, the factory beans are not Spring managed. They are instantiated by the framework through a no-argument constructor by reflection. In case I need to talk to other Spring managed beans, it becomes incredibly difficult. In the below example, I will try to put a hack so that we can use our own <strong>Spring managed</strong> DataSourceFactory.</p>
+<h1>Dev Environment Setup</h1>
+<p>I would need to hook into the Jaspersoft's framework and for that, I need to create my own jar which can then be deployed into the <em>WEB-INF/lib</em> directory of Jaspersoft's webapp. I am using Maven. The following dependencies need to be declared:</p>
+<pre class="lang:java decode:true">	<dependencies>
+		<dependency>
+			<groupId>net.sf.jasperreports</groupId>
+			<artifactId>jasperreports</artifactId>
+			<version>5.6.0</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.jaspersoft.jasperserver.api.engine.impl</groupId>
+			<artifactId>jasperserver-api-engine-impl</artifactId>
+			<version>5.6.0</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.jaspersoft.jasperserver.api.metadata</groupId>
+			<artifactId>jasperserver-api-metadata</artifactId>
+			<version>5.6.0</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.jaspersoft.jasperserver.api.common</groupId>
+			<artifactId>jasperserver-api-common</artifactId>
+			<version>5.6.0</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-core</artifactId>
+			<version>3.1.4.RELEASE</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-context</artifactId>
+			<version>3.1.4.RELEASE</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-core</artifactId>
+			<version>2.0.7.RELEASE</version>
+			<scope>provided</scope>
+		</dependency>
+	</dependencies>
+</pre>
+<p>Note that some of these are not available in Maven public repos and need to manually deployed from the webapps/WEB-INF/lib directory:</p>
+<pre class="" escaped="true" lang="bash">mvn install:install-file -DgroupId=com.jaspersoft.jasperserver.api.engine.impl -DartifactId=jasperserver-api-engine-impl -Dversion=5.6.0 -Dpackaging=jar -Dfile=/path-to-webapps/jasperserver-pro/WEB-INF/lib/jasperserver-api-engine-impl-5.6.0.jar
+mvn install:install-file -DgroupId=com.jaspersoft.jasperserver.api.metadata -DartifactId=jasperserver-api-metadata -Dversion=5.6.0 -Dpackaging=jar -Dfile=/path-to-webapps/jasperserver-pro/WEB-INF/lib/jasperserver-api-metadata-5.6.0.jar
+mvn install:install-file -DgroupId=com.jaspersoft.jasperserver.api.common -DartifactId=jasperserver-api-common -Dversion=5.6.0 -Dpackaging=jar -Dfile=/path-to-webapps/jasperserver-pro/WEB-INF/lib/jasperserver-api-common-5.6.0.jar</pre>
+<h1>Spring bean configuration</h1>
+<p>Jaspersoft works with Spring, thanks God for that!<br />
+<img class="aligncenter wp-image-589 size-full" src="http://palashray.com/wp-content/uploads/2014/07/jasper-bean-creation-sequence-1.png" alt="jasper-bean-creation-sequence-1" width="816" height="1056" /><br />
+<img class="aligncenter wp-image-590 size-full" src="http://palashray.com/wp-content/uploads/2014/07/jasper-bean-creation-sequence-2.png" alt="jasper-bean-creation-sequence-2" width="816" height="1056" /><br />
+Finally, this is what the Spring file looks like:</p>
+<pre class="lang:java decode:true"><?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd">
+	<bean id="bookServiceBean" class="com.swayam.demo.jasper.DummyBookServiceImpl" />
+	<bean id="customDelegatedDataSourceServiceFactory"
+		class="com.swayam.demo.jasper.SpringBeanDataSourceServiceFactory" />
+	<bean id="springBeanDataSource"
+		class="com.jaspersoft.jasperserver.api.engine.jasperreports.util.CustomDataSourceDefinition">
+		<property name="serviceClassName"
+			value="com.jaspersoft.jasperserver.api.metadata.jasperreports.domain.client.CustomReportDataSourceImpl" />
+		<property name="factory" ref="customDataSourceServiceFactory" />
+		<property name="name" value="SpringBeanDataSource" />
+		<property name="customFactory" ref="customDelegatedDataSourceServiceFactory" />
+		<property name="propertyDefinitions">
+			<list>
+				<map>
+					<entry key="name" value="beanName" />
+				</map>
+				<map>
+					<entry key="name" value="methodName" />
+				</map>
+			</list>
+		</property>
+		<property name="queryExecuterMap">
+			<map>
+				<entry key="SpringBeanQuery"
+					value="com.swayam.demo.jasper.SpringBeanQueryExecutorFactory" />
+			</map>
+		</property>
+	</bean>
+	<bean
+		class="com.jaspersoft.jasperserver.api.common.util.spring.GenericBeanUpdater">
+		<property name="definition" ref="addMessageCatalog" />
+		<property name="value">
+			<list>
+				<value>WEB-INF/springBeanDataSource</value>
+			</list>
+		</property>
+		<property name="valueType" value="stringList" />
+	</bean>
+</beans></pre>
+<h1>Information flow</h1>
+<p><img class="aligncenter wp-image-591 size-full" src="http://palashray.com/wp-content/uploads/2014/07/jasper-flow-highlevel-1.png" alt="jasper-flow-highlevel-1" width="816" height="1056" /></p>
+<pre class="lang:java decode:true">public class SpringBeanDataSourceServiceFactory implements CustomDelegatedDataSourceServiceFactory, ApplicationContextAware {
+    private ApplicationContext applicationContext;
+    @Override
+    public void setCustomDataSourceDefinition(CustomDataSourceDefinition customDataSourceDefinition) {
+    }
+    @Override
+    public ReportDataSourceService createService(ReportDataSource reportDataSource) {
+    if (!(reportDataSource instanceof CustomReportDataSourceImpl)) {
+        throw new IllegalArgumentException("Expecting an instance of " + CustomReportDataSourceImpl.class + ", but found " + reportDataSource.getClass());
+    }
+    CustomReportDataSourceImpl customDataSource = (CustomReportDataSourceImpl) reportDataSource;
+    Map map = customDataSource.getPropertyMap();
+    String beanName = (String) map.get("beanName");
+    String methodName = (String) map.get("methodName");
+    return new SpringBeanDataSourceService(applicationContext, beanName, methodName);
+    }
+    @Override
+    public void setApplicationContext(ApplicationContext applicationContext) {
+    this.applicationContext = applicationContext;
+    }
+}</pre>
+<p>&nbsp;</p>
+<pre class="lang:java decode:true">public class SpringBeanDataSourceService implements ReportDataSourceService {
+    private final ApplicationContext applicationContext;
+    private final String beanName;
+    private final String methodName;
+    public SpringBeanDataSourceService(ApplicationContext applicationContext, String beanName, String methodName) {
+    this.applicationContext = applicationContext;
+    this.beanName = beanName;
+    this.methodName = methodName;
+    }
+    @Override
+    public void closeConnection() {
+    // do nothing
+    }
+    @SuppressWarnings("unchecked")
+    @Override
+    public void setReportParameterValues(@SuppressWarnings("rawtypes") Map paramMap) {
+    paramMap.put(SpringBeanQueryExecutorFactory.APPLICATION_CONTEXT, applicationContext);
+    paramMap.put(SpringBeanQueryExecutorFactory.BEAN_NAME, beanName);
+    paramMap.put(SpringBeanQueryExecutorFactory.METHOD_NAME, methodName);
+    }
+}</pre>
+<p><img class="aligncenter wp-image-592 size-full" src="http://palashray.com/wp-content/uploads/2014/07/jasper-flow-highlevel-2.png" alt="jasper-flow-highlevel-2" width="816" height="1056" /></p>
+<pre class="lang:java decode:true">public class SpringBeanQueryExecutorFactory extends AbstractQueryExecuterFactory {
+    public static final String APPLICATION_CONTEXT = "APPLICATION_CONTEXT";
+    public static final String BEAN_NAME = "BEAN_NAME";
+    public static final String METHOD_NAME = "METHOD_NAME";
+    @Override
+    public Object[] getBuiltinParameters() {
+    return new Object[] { APPLICATION_CONTEXT, ApplicationContext.class, BEAN_NAME, String.class, METHOD_NAME, String.class };
+    }
+    @Override
+    public JRQueryExecuter createQueryExecuter(JasperReportsContext jasperReportsContext, JRDataset dataset, Map<String, ? extends JRValueParameter> parameters) throws JRException {
+    return new SpringBeanQueryExecutor(jasperReportsContext, dataset, parameters);
+    }
+    @Override
+    public boolean supportsQueryParameterType(String className) {
+    return true;
+    }
+}</pre>
+<pre class="lang:java decode:true">public class SpringBeanQueryExecutor extends JRAbstractQueryExecuter {
+    private final ApplicationContext applicationContext;
+    private final Map<String, ?> reportParametrsMap;
+    private final String beanName;
+    private final String methodName;
+    protected SpringBeanQueryExecutor(JasperReportsContext jasperReportsContext, JRDataset dataset, Map<String, ? extends JRValueParameter> parametersMap) {
+	super(jasperReportsContext, dataset, parametersMap);
+	reportParametrsMap = (Map<String, ?>) parametersMap.get(JRParameter.REPORT_PARAMETERS_MAP).getValue();
+	applicationContext = (ApplicationContext) reportParametrsMap.get(SpringBeanQueryExecutorFactory.APPLICATION_CONTEXT);
+	beanName = (String) reportParametrsMap.get(SpringBeanQueryExecutorFactory.BEAN_NAME);
+	methodName = (String) reportParametrsMap.get(SpringBeanQueryExecutorFactory.METHOD_NAME);
+	parseQuery();
+    }
+    @Override
+    public JRDataSource createDatasource() throws JRException {
+	String queryString = getQueryString();
+	String[] queryTokens = queryString.split("=");
+	Object serviceInterfaceImpl = applicationContext.getBean(beanName);
+	System.out.println("SpringBeanQueryExecutor.createDatasource() queryString=" + queryString + ", serviceInterfaceImpl=" + serviceInterfaceImpl
+	        + ", beanName=" + beanName + ", methodName=" + methodName);
+	Method method;
+	try {
+	    method = serviceInterfaceImpl.getClass().getDeclaredMethod(methodName, Class.forName(queryTokens[1]));
+	} catch (Exception e) {
+	    throw new RuntimeException(e);
+	}
+	String language = (String) reportParametrsMap.get(queryTokens[0]);
+	List<?> data;
+	try {
+	    data = (List<?>) method.invoke(serviceInterfaceImpl, Language.valueOf(language.toUpperCase()));
+	} catch (Exception e) {
+	    throw new RuntimeException(e);
+	}
+	return new JRBeanCollectionDataSource(data);
+    }
+    @Override
+    public void close() {
+    }
+    @Override
+    public boolean cancelQuery() throws JRException {
+	return false;
+    }
+    @Override
+    protected String getParameterReplacement(String parameterName) {
+	return null;
+    }
+}
+</pre>
+<h1>Making our custom Query appear on the Jaspersoft</h1>
+<p>We need to make further configuration changes before our custom query appears on the Jaspersoft screen.</p>
+<h2>Make an entry in the applicationContext-rest-services.xml</h2>
+<pre class="lang:java decode:true"> <util:list id="queryLanguagesCe">
+           <value>sql</value>
+           <value>hql</value>
+           <value>domain</value>
+           <value>HiveQL</value>
+           <value>MongoDbQuery</value>
+           <value>cql</value>
+   	<value>SpringBeanQuery</value>
+       </util:list></pre>
+<h2>Register your factory at WEB-INF/classes/jasperreports.properties</h2>
+<p>Make the following entry:</p>
+<blockquote><p>net.sf.jasperreports.query.executer.factory.SpringBeanQuery=com.swayam.demo.jasper.SpringBeanQueryExecutorFactory</p></blockquote>
+<h1>Generate report</h1>
+<p>We are all set now to generate a report. Create the DataSource we have just now defined. Then create a JRXML and define the query there:</p>
+<pre class="lang:java decode:true "><?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" name="report1" language="groovy" pageWidth="595" pageHeight="842" columnWidth="535" leftMargin="20" rightMargin="20" topMargin="20" bottomMargin="20" uuid="f71fc9a0-ffb0-48e2-9fd2-5dbbc36d7c14">
+	<property name="ireport.zoom" value="1.0"/>
+	<property name="ireport.x" value="0"/>
+	<property name="ireport.y" value="0"/>
+	<queryString language="SpringBeanQuery">
+		<![CDATA[LANGUAGE=com.swayam.demo.jasper.Language]]>
+	</queryString>
+	<field name="name" class="java.lang.String"/>
+	<field name="author" class="java.lang.String"/>
+	<field name="publisher" class="java.lang.String"/>
+...
+</jasperReport>
+</pre>
+<p>Link the DataSource and the JRXML. You need to define an Input as well. Then run the report. You should see the below report:</p>
+<h1><a href="#"><img class="aligncenter wp-image-593 size-large" src="http://palashray.com/wp-content/uploads/2014/07/generated-report-1024x575.png" alt="generated-report" width="474" height="266" /></a>Resources</h1>
+<p>The sources for this can be found here: <a href="https://github.com/paawak/blog/tree/master/code/jasper/custom-datasource">https://github.com/paawak/blog/tree/master/code/jasper/custom-datasource</a><br />
+&nbsp;</p>

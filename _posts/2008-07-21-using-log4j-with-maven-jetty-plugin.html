@@ -1,0 +1,34 @@
+---
+layout: post
+status: publish
+published: true
+title: Using Log4j with Maven Jetty plugin
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 24
+wordpress_url: http://technoblogs.paawak.com/?p=24
+date: '2008-07-21 11:42:02 +0530'
+date_gmt: '2008-07-21 06:12:02 +0530'
+categories:
+- java
+tags:
+- java
+- maven
+comments: []
+---
+<p>No extra configuration is needed. If log4j.xml or log4j.properties is present in the classpath, it is picked up and logs are directed to the specified appender(s). I found <a href="http://docs.codehaus.org/display/JETTY/Maven+Jetty+Plugin#MavenJettyPlugin-Logging">http://docs.codehaus.org/display/JETTY/Maven+Jetty+Plugin#MavenJettyPlugin-Logging</a> overtly complicated and unnecessary.  The logs can be redirected to a file by using a suitable appender in <em>log4j.xml</em>:</p>
+<pre>&nbsp;&nbsp;&nbsp; <appender name="FILE" class="org.apache.log4j.RollingFileAppender">
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <param name="File" value="./target/dmsweb_log_file.log" />
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <param name="Append" value="false" >
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <param name="MaxBackupIndex" value="1" >
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <param name="MaxFileSize" value="500KB" >
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <layout class="org.apache.log4j.PatternLayout">
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <param name="ConversionPattern"
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; value="%d [%t] %-5p %c - %m%n">
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; </layout>
+&nbsp;&nbsp;&nbsp; </appender></pre>

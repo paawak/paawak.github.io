@@ -1,0 +1,75 @@
+---
+layout: post
+status: publish
+published: true
+title: Installing Fedora 18
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 430
+wordpress_url: http://puretech.paawak.com/?p=430
+date: '2013-02-03 23:42:59 +0530'
+date_gmt: '2013-02-03 18:12:59 +0530'
+categories:
+- linux
+tags:
+- fedora
+- linux
+comments: []
+---
+<style type="text/css"><!--<br />
+@page { margin: 0.79in } 		P { margin-bottom: 0.08in } 		A:link { so-language: zxx }<br />
+--></style>
+<h1><b>Installing the full distribution from usb stick </b></h1>
+<p>Just before I begun my installation from the 4.7 GB iso image (full distribution and not the live cd), I discovered to my dismay that my DVD ROM is not working properly. So i decided to try installing with a bootable usb stick.<br />
+This is the linux command to convert the usb stick to a bootable device from the iso image:</p>
+<blockquote><p>sudo dd if=/path-to-iso/name-XXX.iso of=/dev/sdX</p></blockquote>
+<p>Get the device name of USB by using</p>
+<blockquote><p>sudo parted -l</p></blockquote>
+<p>(Courtesy: <a href="https://ask.fedoraproject.org/question/1704/iso-firmware-to-usb-memory-stick" target="_blank">https://ask.fedoraproject.org/question/1704/iso-firmware-to-usb-memory-stick</a>)</p>
+<h1><b>Making Gnome 3 Usable</b></h1>
+<p>Gnome 3 is not usable in its original form. Here are some tips to make it usable:</p>
+<ol>
+<li>From the <i><b>System Settings</b></i>, select <i><b>details</b></i>. In the <i><b>Graphics</b></i> section, turn on the <i><b>Forced Fallback Mode</b></i>. Logout and log back in. You will see old Gnome somewhat restored.</li>
+<li>Install the<a href="https://live.gnome.org/GnomeTweakTool" target="_blank"> GnomeTweak Tool</a> (<em>yum install gnome-tweak-tool</em>). With this, you can change your Desktop to have files and launchers and can also bring back some amount of sanity in the Nautilus file manager. Also, you can install themes of your liking.</li>
+</ol>
+<p>&nbsp;<br />
+&nbsp;</p>
+<p style="text-align: center;"><img class="aligncenter size-medium wp-image-431" alt="Gnome 3 Settings" src="http://palashray.com/wp-content/uploads/2013/02/Gnome3_settings-300x168.png" width="300" height="168" /></p>
+<p>&nbsp;<br />
+&nbsp;<br />
+&nbsp;</p>
+<p style="text-align: center;"><img class="aligncenter size-medium wp-image-432" alt="Gnome 3 Settings Details" src="http://palashray.com/wp-content/uploads/2013/02/Gnome3_settings_details-300x168.png" width="300" height="168" /></p>
+<p>&nbsp;<br />
+&nbsp;</p>
+<h1><b>Playing mp3 and most movie formats</b></h1>
+<p>By default, due to some licensing issue, Totem cannot playback mp3 or the most popular movie formats. Run these commands to enable these:</p>
+<blockquote><p>yum --nogpgcheck install http://rpm.livna.org/livna-release.rpm http://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-stable.noarch.rpm http://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-stable.noarch.rpm<br />
+yum --nogpgcheck install gstreamer1 gstreamer1-plugins-good gstreamer1-plugins-bad-freeworld gstreamer1-plugins-ugly<br />
+yum --nogpgcheck install gstreamer-plugins-ugly<br />
+yum --nogpgcheck install audacious-plugins-freeworld-mp3</p></blockquote>
+<p>You can also install vlc, mplayer, xmms, amarok, etc. These are indeed cool.</p>
+<h1><b>Bye, bye Gnome3, welcome Mate</b></h1>
+<p>Gnome3 sucks big time. The Up-arrow in Nautilus is missing. I have to press crazy (Alt + Up-arrow) to go back to the parent folder. Breadcrumbs does not work for me. Also, I am constrained by Gnome3 to act in a certain way. So, I felt enough is enough and made a switch to Mate. Its the same old Gnome2. Gnome 2 is dead, long live Mate.<br />
+This is the way to install it:</p>
+<blockquote><p>yum groupinstall "MATE Desktop"</p></blockquote>
+<p>You can also install this:</p>
+<blockquote><p>yum install https://dl.dropbox.com/u/105479527/Mate-Desktop/fedora-release-extra-18/mate-desktop-fedora/noarch/mate-desktop-extra-release-18-1.fc18.noarch.rpm<br />
+yum groupinstall mate-desktop-extra</p></blockquote>
+<h1><b>Mate problems and solutions</b></h1>
+<p><strong>1. Totem (movie player) wont display any icon:</strong> It is an existing <a href="https://bugs.mageia.org/show_bug.cgi?id=5132" target="_blank">bug</a>. Actually the problem is with the default theme. Make sure these two packages: <strong>gnome-icon-theme</strong>, <strong>gnome-icon-theme-symbolic</strong> are installed. Next change the theme from the default, to some other theme, and it works like breeze.<br />
+<strong>2. Screen-saver is not installed:</strong> I see that the screen-saver is not installed by default. I had to do <em>yum install mate-screensaver</em> to install it.</p>
+<h1>Fedora 18 random screen freeze</h1>
+<p>When I upgrade to kernel <em><strong>3.7.7-201.fc18.i686.PAE</strong></em> or <em><strong>3.7.8-202.fc18.i686.PAE</strong></em>, my Fedora freezes randomly. I am either unable to log in as the user-list screen itself does not appear as it hangs forever, or after login when I open Firefox, my screen freezes. I can fix this only if I use kernel <strong><em>3.6.10-4.fc18.i686.PAE</em></strong>. This is what my messages say:</p>
+<blockquote><p>Feb 18 23:48:09 localhost gnome-session[1074]: WARNING: Detected that screensaver has left the bus<br />
+Feb 18 23:48:09 localhost gnome-session[1074]: CRITICAL: gsm_manager_set_phase: assertion `GSM_IS_MANAGER (manager)' failed<br />
+Feb 18 23:48:09 localhost gdm-simple-slave[687]: WARNING: Failed to remove slave program access to the display. Trying to proceed.</p></blockquote>
+<h1>Grub 2: A pain in the wrong place</h1>
+<p>Grub 2 is just overtly complex for people who are not Linux sys admins. I wanted to change the default kernel in my boot loader(due to random screen freezes after kernel upgrade). You can understand my frustration when, even after frantic googling, all I found was warnings never to edit the main configuration file manually. I finally found a buddy in grubby. This is the command for displaying the default kernel:</p>
+<blockquote><p>grubby --default-kernel</p></blockquote>
+<p>And this is the one which sets the default kernel to our choice:</p>
+<blockquote><p>grubby --set-default=/boot/vmlinuz-3.6.x</p></blockquote>

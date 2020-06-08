@@ -1,0 +1,72 @@
+---
+layout: post
+status: publish
+published: true
+title: Creating a Gnome Launcher
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 1050
+wordpress_url: http://palashray.com/?p=1050
+date: '2019-11-02 06:20:12 +0530'
+date_gmt: '2019-11-02 10:20:12 +0530'
+categories:
+- java
+tags: []
+comments: []
+---
+<p><!-- wp:paragraph --></p>
+<p>A Gnome Launcher can be created by creating the below file in the Home/Desktop directory:</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:preformatted --></p>
+<pre class="wp-block-preformatted">vim ~/Desktop/EclipsePhoton.desktop
+</pre>
+<p><!-- /wp:preformatted --><br />
+<!-- wp:paragraph --></p>
+<p>with the below contents:</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:preformatted {"className":""} --></p>
+<pre class="wp-block-preformatted">
+[Desktop Entry]
+Version=1.0
+Type=Application
+Terminal=false
+Icon=/path-to-my-icon/icon.xpm
+Icon[en_US]=/path-to-my-icon/icon.xpm
+Exec=/path-to-my-installation/eclipse
+Name[en_US]=Eclipse
+Name=Eclipse
+</pre>
+<p><!-- /wp:preformatted --><br />
+<!-- wp:paragraph --></p>
+<p>Once you save, you should be able to see the Laucher Icon on the Desktop. The challenge is, sometimes, you need to set some environment variables before launching. You can do that using <em>sh -c </em>command as shown below:</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:preformatted --></p>
+<pre class="wp-block-preformatted">
+[Desktop Entry]
+ Version=1.0
+ Type=Application
+ Terminal=false
+ Icon=/path-to-my-icon/icon.xpm
+ Icon[en_US]=/path-to-my-icon/icon.xpm
+ Exec=sh -c "GTK_IM_MODULE=ibus JAVA_HOME=/my/java/installation PATH=$JAVA_HOME/bin:$PATH /my-eclipse-installation/eclipse"
+ Name[en_US]=Eclipse
+ Name=Eclipse
+</pre>
+<p><!-- /wp:preformatted --><br />
+<!-- wp:paragraph --></p>
+<p>In the above example, I am setting 2 environment variables:</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:list --></p>
+<ul>
+<li>GTK_IM_MODULE</li>
+<li>JAVA_HOME</li>
+</ul>
+<p><!-- /wp:list --><br />
+<!-- wp:paragraph --></p>
+<p>The above works for Gnome 3 and Mate Desktops</p>
+<p><!-- /wp:paragraph --></p>

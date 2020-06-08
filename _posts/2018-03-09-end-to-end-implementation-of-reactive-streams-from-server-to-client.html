@@ -1,0 +1,185 @@
+---
+layout: post
+status: publish
+published: true
+title: 'End to End Implementation of Reactive Streams: from Server to Client'
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 968
+wordpress_url: http://palashray.com/?p=968
+date: '2018-03-09 14:03:57 +0530'
+date_gmt: '2018-03-09 19:03:57 +0530'
+categories:
+- java
+- spring
+tags:
+- flux
+- reactive
+- stream
+comments: []
+---
+<h1 class="western">Problem Statement</h1>
+<p class="western">We will be implementing Reactive Streaming on the server side, and then consume the same using HTML and JavaScript on the front end. At the server side, we will be using Spring Boot 2.0, Spring Webflux and Netty Server. In the front end, we will be using Server Sent Events to consume this Stream from the server. Please note that only Netty gives the real power of reactive, publishing data on stream and passing it on to the client immediately. If you use Tomcat or any other server, the client will recieve the data only when all of the data is published on the Stream. So, the real power of Reactive Streams is not realised.</p>
+<h1 class="western">Project Configuration</h1>
+<p class="western">This would be a Spring Boot 2.0 application. Include the modules <span style="color: #1a1a1a;"><span style="font-family: monospace;"><span style="font-size: small;">spring-boot-starter-web</span></span></span> and <span style="color: #1a1a1a;"><span style="font-family: monospace;"><span style="font-size: small;">spring-boot-starter-webflux</span></span></span>. In order to run with Netty, you would need to exclude the <span style="color: #1a1a1a;"><span style="font-family: monospace;"><span style="font-size: small;">spring-boot-starter-tomcat</span></span></span> from <span style="color: #1a1a1a;"><span style="font-family: monospace;"><span style="font-size: small;">spring-boot-starter-web</span></span></span>. Netty is already included with <span style="color: #1a1a1a;"><span style="font-family: monospace;"><span style="font-size: small;">spring-boot-starter-webflux</span></span></span>.</p>
+<p class="western">The pom.xml woul look like:</p>
+<pre class="lang:xhtml decode:true "><parent>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-parent</artifactId>
+<version>2.0.0.RELEASE</version>
+<relativePath /> <!-- lookup parent from repository -->
+</parent>
+<dependencies>
+<dependency>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-web</artifactId>
+<exclusions>
+<exclusion>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-tomcat</artifactId>
+</exclusion>
+</exclusions>
+</dependency>
+<dependency>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-webflux</artifactId>
+</dependency>
+</pre>
+<h1 class="western">The Server Side Code</h1>
+<h2 class="western"><a name="__DdeLink__701_694671418"></a>How to make the server reactive?</h2>
+<h3 class="western">Dao</h3>
+<p class="western">We should start from the Dao layer, as we would be reading the data from a DB. We want to publish the data as soon as we read it from the DB, without storing it in memory. We use the <span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">FluxSink</span></span></span> for publishing data asynchronously. This is how the Dao looks like:</p>
+<pre class="lang:java decode:true ">public interface BankDetailDao {
+	void publishBankDetails(FluxSink<BankDetail> fluxSink);
+}</pre>
+<p class="western">Note that the method returns null, as we publish the data on to the <span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">FluxSink</span></span></span>. In the DaoImpl, we use the <span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">ResultSetExtractor</span></span></span> with the <span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">JdbcTemplate</span></span></span> to query and extract data. We make the <span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">ResultSetExtractor</span></span></span>, as lambda function, return null. There is a check on <span style="color: #6a3e3e;"><span style="font-family: monospace;"><span style="font-size: small;">fluxSink</span></span></span><span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">.isCancelled()</span></span></span>. This helps us terminate the loop when the client closes the connection.</p>
+<pre class="lang:java decode:true ">    @Override
+    public void publishBankDetails(FluxSink<BankDetail> fluxSink) {
+jdbcTemplate.query(BANK_DETAILS_SQL, (ResultSet rs) -> {
+    LOGGER.info("start publishing...");
+    int rowCount = 0;
+    while (rs.next()) {
+if (fluxSink.isCancelled()) {
+    LOGGER.info("publishing is cancelled");
+    return null;
+}
+fluxSink.next(mapResultSet(rs));
+if (++rowCount % 2 == 0) {
+    try {
+LOGGER.info("in delay...");
+Thread.sleep(1000);
+    } catch (InterruptedException e) {
+LOGGER.error("error", e);
+    }
+}
+    }
+    LOGGER.info("completed publishing");
+    fluxSink.complete();
+    return null;
+});
+    }</pre>
+<h3 class="western">Service</h3>
+<p class="western">The Service creates a <span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">Flux</span></span></span> and passes the <span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">FluxSink</span></span></span> on to the Dao.</p>
+<pre class="lang:java decode:true ">public interface BankDetailService {
+	Flux<BankDetail> getBankDetailsReactive();
+}
+@Service
+public class BankDetailServiceImpl implements BankDetailService {
+	private final BankDetailDao bankDetailDao;
+	@Override
+	public Flux<BankDetail> getBankDetailsReactive() {
+		return Flux.create((FluxSink<BankDetail> fluxSink) -> {
+			bankDetailDao.publishBankDetails(fluxSink);
+		});
+	}
+}</pre>
+<p class="western">Note that <span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">Flux.</span></span></span><span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;"><i>create</i></span></span></span><span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">()</span></span></span> is an asynchronous call.</p>
+<h3 class="western">Controller</h3>
+<p class="western">The Controller invokes the srvice and returns the Flux that the service returns.</p>
+<pre class="lang:java decode:true ">@RestController
+@RequestMapping("/bank-item")
+public class BankDetailController {
+	private static final Logger LOGGER = LoggerFactory.getLogger(BankDetailController.class);
+	private final BankDetailService bankDetailService;
+	@RequestMapping(value = "/reactive", method = RequestMethod.GET)
+	public Flux<BankDetail> getBankDetailsReactive() {
+		LOGGER.info("serving reactive content");
+		return bankDetailService.getBankDetailsReactive();
+	}
+}</pre>
+<h1 class="western">The Front End Code</h1>
+<h2 class="western">How to build a reactive client?</h2>
+<p class="western">While making a request to the server, you have to always ensure that the <em><strong><span style="color: #ff0000;">content-type</span></strong></em> is set to <em><strong><span style="color: #ff0000;">text/event-stream</span></strong></em>. If that is not done, the server will not publish the content reactively, and we have to wait till the server finishes publishing all data. &nbsp;We would use the ServerSentEvents to consume the stream of data published. Also, we would use RxJs to make our code reactive.</p>
+<h3 class="western">HTML</h3>
+<p class="western">This is how our web page looks like:</p>
+<p><img class="alignnone size-full wp-image-969" src="http://localhost/tech-blog/wp-content/uploads/2018/03/reactive-stream-html.png" alt="" width="620" height="137" /></p>
+<p class="western">This is the source:</p>
+<pre class="lang:xhtml decode:true "><html>
+<head>
+<link rel="stylesheet" type="text/css" href="css/reactive-demo.css">
+</head>
+<div>
+	<div>
+		<div>
+			<h2>Customer List</h2>
+			<a href="#" id="fetch">Fetch</a>
+			<a href="#" id="stop">Stop</a>
+		</div>
+	</div>
+	<div class="div-table" id="tableDiv">
+		<div class="div-table-row">
+			<div class="div-table-col" align="center">Customer ID</div>
+			<div class="div-table-col">Customer Age</div>
+			<div class="div-table-col">Customer Job</div>
+		</div>
+	</div>
+</div>
+<script src="js/Rx-5.5.6.js"></script>
+<script src="js/react-demo.js"></script>
+<script src="js/jquery-3.3.1.js"></script>
+</html></pre>
+<h3 class="western">JavaScript</h3>
+<p class="western">Convert the on-click event of the fetch link as a Observable, which is equivalent of a Flux on the server side:</p>
+<pre class="lang:js decode:true ">var fetchButton = document.getElementById('fetch');
+var fetchClickStream = Rx.Observable.fromEvent(fetchButton, 'click');</pre>
+<p class="western">Write a function to trigger a server sent event, and then convert the response into a Subscribe-able function, that can be used to create an Observable:</p>
+<pre class="lang:js decode:true ">var eventSourceObserver = function (observer) {
+    eventSource = new EventSource(url);
+    eventSource.onmessage = function(event) {
+	observer.next(event.data);
+    };
+    eventSource.onerror = function() {
+	console.log("EventSource failed: closing the connection");
+	eventSource.close();
+	observer.complete();
+	eventSource = null;
+    };
+};</pre>
+<p class="western">When the server completes, some how (I think its a bug in the garb of a feature), the eventSource.onerror() gets invoked. Make sure you close the call, otherwise, it would continue sending out requests to the server one after another.</p>
+<p class="western">In the reactive world, nothing happens unless you subscribe to an Observable, so:</p>
+<pre class="lang:js decode:true ">fetchClickStream.flatMap(event => {
+    console.log("refresh clicked.");
+    return Rx.Observable.create(eventSourceObserver);
+}).map(dataAsText => {
+    return JSON.parse(dataAsText);
+}).subscribe(jsonData => {
+    addRow(jsonData);
+});</pre>
+<p class="western">Note the use of flatMap(): we need to use faltMap() here as the eventSourceObserver returns an Observable. The beauty of reactive programming is that we can lazily chain our data transformation logic, and then the actual action happens in the subscribe() block.</p>
+<h1 class="western">Running this example</h1>
+<p class="western">This is a typical Spring Boot Application and can be run by running the main class <span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">ReactiveDemoApplication</span></span></span>. Browse to <span style="color: #000080;"><span lang="zxx"><u><a href="http://localhost:8080/index.html">http://localhost:8080/index.html</a></u></span></span>. Click on Fetch. You will see that as soon as the server publishes the data, it is added as a row on the table almost real time. You can also stop it at any point by clicking on the Stop link.</p>
+<p><a href="http://localhost/tech-blog/wp-content/uploads/2018/03/reactive-stream-server-request-details.png"><img class="aligncenter size-large wp-image-987" src="http://localhost/tech-blog/wp-content/uploads/2018/03/reactive-stream-server-request-details-1024x466.png" alt="" width="604" height="275" /></a><br />
+This is deployed on Heroku:<br />
+<a href="https://reactive-demo.herokuapp.com/index.html">https://reactive-demo.herokuapp.com/index.html</a></p>
+<h1 class="western">Sources</h1>
+<p><a href="https://github.com/paawak/spring-boot-demo/tree/master/reactive/reactive-demo-with-netty">https://github.com/paawak/spring-boot-demo/tree/master/reactive/reactive-demo-with-netty</a></p>
+<h1 class="western">References</h1>
+<p class="western"><span style="color: #000080;"><span lang="zxx"><u><a href="https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events">https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events</a></u></span></span></p>
+<p class="western"><span style="color: #000080;"><span lang="zxx"><u><a href="https://www.w3schools.com/html/html5_serversentevents.asp">https://www.w3schools.com/html/html5_serversentevents.asp</a></u></span></span></p>
+<p class="western"><span style="color: #000080;"><span lang="zxx"><u><a href="http://reactivex.io/rxjs/manual/tutorial.html">http://reactivex.io/rxjs/manual/tutorial.html</a></u></span></span></p>
+<p class="western"><span style="color: #000080;"><span lang="zxx"><u><a href="https://docs.spring.io/spring-boot/docs/current/reference/htmlsingle/#boot-features-webflux">https://docs.spring.io/spring-boot/docs/current/reference/htmlsingle/#boot-features-webflux</a></u></span></span></p>

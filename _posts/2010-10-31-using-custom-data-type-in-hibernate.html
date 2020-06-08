@@ -1,0 +1,179 @@
+---
+layout: post
+status: publish
+published: true
+title: Using custom data type in Hibernate
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 389
+wordpress_url: http://puretech.paawak.com/?p=389
+date: '2010-10-31 19:06:36 +0530'
+date_gmt: '2010-10-31 13:36:36 +0530'
+categories:
+- hibernate
+tags:
+- hibernate
+- java
+comments: []
+---
+<h2>Why need custom data type?</h2>
+<p>I have a <em>java.util.Calendar</em> object which I want to persist in the db, along with the <em>TimeZone</em>. Suppose I am working with a db which does not have support for storing <em>TimeZone</em>. How do I proceed? One of the easiest solutions would be to store the entire timestamp as a <em>VARCHAR</em>. Granted, but how do I instruct Hibernate to use a <em>java.util.Calendar</em> object instead of a String? Its done by annotating with <em>@Type(type="")</em>, where <em>type</em> should be the fully qualified name of a class implementing the <em>org.hibernate.usertype.UserType</em> interface.</p>
+<h2>Custom UserType</h2>
+<pre lang="java">public class TimeWithZone implements UserType {
+    private static final Logger LOG = Logger.getLogger(TimeWithZone.class);
+    /**
+     * Define the supported column types
+     */
+    @Override
+    public int[] sqlTypes() {
+        return new int[] { Types.VARCHAR };
+    }
+    @Override
+    public Class returnedClass() {
+        return Calendar.class;
+    }
+    @Override
+    public boolean equals(Object x, Object y) throws HibernateException {
+        if (x == null || y == null) {
+            return false;
+        }
+        return x.equals(y);
+    }
+    @Override
+    public int hashCode(Object x) throws HibernateException {
+        if (x != null) {
+            return x.hashCode();
+        }
+        return 0;
+    }
+    @Override
+    public Object nullSafeGet(ResultSet rs, String[] names, Object owner)
+            throws HibernateException, SQLException {
+        Calendar cal = null;
+        String timestampStr = rs.getString(names[0]);
+        if (timestampStr != null) {
+            cal = getTimeWithZone(timestampStr);
+        }
+        return cal;
+    }
+    @Override
+    public void nullSafeSet(PreparedStatement st, Object value, int index)
+            throws HibernateException, SQLException {
+        if (value == null) {
+            st.setNull(index, Types.VARCHAR);
+        } else {
+            doInstanceCheck(value);
+            Calendar cal = (Calendar) value;
+            st.setString(index, getTimeWithZone(cal));
+        }
+    }
+    @Override
+    public Object deepCopy(Object value) throws HibernateException {
+        Calendar clone = null;
+        if (value != null) {
+            doInstanceCheck(value);
+            Calendar cal = (Calendar) value;
+            // just copying the timezone and time
+            clone = new GregorianCalendar();
+            clone.setTimeInMillis(cal.getTimeInMillis());
+            TimeZone tz = cal.getTimeZone();
+            clone.setTimeZone(TimeZone.getTimeZone(tz.getID()));
+        }
+        return clone;
+    }
+    @Override
+    public boolean isMutable() {
+        return true;
+    }
+    @Override
+    public Serializable disassemble(Object value) throws HibernateException {
+        Calendar cal = null;
+        if (value != null) {
+            doInstanceCheck(value);
+            cal = (Calendar) deepCopy(value);
+        }
+        return cal;
+    }
+    @Override
+    public Object assemble(Serializable cached, Object owner)
+            throws HibernateException {
+        return disassemble(cached);
+    }
+    @Override
+    public Object replace(Object original, Object target, Object owner)
+            throws HibernateException {
+        return disassemble(original);
+    }
+    protected void doInstanceCheck(Object value) {
+        if ((value != null) &amp;&amp; !(value instanceof Calendar)) {
+            throw new UnsupportedOperationException(value.getClass()
+                    + " not supported, expecting type "
+                    + Calendar.class.getName());
+        }
+    }
+    /**
+     * Converts a String <em>2010-09-26 11:30:00 Australia/Adelaide</em> to
+     * Calendar
+     *
+     * @param timeWithZone
+     * @return
+     */
+    private Calendar getTimeWithZone(String timeWithZone) {
+        String timeZoneId = timeWithZone.split("s")[2];
+        TimeZone tz = TimeZone.getTimeZone(timeZoneId);
+        String format = "yyyy-MM-dd HH:mm:ss";
+        DateFormat df = new SimpleDateFormat(format);
+        df.setTimeZone(tz);
+        try {
+            df.parse(timeWithZone);
+        } catch (ParseException e) {
+            LOG.error("could not parse date string: " + timeWithZone, e);
+        }
+        return df.getCalendar();
+    }
+    private String getTimeWithZone(Calendar timeWithZone) {
+        String format = "yyyy-MM-dd HH:mm:ss zzzz";
+        DateFormat df = new SimpleDateFormat(format);
+        df.setTimeZone(timeWithZone.getTimeZone());
+        return df.format(timeWithZone.getTime());
+    }
+}</pre>
+<h2>Hibenate Entity</h2>
+<pre lang="java">@Entity
+@Table(name = "CUSTOM_DEMO")
+public class CustomDemo {
+    @Id
+    @SequenceGenerator(name = "seq", allocationSize = 1, initialValue = 1, sequenceName = "CUSTOM_DEMO_SEQ")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "seq")
+    private long id;
+    @Column
+    private String name;
+    @Column(name = "TIME_WITH_ZONE")
+    @Type(type = "com.swayam.demo.oracle.hibernate.TimeWithZone")
+    private Calendar timeWithZone;
+    public long getId() {
+        return id;
+    }
+    public void setId(long id) {
+        this.id = id;
+    }
+    public String getName() {
+        return name;
+    }
+    public void setName(String name) {
+        this.name = name;
+    }
+    public Calendar getTimeWithZone() {
+        return timeWithZone;
+    }
+    public void setTimeWithZone(Calendar timeWithZone) {
+        this.timeWithZone = timeWithZone;
+    }
+}</pre>
+<h2>Resources</h2>
+<p>The sources can be found&nbsp;<a href="https://github.com/paawak/blog/tree/master/code/HibernateCustomDataType">https://github.com/paawak/blog/tree/master/code/HibernateCustomDataType</a></p>

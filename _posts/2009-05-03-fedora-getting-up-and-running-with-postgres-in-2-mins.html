@@ -1,0 +1,55 @@
+---
+layout: post
+status: publish
+published: true
+title: "[Fedora] Getting up and running with postgres in 2 mins"
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 108
+wordpress_url: http://puretech.paawak.com/?p=108
+date: '2009-05-03 16:28:37 +0530'
+date_gmt: '2009-05-03 10:58:37 +0530'
+categories:
+- linux
+- postgres
+tags:
+- linux
+- postgres
+comments: []
+---
+<p>I am very fascinated with Postgres, right since I hard about it, around 2002. Compared to MySQL 3.25, which was and perhaps still is, more popular, Postgres fared a lot better in terms of SQL-compliance, foreign-key support [which was lacking in MySQL 3.25] etc. Also, Postgres is an ORDBMS, just like Oracle. You can do lot of cool stuff with Postgres.<br />
+For this exercise, we will assume:<br />
+Postgres user name = <em>mypguser</em><br />
+Postgres data directory =<em> /usr/local/pgsql/data</em><br />
+If you are using Fedora, Postgres will be installed by default. To verify, do a find on <em>initdb</em> and <em>psql</em>. If you do not have it installed, install it with yum or grab a tar ball from <a href="http://www.postgresql.org/" target="_blank">here</a> and follow the instructions. Its pretty straight forward.<br />
+After you have installed, run the following commands:<br />
+#adduser mypguser<br />
+#passwd mypguser<br />
+#mkdir /usr/local/pgsql/data<br />
+#chown mypguser /usr/local/pgsql/data<br />
+#su - mypguser<br />
+$initdb -D /usr/local/pgsql/data</p>
+<h3>Starting Postgres</h3>
+<p>Postmaster should always be started as the underprivileged user <em>mypguser</em>.<br />
+$postgres -D /usr/local/pgsql/data >logfile 2>&amp;1 &amp;<br />
+To create a database:<br />
+createdb somedatabase<br />
+To start the command line tool:<br />
+psql somedatabase</p>
+<h3>Autostart Postgres as a service</h3>
+<p>Fedora should already have this script in /etc/init.d/postgresql.<br />
+The problem is that this assumes that the postgres user name is <em>postgres</em> and the data is located in <em>/var/lib/pgsql/data</em>. You can edit the script suitably and then enable it as a service, so that postmaster starts everytime your system boots up. You can also use the script that I have modified, just declared the user and data as variables. You can find it <a href="http://palashray.com/resources/scripts/postgresql">here</a>.</p>
+<h3>Installing PgAdmin</h3>
+<p>PgAdmin is a nice gui frontend for administratin Postgres. You have to first add its yum repository. Follow these steps [you must be super user].<br />
+1. download rpm and add yum repository:<br />
+<a href="http://yum.pgsqlrpms.org/reporpms/repoview/letter_p.group.html" target="_blank">http://yum.pgsqlrpms.org/reporpms/repoview/letter_p.group.html</a><br />
+2. yum install postgis<br />
+3. yum install pgadmin3<br />
+You can also use <a href="http://phppgadmin.sourceforge.net/" target="_blank">phpPgAdmin</a>.<br />
+For this article, I was inspired by:<br />
+<a href="http://www.postgresonline.com/journal/index.php?/archives/45-An-Almost-Idiots-Guide-to-PostgreSQL-YUM.html">http://www.postgresonline.com/journal/index.php?/archives/45-An-Almost-Idiots-Guide-to-PostgreSQL-YUM.html</a></p>

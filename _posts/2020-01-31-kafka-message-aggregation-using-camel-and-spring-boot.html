@@ -1,0 +1,478 @@
+---
+layout: post
+status: publish
+published: true
+title: Kafka Message Aggregation using Camel and Spring Boot
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 1066
+wordpress_url: http://palashray.com/?p=1066
+date: '2020-01-31 00:46:47 +0530'
+date_gmt: '2020-01-31 05:46:47 +0530'
+categories:
+- java
+- java11
+- kafka
+- spring
+- camel
+tags:
+- camel
+- eip
+- java
+- java11
+- kafka
+- soring-boot
+comments: []
+---
+<p><!-- wp:heading {"level":1} --></p>
+<h1>Introduction</h1>
+<p><!-- /wp:heading --><br />
+<!-- wp:paragraph --></p>
+<p><a href="https://camel.apache.org/">Apache Camel</a> is a popular open source integration framework that can work with almost any message brokers like Kafka, ActiveMQ, RabbitMQ etc. It provides <a href="https://camel.apache.org/manual/latest/enterprise-integration-patterns.html">out of the box support</a> for the most popular EIPs (<a href="https://www.enterpriseintegrationpatterns.com/patterns/messaging/toc.html">Enterprise Integration Patterns</a>). Camel can also work seamlessly with Spring Boot, and that makes it a killer combination. In this example, we will see how to use the <a href="https://camel.apache.org/manual/latest/aggregate-eip.html">Aggregate EIP</a> provided by Camel to do message aggregation on Kafka.</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:heading {"level":1} --></p>
+<h1>Problem Statement</h1>
+<p><!-- /wp:heading --><br />
+<!-- wp:paragraph --></p>
+<p>We are building a microservice. It reads BankDetail messages in JSON format from the Kafka Topic <em>bank-details</em>. A BankDetail message has the below attributes:</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:preformatted --></p>
+<pre class="lang:java decode:true wp-block-preformatted">	private int id;
+	private int age;
+	private String job;
+	private String marital;
+	private String education;
+	private String defaulted;
+	private BigDecimal balance;
+	private String housing;
+	private String loan;
+	private String contact;
+	private int day;
+	private String month;
+	private int duration;
+	private int campaign;
+	private int pdays;
+	private int previous;
+	private String poutcome;
+	private String y;
+</pre>
+<p><!-- /wp:preformatted --><br />
+<!-- wp:paragraph --></p>
+<p>BankDetail messages come in batches, each message of the same batch, has the same <em>kafka.key</em>. The microservice then aggregates all the messages of the same batch based on the <em>job</em> and finds out the count of various job categories. It would then publish the result of the aggregation on the Kafka Topic <em>bank-details-aggregated</em>. A typical aggregate message would look like:</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:preformatted --></p>
+<pre class="lang:js decode:true wp-block-preformatted">{
+	"adminCount": 478,
+	"blueCollarCount": 946,
+	"entrepreneurCount": 168,
+	"houseMaidCount": 112,
+	"managementCount": 969,
+	"retiredCount": 230,
+	"selfEmployedCount": 183,
+	"servicesCount": 417,
+	"studentCount": 84,
+	"technicianCount": 768,
+	"unemployedCount": 128,
+	"unknownCount": 38
+}</pre>
+<p><!-- /wp:preformatted --><br />
+<!-- wp:heading {"level":1} --></p>
+<h1>Solution</h1>
+<p><!-- /wp:heading --><br />
+<!-- wp:heading --></p>
+<h2>Project Setup using Maven</h2>
+<p><!-- /wp:heading --><br />
+<!-- wp:paragraph --></p>
+<p>Its a standard Spring Boot project. We will define the Camel BOM as below:</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:preformatted --></p>
+<pre class="lang:xhtml decode:true wp-block-preformatted">	<dependencyManagement>
+		<dependencies>
+			<!-- Camel BOM -->
+			<dependency>
+				<groupId>org.apache.camel</groupId>
+				<artifactId>camel-spring-boot-dependencies</artifactId>
+				<version>${spring.camel-version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement></pre>
+<p><!-- /wp:preformatted --><br />
+<!-- wp:paragraph --></p>
+<p>Then we will define the dependencies for Camel:</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:preformatted --></p>
+<pre class="lang:xhtml decode:true wp-block-preformatted">		<!-- START :: Camel -->
+		<dependency>
+			<groupId>org.apache.camel</groupId>
+			<artifactId>camel-spring-boot-starter</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.camel</groupId>
+			<artifactId>camel-stream-starter</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.camel</groupId>
+			<artifactId>camel-kafka</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.camel</groupId>
+			<artifactId>camel-kafka-starter</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.camel</groupId>
+			<artifactId>camel-jackson-starter</artifactId>
+		</dependency>
+		<!-- END :: Camel --></pre>
+<p><!-- /wp:preformatted --><br />
+<!-- wp:heading --></p>
+<h2>Contract with the message publisher</h2>
+<p><!-- /wp:heading --><br />
+<!-- wp:paragraph --></p>
+<p>We have the below contract with the BankDetail message publisher:</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:paragraph --></p>
+<p>1. The messages will be published in JSON format on the Kafka Topic <em>bank-details</em>.</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:paragraph --></p>
+<p>2. The <em>kafka.key</em> of all messages of the same group or batch would be identical.</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:paragraph --></p>
+<p>3. The message will have a header named <em>__TypeId__</em> that will have its fully qualified Java class name. This feature comes out of the box with Spring.</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:paragraph --></p>
+<p>4. There is no expectation as to the type of the key, as long as the keys are fairly unique across different batches. In this example, I am using a random UUID.</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:paragraph --></p>
+<p>5. After all messages in a batch are published, a CompletionSignal is published on Kafka.</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:paragraph --></p>
+<p>6. A simple BankDetail publisher that respects the above contract can be found <a href="https://github.com/paawak/spring-boot-demo/tree/master/kafka-spring/kafka-simple-publisher">here</a>.</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:heading --></p>
+<h2>Implementation details</h2>
+<p><!-- /wp:heading --><br />
+<!-- wp:heading {"level":3} --></p>
+<h3>Camel Route</h3>
+<p><!-- /wp:heading --><br />
+<!-- wp:paragraph --></p>
+<p>A <em>Route</em> defines a logical message routing. We define a <em>Route</em> by extending a <em>RouteBuilder</em>. And it can be defined as a Spring Bean:</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:preformatted --></p>
+<pre class="lang:java decode:true wp-block-preformatted">@Service
+public class BankDetailAggregatorByJob extends RouteBuilder {
+	@Override
+	public void configure() {
+		...
+	}
+}</pre>
+<p><!-- /wp:preformatted --><br />
+<!-- wp:paragraph --></p>
+<p>Inside the <em>configure()</em> method, we define how we will process the incoming messages. In this case, we will read the messages off a Kafka Topic, aggregate those based on some condition and then publish the aggregated message back onto a Kafka Topic.</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:heading {"level":3} --></p>
+<h3>Reading messages from Kafka</h3>
+<p><!-- /wp:heading --><br />
+<!-- wp:paragraph --></p>
+<p>The below line reads messages off the Kafka Topic <em>bank-details</em>:</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:preformatted --></p>
+<pre class="lang:java decode:true wp-block-preformatted">from("kafka:bank-details?brokers=" + kafkaBrokers + "&amp;autoOffsetReset=earliest"
+		+ "&amp;autoCommitEnable=true" + "&amp;groupId=bank-detail-camel-consumer")</pre>
+<p><!-- /wp:preformatted --><br />
+<!-- wp:heading {"level":3} --></p>
+<h3>Define a Route ID</h3>
+<p><!-- /wp:heading --><br />
+<!-- wp:paragraph --></p>
+<p>Its always a good practice to define a RouteID, its helps debugging.</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:preformatted --></p>
+<pre class="lang:java decode:true wp-block-preformatted">  .routeId(BankDetailAggregatorByJob.class.getSimpleName()) </pre>
+<p><!-- /wp:preformatted --><br />
+<!-- wp:heading {"level":3} --></p>
+<h3>Logging</h3>
+<p><!-- /wp:heading --><br />
+<!-- wp:paragraph --></p>
+<p>Camel supports logging out of the box and also takes in a Slf4J Logger. Here <em>LOG</em> is a Slf4j <em>Logger</em>. <em>${header[key]}</em> will print the message header with the <em>key</em>. <em>${headers}</em> will print all the message headers and <em>${body}</em> will print the message body. These are very useful short hands for debugging. <a href="https://camel.apache.org/manual/latest/simple-language.html">Here</a> is the full list of expressions supported by Camel.</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:preformatted --></p>
+<pre class="lang:java decode:true wp-block-preformatted">               .log(LoggingLevel.TRACE, LOG,
+               				"${header[" + RouteConstants.TYPE_HEADER + "]}")</pre>
+<p><!-- /wp:preformatted --><br />
+<!-- wp:heading {"level":3} --></p>
+<h3>Conditional branching using choice expression</h3>
+<p><!-- /wp:heading --><br />
+<!-- wp:paragraph --></p>
+<p>In our Route, we can expect the below 2 types of messages:</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:paragraph --></p>
+<p>1. <em>BankDetail</em>: This is the message that has to be aggregated</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:paragraph --></p>
+<p>2. <em>CompletionSignal</em>: This message signifies the end of the batch, essentially, the end of aggregation operation</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:paragraph --></p>
+<p>Based on the type of message, as defined by the <em>__TypeId__</em> header, we would have to do different things. If the message is of the type <em>BankDetail</em>, we would convert this to a <em>JobCount</em>, which is the aggregate message. If the message is of the type <em>CompletionSignal</em>, we would send a signal to the aggregation framework to complete the aggregation operation for the current batch. We would do that by setting a <em>Boolean</em> flag. The complete choice code is shown below:</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:preformatted --></p>
+<pre class="lang:java decode:true wp-block-preformatted">               			.choice()
+               			.when(simple("${header." + RouteConstants.TYPE_HEADER + "} == '"
+               				+ BankDetail.class.getName() + "'"))
+               			.unmarshal().json(JsonLibrary.Jackson, BankDetail.class)
+               			.process(exchange -> {
+               			    BankDetail bankDetail = exchange.getIn().getBody(BankDetail.class);
+               			    exchange.getIn().setBody(toJobCount(bankDetail), JobCount.class);
+               			}).when(simple("${header." + RouteConstants.TYPE_HEADER + "} == '"
+               				+ CompletionSignal.class.getName() + "'"))
+               			.process(exchange -> {
+               			    exchange.getIn().setBody(new JobCount(), JobCount.class);
+               			    exchange.getIn().setHeader(
+               				    RouteConstants.COMPLETE_JOB_AGGREGATION_COMMAND, Boolean.TRUE);
+               			}).end()</pre>
+<p><!-- /wp:preformatted --><br />
+<!-- wp:paragraph --></p>
+<p>Note that the message arrives as a JSON formatted string. In order to convert that to a Java object, we need to apply the <em>unmarshal()</em> transform as shown below:</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:preformatted --></p>
+<pre class="wp-block-preformatted"> .unmarshal().json(JsonLibrary.Jackson, BankDetail.class) </pre>
+<p><!-- /wp:preformatted --><br />
+<!-- wp:heading {"level":3} --></p>
+<h3>Aggregation Implementation</h3>
+<p><!-- /wp:heading --><br />
+<!-- wp:paragraph --></p>
+<p>In its simplest form, the aggregate() function takes in 2 params:</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:paragraph --></p>
+<p>1. The <em>expression</em>, based on which the messages are grouped together for aggregation. In the present case, messages are aggregated by the <em>KafkaKey</em> header.</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:paragraph --></p>
+<p>2. The <em>AggregationStrategy</em>: Defines how 2 messages can be merged into a single message: more on it later.</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:preformatted --></p>
+<pre class="lang:java decode:true wp-block-preformatted">.aggregate(header(KafkaConstants.KEY), new BankDetailAggregationStrategy()) </pre>
+<p><!-- /wp:preformatted --><br />
+<!-- wp:paragraph --></p>
+<p>We can also specify the <em>completionTimeout</em>. This defines the max time this aggregation operation can wait for the next message to arrive, starting from the time the last message was received. In essence, if a message does not arrive within the stipulated <em>completionTimeout</em> of the last message in the same aggregation group, the aggregation operation would be deemed to have timed out. We can also specify if we want to discard the partially aggregated message in case of time out.</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:preformatted --></p>
+<pre class="lang:java decode:true wp-block-preformatted"> .completionTimeout(2_000).discardOnCompletionTimeout() </pre>
+<p><!-- /wp:preformatted --><br />
+<!-- wp:heading {"level":3} --></p>
+<h3>Aggregation Strategy</h3>
+<p><!-- /wp:heading --><br />
+<!-- wp:paragraph --></p>
+<p>The <em>AggregationStrategy</em> is the place where incoming messages are combined to form a single message. It defines a single method:</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:preformatted --></p>
+<pre class="lang:java decode:true wp-block-preformatted">public Exchange aggregate(Exchange oldExchange, Exchange newExchange) </pre>
+<p><!-- /wp:preformatted --><br />
+<!-- wp:paragraph --></p>
+<p>The <em>oldExchange</em> holds the partial aggregate results, while the <em>newExchange</em> holds the new incoming message. We would need to compute the next partial result and return it. Note that for the first message, the <em>oldExchange</em> would be <em>null</em>.</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:preformatted --></p>
+<pre class="lang:java decode:true wp-block-preformatted">                   @Override
+                   public Exchange aggregate(Exchange oldExchange, Exchange newExchange) {
+               	if (oldExchange == null) {
+               	    LOG.info("########### First message recieved for the correlationID: {}",
+               		    getCorrelationId(newExchange));
+               	    return newExchange;
+               	}
+               	JobCount partialResults = oldExchange.getIn().getBody(JobCount.class);
+               	JobCount newMessage = newExchange.getIn().getBody(JobCount.class);
+               	oldExchange.getIn().setBody(doAggregation(newMessage, partialResults), JobCount.class);
+               	// any header that is used by the predicate should be set in the message
+               	// returned from this method
+               	Map<String, Object> headers = new HashMap<>();
+               	headers.putAll(oldExchange.getIn().getHeaders());
+               	headers.putAll(newExchange.getIn().getHeaders());
+               	oldExchange.getIn().setHeaders(headers);
+               	return oldExchange;
+                   }</pre>
+<p><!-- /wp:preformatted --><br />
+<!-- wp:paragraph --></p>
+<p>Apart from computing the aggregate result, it can also do some other interesting things as defined below.</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:heading {"level":3} --></p>
+<h3>Completing the Aggregation</h3>
+<p><!-- /wp:heading --><br />
+<!-- wp:paragraph --></p>
+<p>If we implement the <em>Predicate</em>, we could indicate when the aggregation operation is deemed complete. In the present case, we wait till we receive a <em>TRUE</em> signal in a given header.</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:preformatted --></p>
+<pre class="lang:java decode:true wp-block-preformatted">                   @Override
+                   public boolean matches(Exchange oldExchange) {
+               	Boolean completionCommand = oldExchange.getIn()
+               		.getHeader(RouteConstants.COMPLETE_JOB_AGGREGATION_COMMAND, Boolean.class);
+               	if (completionCommand == null) {
+               	    return false;
+               	}
+               	LOG.debug("******shouldComplete: {}", completionCommand);
+               	return completionCommand;
+                   }</pre>
+<p><!-- /wp:preformatted --><br />
+<!-- wp:heading {"level":3} --></p>
+<h3>Aggregation Complete signal</h3>
+<p><!-- /wp:heading --><br />
+<!-- wp:paragraph --></p>
+<p>If we implement the <em>CompletionAwareAggregationStrategy</em>, we would get a callback when the aggregation operation completes successfully.</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:preformatted --></p>
+<pre class="lang:java decode:true wp-block-preformatted">                   @Override
+                   public void onCompletion(Exchange exchange) {
+               	String correlationId = getCorrelationId(exchange);
+               	LOG.info("########### Aggregation is complete for {}", correlationId);
+                   }</pre>
+<p><!-- /wp:preformatted --><br />
+<!-- wp:heading {"level":3} --></p>
+<h3>Aggregation Timeout signal</h3>
+<p><!-- /wp:heading --><br />
+<!-- wp:paragraph --></p>
+<p>If we implement the <em>TimeoutAwareAggregationStrategy</em>, we would get a callback if the aggregation operation times out.</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:preformatted --></p>
+<pre class="lang:java decode:true wp-block-preformatted">                   @Override
+                   public void timeout(Exchange oldExchange, int index, int total, long timeout) {
+               	LOG.info("############# timed out");
+                   }</pre>
+<p><!-- /wp:preformatted --><br />
+<!-- wp:heading {"level":3} --></p>
+<h3>Converting message to JSON</h3>
+<p><!-- /wp:heading --><br />
+<!-- wp:paragraph --></p>
+<p>Before we publish the aggregate message to the bus, we would need to convert the Java POJO into JSON.</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:preformatted --></p>
+<pre class="lang:java decode:true wp-block-preformatted">  .marshal().json(JsonLibrary.Jackson) </pre>
+<p><!-- /wp:preformatted --><br />
+<!-- wp:heading {"level":3} --></p>
+<h3>Publishing message to Kafka</h3>
+<p><!-- /wp:heading --><br />
+<!-- wp:paragraph --></p>
+<p>This is how we would publish the aggregated message to the <em>bank-details-aggregated</em> Kafka Topic:</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:preformatted --></p>
+<pre class="lang:java decode:true wp-block-preformatted"> .to("kafka:bank-details-aggregated?brokers=" + kafkaBrokers) </pre>
+<p><!-- /wp:preformatted --><br />
+<!-- wp:heading --></p>
+<h2>Putting it together</h2>
+<p><!-- /wp:heading --><br />
+<!-- wp:paragraph --></p>
+<p>Assuming that the <a href="https://github.com/paawak/spring-boot-demo/tree/master/kafka-spring/kafka-simple-publisher">kafka-simple-publisher</a> is running on <em>localhost:8090</em>, to trigger BankDetail messages on Kafka Topic <em>bank-detail</em>, do:</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:paragraph --></p>
+<p>curl "<a href="http://localhost:8090/kafka/publish">http://localhost:8090/kafka/publish</a>"</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:paragraph --></p>
+<p>Wait for around 50 seconds, and then you would see the aggregated message published on the <em>bank-details-aggregated</em> topic.</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:heading {"level":1} --></p>
+<h1>Source Code</h1>
+<p><!-- /wp:heading --><br />
+<!-- wp:paragraph --></p>
+<p>The completely working source code can be found here:</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:paragraph --></p>
+<p><a href="https://github.com/paawak/spring-boot-demo/tree/master/kafka-spring/kafka-camel-aggregation-simple">https://github.com/paawak/spring-boot-demo/tree/master/kafka-spring/kafka-camel-aggregation-simple</a></p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:heading {"level":1} --></p>
+<h1>Running the Demo</h1>
+<p><!-- /wp:heading --><br />
+<!-- wp:heading --></p>
+<h2>As Simple Java App</h2>
+<p><!-- /wp:heading --><br />
+<!-- wp:paragraph --></p>
+<p>This is a Spring Boot application, so running it locally as a Java Application is just about running the main class <em>KafkaCamelDemoApplication</em>.</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:heading --></p>
+<h2>As Docker Image</h2>
+<p><!-- /wp:heading --><br />
+<!-- wp:paragraph --></p>
+<p>This has also been dockerised using the <em>io.fabric8</em> Docker Maven plugin.</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:paragraph --></p>
+<p>In pom.xml:</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:preformatted --></p>
+<pre class="lang:xhtml decode:true wp-block-preformatted">           			<plugin>
+           				<groupId>io.fabric8</groupId>
+           				<artifactId>docker-maven-plugin</artifactId>
+           				<version>0.32.0</version>
+           				<configuration>
+           					<images>
+           						<image>
+           							<name>docker.io/paawak/${project.artifactId}</name>
+           							<build>
+           								<dockerFileDir>${basedir}</dockerFileDir>
+           								<dockerFile>Dockerfile</dockerFile>
+           								<tags>
+           									<tag>${project.version}</tag>
+           									<tag>latest</tag>
+           								</tags>
+           							</build>
+           						</image>
+           					</images>
+           				</configuration>
+           				<executions>
+           					<execution>
+           						<id>build-docker-image</id>
+           						<phase>package</phase>
+           						<goals>
+           							<goal>build</goal>
+           						</goals>
+           					</execution>
+           					<execution>
+           						<id>push-docker-image</id>
+           						<phase>install</phase>
+           						<goals>
+           							<goal>push</goal>
+           						</goals>
+           					</execution>
+           				</executions>
+           			</plugin>
+           </pre>
+<p><!-- /wp:preformatted --><br />
+<!-- wp:heading {"level":3} --></p>
+<h3>Build docker image</h3>
+<p><!-- /wp:heading --><br />
+<!-- wp:preformatted --></p>
+<pre class="lang:sh decode:true wp-block-preformatted">mvn clean package</pre>
+<p><!-- /wp:preformatted --><br />
+<!-- wp:heading {"level":3} --></p>
+<h3>Run docker image<code></code></h3>
+<p><!-- /wp:heading --><br />
+<!-- wp:preformatted --></p>
+<pre class="lang:sh decode:true">docker run -it -p 8080:8080 -e server.port=8080 -e spring.profiles.active=default paawak/kafka-camel-aggregation-simple:latest</pre>
+<p><!-- /wp:preformatted --><br />
+<!-- wp:heading --></p>
+<h2>As cucumber test harness</h2>
+<p><!-- /wp:heading --><br />
+<!-- wp:paragraph --></p>
+<p>You can also find a Cucumber based test harness here:</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:paragraph --></p>
+<p><a href="https://github.com/paawak/spring-boot-demo/tree/master/kafka-spring/message-aggregation-cucumber-test-harness">https://github.com/paawak/spring-boot-demo/tree/master/kafka-spring/message-aggregation-cucumber-test-harness</a></p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:paragraph --></p>
+<p>However, as a pre-requisite, you would need to download and build a docker image of the <em>kafka-simple-publisher</em> from here:</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:paragraph --></p>
+<p><a href="https://github.com/paawak/spring-boot-demo/tree/master/kafka-spring/kafka-simple-publisher">https://github.com/paawak/spring-boot-demo/tree/master/kafka-spring/kafka-simple-publisher</a></p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:paragraph --></p>
+<p>The feature file for our scenario is the <a href="https://github.com/paawak/spring-boot-demo/blob/master/kafka-spring/message-aggregation-cucumber-test-harness/src/test/resources/com/swayam/demo/springbootdemo/kafka/test/it/message-aggregation-simple.feature">message-aggregation-simple.feature</a>.</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:paragraph --></p>
+<p>Run the docker-compose file as:</p>
+<p><!-- /wp:paragraph --><br />
+<!-- wp:preformatted --></p>
+<pre class="lang:sh decode:true wp-block-preformatted"> docker-compose -f docker-compose-message-aggregation-simple.yml  up </pre>
+<p><!-- /wp:preformatted --><br />
+<!-- wp:paragraph --></p>
+<p>This will start the needed docker images. After the containers are up, run the <a href="https://github.com/paawak/spring-boot-demo/blob/master/kafka-spring/message-aggregation-cucumber-test-harness/src/test/java/com/swayam/demo/springbootdemo/kafka/test/it/RunCucumberTest.java">RunCucumberTest</a>.</p>
+<p><!-- /wp:paragraph --></p>

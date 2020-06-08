@@ -1,0 +1,143 @@
+---
+layout: post
+status: publish
+published: true
+title: Using JDK 8 features to group data in a list
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 630
+wordpress_url: http://palashray.com/?p=630
+date: '2014-12-25 06:56:01 +0530'
+date_gmt: '2014-12-25 06:56:01 +0530'
+categories:
+- java
+tags:
+- java
+- jdk8
+comments:
+- id: 71
+  author: Fred
+  author_email: frederic.bernard@urbica.fr
+  author_url: ''
+  date: '2015-08-10 20:21:25 +0530'
+  date_gmt: '2015-08-10 20:21:25 +0530'
+  content: |-
+    Hi,
+    Very interesting post.
+    But I probably missed something : the bankdetailDao tries to fetch the data from a mysql table, and I can't find it, neither the way to setup the corresponding database.
+    I am going to adapt your code to use my derby instance and create the expected database. but I was wondering if you perhaps missed to provide the data ?
+    thank you !
+    fred
+- id: 72
+  author: palash
+  author_email: paawak@gmail.com
+  author_url: ''
+  date: '2015-08-11 01:29:47 +0530'
+  date_gmt: '2015-08-11 01:29:47 +0530'
+  content: |-
+    Hi Fred,
+    You can find the table and data here:
+    https://github.com/paawak/blog/tree/master/code/lambda-demo/src/main/sql
+    Thanks,
+    Palash.
+---
+<p class="western"><span style="font-size: large;"><b>Use Case</b></span></p>
+<p class="western">Sorting has always been supported by Java. Recently, I came across a requirement in our project where we needed to group data in a list by some conditions, which can change based on the user selection. Traditionally, this would have been done by the sql statement's GROUP BY clause in the DataAccess layer. But in our case, that would make the sql query very complex. So we decided to take the plunge and do the group by in the Service Layer using Java.</p>
+<p class="western">The Dao looks like this:</p>
+<pre escaped="true" lang="java">public List getAllBankDetails() throws SQLException</pre>
+<p class="western">And the Service looks like this:</p>
+<pre class="lang:java decode:true">public Map<String, List> getBankDetails(BankDetailGroups group)</pre>
+<p class="western"><span style="font-size: large;"><b>How to do it pre JDK 8</b></span></p>
+<p class="western">Pre JDK 8, Java does not provide group by out of the box. After ruling out hand-coding that logic, we decided to go with Google Guava's <a href="http://docs.guava-libraries.googlecode.com/git/javadoc/com/google/common/collect/ListMultimap.html">ListMultimap</a>. Its pretty cool actually. It stores in different values having the same key. Then, it exposes a List view of data with similar keys.</p>
+<pre class="lang:java decode:true "> @Override
+    public Map<String, List> getBankDetails(BankDetailGroups group) {
+        List unGroupedBankDetails;
+        try {
+            unGroupedBankDetails = bankDetailDao.getAllBankDetails();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+        ListMultimap<String, BankDetail> groupByBroker = ArrayListMultimap
+                .create();
+        for (BankDetail bankDetail : unGroupedBankDetails) {
+            String groupKey = getGroupKey(group, bankDetail);
+            groupByBroker.put(groupKey, bankDetail);
+        }
+        Map<String, List> groupedBankDetails = new HashMap<>();
+        for (String groupKey : groupByBroker.keySet()) {
+            List groupedData = groupByBroker.get(groupKey);
+            groupedBankDetails.put(groupKey, groupedData);
+        }
+        return groupedBankDetails;
+    }
+    private String getGroupKey(BankDetailGroups group, BankDetail bankDetail) {
+        switch (group) {
+        case JOB:
+            return bankDetail.getJob();
+        case EDUCATION:
+            return bankDetail.getEducation();
+        case MARITAL_STATUS:
+            return bankDetail.getMarital();
+        default:
+            throw new IllegalArgumentException();
+        }
+    }</pre>
+<p class="western">Note that we have to do it in 2 steps:</p>
+<ol>
+<li>
+<p class="western">Collect the data</p>
+</li>
+<li>
+<p class="western">Iterate over the collected data and create a List view for each unique key</p>
+</li>
+</ol>
+<p class="western">This sometimes becomes cumbersome, but is possibly one of the most elegant solutions pre JDK 8.</p>
+<p class="western"><span style="font-size: large;"><b>What changed in JDK 8?</b></span></p>
+<p class="western">Jdk 8 supports group by out of the box. No for loops, no 3rd party libraries. This is the code, short and sweet:</p>
+<pre class="lang:java decode:true ">@Override
+    public Map<String, List> getBankDetails(BankDetailGroups group) {
+        Function<BankDetail, String> groupByClassifier = (BankDetail bankDetail) -> {
+            switch (group) {
+            case JOB:
+                return bankDetail.getJob();
+            case EDUCATION:
+                return bankDetail.getEducation();
+            case MARITAL_STATUS:
+                return bankDetail.getMarital();
+            default:
+                throw new IllegalArgumentException();
+            }
+        };
+        Collector<BankDetail, ?, Map<String, List>> groupByCollector = Collectors
+                .groupingBy(groupByClassifier);
+        Map<String, List> groupedBankDetails;
+        List unGroupedBankDetails;
+        try {
+            unGroupedBankDetails = bankDetailDao.getAllBankDetails();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+        groupedBankDetails = unGroupedBankDetails.parallelStream().collect(
+                groupByCollector);
+        return groupedBankDetails;
+    }</pre>
+<p class="western">Again, note the absolute lack of for loops, which make the code crisp and more readable. Let me sum up how this is achieved:</p>
+<ol>
+<li>
+<p class="western">Create the Function for generating the key by which the data would be grouped. This Function would take a BankDetail object and supply a String. Note that the key can be any Object as long as it has a proper hashcode() method.</p>
+</li>
+<li>
+<p class="western">Create a Collector using the Collectors.groupingBy() to collect the data</p>
+</li>
+<li>
+<p class="western">From the un-grouped data, create a Stream, and apply the collector created above.</p>
+</li>
+</ol>
+<p class="western">That simple!</p>
+<p class="western">The code can be found here:</p>
+<p class="western"><a href="https://github.com/paawak/blog/tree/master/code/lambda-demo">https://github.com/paawak/blog/tree/master/code/lambda-demo</a></p>

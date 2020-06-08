@@ -1,0 +1,46 @@
+---
+layout: post
+status: publish
+published: true
+title: Running Jetty from a custom port through Maven
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 22
+wordpress_url: http://technoblogs.paawak.com/?p=22
+date: '2008-07-21 11:40:59 +0530'
+date_gmt: '2008-07-21 06:10:59 +0530'
+categories:
+- java
+tags:
+- java
+- maven
+comments: []
+---
+<p>There are two options:</p>
+<ul>
+<li><strong>pom.xml: </strong></li>
+</ul>
+<pre class="lang:xhtml decode:true ">            <plugin>
+                <groupId>org.mortbay.jetty</groupId>
+                <artifactId>maven-jetty-plugin</artifactId>
+                <version>6.1.10</version>
+                <configuration>
+                    ...
+                    </scanTargetPatterns>
+                    <systemProperties>
+                        <systemProperty>
+                            <name>jetty.port</name>
+                            <value>8080</value>
+                        </systemProperty>
+                    </systemProperties>
+                </configuration>
+            </plugin></pre>
+<ul>
+<li><strong>command prompt:</strong> <em>mvn -Djetty.port=8090 jetty:run</em></li>
+</ul>
+<p>The thing to remember is the command line value will override the value in pom.xml.</p>

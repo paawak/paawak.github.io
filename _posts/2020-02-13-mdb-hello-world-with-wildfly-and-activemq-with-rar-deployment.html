@@ -1,0 +1,189 @@
+---
+layout: post
+status: publish
+published: true
+title: MDB Hello World With WildFly And ActiveMQ With RAR Deployment
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 1133
+wordpress_url: http://palashray.com/?p=1133
+date: '2020-02-13 23:38:34 +0530'
+date_gmt: '2020-02-14 04:38:34 +0530'
+categories:
+- activemq
+- java
+- java11
+- mdb
+- spring
+tags:
+- activemq
+- java11
+- mdb
+- spring
+- spring mvc
+comments: []
+---
+<h1><a id="post-1133-_1vuf6g5hq9i"></a>Introduction</h1>
+<p>This is the 2nd increment of the <a href="http://palashray.com/java/java/mdb/">MDB Series</a>. In <a href="http://palashray.com/mdb-hello-world-with-wildfly-and-embedded-artemis-mq/">Part 1</a>, we spoke about what is an MDB? We then, took a simple design problem: a servlet posts user data to a Message Queue. The Message Broker then sends a notification to a MDB. We used the Artemis MQ, which comes embedded in Wildfly, as our Message Broker.<br />
+In this increment, we are going to use <a href="https://activemq.apache.org/">Apache ActiveMQ</a>, running as a separate service, as our Message Broker. We are going to use the RAR archive, or specifically, the activemq-rar archive, to communicate between Wildfly and ActiveMQ.</p>
+<h2><a id="post-1133-_svwv45gd9sqd"></a>What is a RAR?</h2>
+<p>In simple terms, a RAR Archive or a <a href="https://docs.oracle.com/javaee/6/tutorial/doc/gipgl.html">Resource Adapter Archive</a>, is a JEE Component that helps a JEE Server to communicate with an external Resource. The RAR implements the JEE Connector architecture specs. It can be either deployed within a EAR file, or independently. In our example, we are going to deploy the <em>activemq.rar</em> independently.</p>
+<h1><a id="post-1133-_24g4qdvllfvu"></a>Implementation Details</h1>
+<p>The structure will be very similar to what we had in the <a href="http://palashray.com/mdb-hello-world-with-wildfly-and-embedded-artemis-mq/">1<sup>st</sup> increment of the series</a>, with subtle differences as highlighted below.</p>
+<h2><a id="post-1133-_mq3no4cze4zu"></a>The pom.xml</h2>
+<p>The pom is a slight improvement, with minor version upgrades for the below dependencies:</p>
+<pre class="lang:xhtml decode:true">    	<dependency>
+   		 <groupId>javax.servlet</groupId>
+   		 <artifactId>javax.servlet-api</artifactId>
+   		 <version>3.1.0</version>
+   		 <scope>provided</scope>
+   	 </dependency>
+   	 <dependency>
+   		 <groupId>javax.jms</groupId>
+   		 <artifactId>javax.jms-api</artifactId>
+   		 <version>2.0.1</version>
+   		 <scope>provided</scope>
+   	 </dependency>
+   	 <dependency>
+   		 <groupId>javax.ejb</groupId>
+   		 <artifactId>javax.ejb-api</artifactId>
+   		 <version>3.2.2</version>
+   		 <scope>provided</scope>
+   	 </dependency>
+</pre>
+<p>We have removed the <strong><em>org.wildfly:wildfly-jms-client-bom</em></strong> dependency, as it is no longer needed.<br />
+Apart from the above changes, all other elements like the war-plugin etc., remains the same.</p>
+<h2><a id="post-1133-_571tjv70l7uv"></a>Defining the JMS Queue</h2>
+<p>The <strong><em>WEB-INF/embedded-artemis-jms.xml</em></strong> file is no longer needed, instead, the <em>Queue</em> is defined in the <em>standalone.xml</em> configuration, as described in a later section.</p>
+<h3><a id="post-1133-_7jbjdu4rliau"></a>mdb.properties</h3>
+<p>There are slight changes to the JNDI names of the Queue and the ConnectionFactory:</p>
+<pre class="lang:yaml decode:true">ACTIVEMQ_QUEUE_LOOKUP=java:/queue/HELLOWORLDMDBQueue
+ACTIVEMQ_JMS_CONNECTION_FACTORY=java:/ActiveMQConnectionFactory
+WILDFLY_USER=user
+WILDFLY_PASSWORD=user123
+</pre>
+<h2><a id="post-1133-_3mmsrpei7a55"></a>MdbConfig</h2>
+<p>This remains the same, except for the change in the property file keys.</p>
+<h2><a id="post-1133-_j48w8hpygli1"></a>AuthorRestController</h2>
+<p>This remains the same, without any changes.</p>
+<h2><a id="post-1133-_2une5s4sjlfv"></a>Configuring the MDB to Receive JMS Messages</h2>
+<p>The <em>AuthorRequestListenerBean</em> remains the same structurally, with a few minor changes in the <em>@MessageDriven</em> annotation as shown below:</p>
+<pre class="lang:java decode:true">@MessageDriven(name = "HelloWorldQueueMDB",
+    activationConfig = {
+   	 @ActivationConfigProperty(propertyName = "destinationType",
+   		 propertyValue = "javax.jms.Queue"),
+   	 @ActivationConfigProperty(propertyName = "destination",
+   		 propertyValue = "HELLOWORLDMDBQueue"),
+   	 @ActivationConfigProperty(propertyName = "acknowledgeMode",
+   		 propertyValue = "Auto-acknowledge") })
+public class AuthorRequestListenerBean implements MessageListener {
+...
+}</pre>
+<h2><a id="post-1133-_cfw8p292wgm2"></a>The standalone.xml</h2>
+<p>As before, we would need to modify the default <em>standalone.xml</em> that comes bundled with WildFly. We would be taking Wildfly 18 for our reference. Copy the <em>$WILDFLY_HOME/standalone/configuration/standalone.xml</em> and rename it to <em>standalone-with-external-activemq-rar-deployment.xml</em>. You can see the differences here:<br />
+<a href="https://github.com/paawak/blog/commit/2013c222f8d847e7d41c8910c92ff68f67eef4a8?diff=unified">https://github.com/paawak/blog/commit/2013c222f8d847e7d41c8910c92ff68f67eef4a8?diff=unified</a><br />
+The differences are highlighted below.</p>
+<h3><a id="post-1133-_kxa0qqe21x12"></a>Adding the ActiveMQ Messaging Extension</h3>
+<p>Under the <em>extensions</em> section, we would need to add the below extension:</p>
+<pre class="lang:xhtml decode:true"><extension module="org.wildfly.extension.messaging-activemq"/></pre>
+<h3><a id="post-1133-_bzfk5g5r24jf"></a>Defining the ActiveMQ Messaging SubSystem</h3>
+<p>Like before, we would need to define the new subsystem for ActiveMQ Messaging:</p>
+<pre class="lang:xhtml decode:true">    	<subsystem xmlns="urn:jboss:domain:messaging-activemq:3.0">
+        	<server name="default">
+            	<security-setting name="#">
+                	<role name="guest" send="true" consume="true" create-non-durable-queue="true" delete-non-durable-queue="true"/>
+            	</security-setting>
+            	<address-setting name="#" dead-letter-address="jms.queue.DLQ" expiry-address="jms.queue.ExpiryQueue" max-size-bytes="10485760" page-size-bytes="2097152" message-counter-history-day-limit="10"/>
+            	<http-connector name="http-connector" socket-binding="http" endpoint="http-acceptor"/>
+            	<http-connector name="http-connector-throughput" socket-binding="http" endpoint="http-acceptor-throughput">
+                	<param name="batch-delay" value="50"/>
+            	</http-connector>
+            	<in-vm-connector name="in-vm" server-id="0">
+                	<param name="buffer-pooling" value="false"/>
+            	</in-vm-connector>
+            	<http-acceptor name="http-acceptor" http-listener="default"/>
+            	<http-acceptor name="http-acceptor-throughput" http-listener="default">
+                	<param name="batch-delay" value="50"/>
+                	<param name="direct-deliver" value="false"/>
+            	</http-acceptor>
+            	<in-vm-acceptor name="in-vm" server-id="0">
+                	<param name="buffer-pooling" value="false"/>
+            	</in-vm-acceptor>
+            	<jms-queue name="ExpiryQueue" entries="java:/jms/queue/ExpiryQueue"/>
+            	<jms-queue name="DLQ" entries="java:/jms/queue/DLQ"/>
+            	<connection-factory name="InVmConnectionFactory" entries="java:/ConnectionFactory" connectors="in-vm"/>
+            	<connection-factory name="RemoteConnectionFactory" entries="java:jboss/exported/jms/RemoteConnectionFactory" connectors="http-connector"/>
+            	<pooled-connection-factory name="activemq-ra" entries="java:/JmsXA java:jboss/DefaultJMSConnectionFactory" connectors="in-vm" transaction="xa"/>
+        	</server>
+    	</subsystem>
+</pre>
+<h3><a id="post-1133-_wijvt8q68kpv"></a>Adding the MDB Resource Adapter</h3>
+<p>As before, under the subsystem ejb3 section, we would need to add the details of the <em>Resource Adapter</em> to be used to communicate with the ActiveMQ Messaging system.</p>
+<pre class="lang:xhtml decode:true"><mdb>
+   <resource-adapter-ref resource-adapter-name="activemq-rar-5.15.4.rar"/>
+   <bean-instance-pool-ref pool-name="mdb-strict-max-pool"/>
+</mdb></pre>
+<h3><a id="post-1133-_416q1eex670t"></a>Describing the ActiveMQ Resource Adapter</h3>
+<p>This is a new section that we would need to add under the <em>resource-adapters</em> to describe the ActiveMQ RAR. Note that we would need to specify the ActiveMQ broker details, as well as the Queue JNDI lookup details here.</p>
+<pre class="lang:xhtml decode:true">    	<subsystem xmlns="urn:jboss:domain:resource-adapters:5.0">
+        	<resource-adapters>
+            	<resource-adapter id="activemq-rar-5.15.4.rar">
+           		 <archive>activemq-rar-5.15.4.rar</archive>
+                	<transaction-support>XATransaction</transaction-support>
+                	<config-property name="UseInboundSession">false</config-property>
+                	<config-property name="Password">admin</config-property>
+                	<config-property name="UserName">admin</config-property>
+                	<config-property name="ServerUrl">tcp://localhost:61616?jms.rmIdFromConnectionId=true</config-property>
+                	<connection-definitions>
+                    	<connection-definition class-name="org.apache.activemq.ra.ActiveMQManagedConnectionFactory"
+                   		 jndi-name="java:/ActiveMQConnectionFactory" enabled="true" pool-name="ActiveMQConnectionFactory">
+                        	<xa-pool>
+                            	<min-pool-size>1</min-pool-size>
+                            	<max-pool-size>20</max-pool-size>
+                            	<prefill>false</prefill>
+                            	<is-same-rm-override>false</is-same-rm-override>
+                        	</xa-pool>
+                    	</connection-definition>
+                	</connection-definitions>
+                	<admin-objects>
+                    	<admin-object class-name="org.apache.activemq.command.ActiveMQQueue"
+                   		 jndi-name="java:/queue/HELLOWORLDMDBQueue"
+                   		 use-java-context="true" pool-name="HELLOWORLDMDBQueue">
+                        	<config-property name="PhysicalName">HELLOWORLDMDBQueue</config-property>
+                    	</admin-object>
+                	</admin-objects>
+            	</resource-adapter>
+        	</resource-adapters>
+    	</subsystem></pre>
+<p>This is how the completed <em>standalone-with-external-activemq-rar-deployment.xml</em> looks like:<br />
+<a href="https://github.com/paawak/blog/blob/master/code/mdb-demo/wildfly/external-activemq/rar-archive-deployment/mdb-activemq-rar-demo-spring/src/main/wildfly/standalone-with-external-activemq-rar-deployment.xml">https://github.com/paawak/blog/blob/master/code/mdb-demo/wildfly/external-activemq/rar-archive-deployment/mdb-activemq-rar-demo-spring/src/main/wildfly/standalone-with-external-activemq-rar-deployment.xml</a></p>
+<h1><a id="post-1133-_a41ndp8w4ks5"></a>Source Code</h1>
+<p>The complete source can be found here:<br />
+<a href="https://github.com/paawak/blog/tree/master/code/mdb-demo/wildfly/external-activemq/rar-archive-deployment/mdb-activemq-rar-demo-spring">https://github.com/paawak/blog/tree/master/code/mdb-demo/wildfly/external-activemq/rar-archive-deployment/mdb-activemq-rar-demo-spring</a></p>
+<h1><a id="post-1133-_2ndq356qp844"></a>Running the Demo</h1>
+<h2><a id="post-1133-_iqp98gjz77ci"></a>Building the war</h2>
+<p>To build the war file, we do:</p>
+<pre class="lang:sh decode:true">mvn clean package</pre>
+<h2><a id="post-1133-_vh8tf2hobsf"></a>Deploying the RAR</h2>
+<p>The ActiveMQ RAR is no longer included in the <a href="https://activemq.apache.org/components/classic/download/">ActiveMQ Distribution</a>, but, can be downloaded from here: <a href="https://repo1.maven.org/maven2/org/apache/activemq/activemq-rar/">https://repo1.maven.org/maven2/org/apache/activemq/activemq-rar/</a><br />
+Just copy the RAR file into the <em>$WILDFLY_HOME/standalone/deployments</em> directory.</p>
+<h2><a id="post-1133-_vh8tf2hobsf"></a>Creating a Guest User in WildFly</h2>
+<p>Follow the steps as described in the <a href="http://palashray.com/mdb-hello-world-with-wildfly-and-embedded-artemis-mq/">previous increment</a>.</p>
+<h2><a id="post-1133-_vh8tf2hobsf"></a>Deploying the war</h2>
+<p>Copy the <em>mdb-activemq-rar-demo-spring.war</em> into the directory <em>$WILDFLY_HOME/standalone/deployments</em>.</p>
+<h2><a id="post-1133-_fj0pqkjv9xf5"></a>Starting the ActiveMQ Locally</h2>
+<p>Download and unpack the <a href="https://activemq.apache.org/components/classic/download/">ActiveMQ distribution</a> for your platform. Then start it with</p>
+<pre class="lang:sh decode:true">bin/activemq start</pre>
+<h2><a id="post-1133-_vh8tf2hobsf"></a>Starting WildFly with our custom configuration</h2>
+<p>Copy the <em>src/main/wildfly/standalone-with-external-activemq-rar-deployment.xml</em> into the <em>$WILDFLY_HOME/standalone/configuration/</em> directory. Then start WildFly with the below command:</p>
+<pre class="lang:sh decode:true">$WILDFLY_HOME/bin/standalone.sh -c standalone-with-external-activemq-rar-deployment.xml</pre>
+<p>After WildFly starts successfully, you can access the Author page here:<br />
+<a href="#">http://localhost:8080/mdb-activemq-rar-demo-spring/author.html</a><br />
+As before, you should be able to post a Message through the Author Page, and the same would appear on the Console from the MDB as a Json Message.</p>
+<pre class="wrap:true lang:sh decode:true">23:32:55,072 INFO [com.swayam.demo.mdb.rar.spring.listener.AuthorRequestListenerBean] (default-threads - 2) Text message received: {"authorId":1,"authorFirstName":"aaaa","authorLastName":"bbbb","genreShortName":"cccc","genreName":"dddd"}</pre>
+<p>&nbsp;</p>

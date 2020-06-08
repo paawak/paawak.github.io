@@ -1,0 +1,64 @@
+---
+layout: post
+status: publish
+published: true
+title: 'Invoking Ant from Maven: The Maven AntRun Plugin'
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 623
+wordpress_url: http://palashray.com/?p=623
+date: '2014-08-13 03:06:02 +0530'
+date_gmt: '2014-08-13 03:06:02 +0530'
+categories:
+- ant
+- maven
+tags:
+- ant
+- build
+- maven
+comments: []
+---
+<h2>Context</h2>
+<p>In my previous entries, <em>Accessing Maven dependencies through Ant</em>: <a href="http://palashray.com/accessing-maven-dependencies-through-ant-part-1-the-maven-ant-tasks/">Part 1</a> and <a href="http://palashray.com/accessing-maven-dependencies-through-ant-part-2-the-aether-ant-tasks/">Part 2</a> , I had been talking about how we can explore Maven dependencies from Ant. Here, we will talk about how we can do the reverse, that is, invoke Ant from within Maven. I guess this is the more common scenario of the two. Often we have encountered a legacy project which has Ant as the build tool, and we need to integrate that with Maven, often invoking the Ant's build file from pom.xml. We will continue using our <a href="https://github.com/paawak/blog/tree/master/code/maven-ant-assembly-example" target="_blank">RMI Sever</a> as an example.<br />
+We will actually use the&nbsp;<a href="http://palashray.com/the-ultimate-idiots-handbook-for-build-obfuscation/">Idiot's paradigm &copy;</a> to demonstrate how to invoke Ant through Maven.</p>
+<h2>Using the Maven AntRun Plugin</h2>
+<p>Is pretty straight forward. I have created a <em>Profile</em> called AetherAntTaskExample, which looks like:</p>
+<pre class="lang:java decode:true ">		<profile>
+			<id>AetherAntTaskExample</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-antrun-plugin</artifactId>
+						<version>1.7</version>
+						<executions>
+							<execution>
+								<phase>package</phase>
+								<configuration>
+									<target>
+										<property name="project.name" value="${project.name}" />
+										<property name="project.version" value="${project.version}" />
+										<property name="maven.local.repo" value="${settings.localRepository}" />
+										<ant antfile="${project.basedir}/build-with-aether-ant-task.xml" />
+										<attachartifact
+											file="${project.build.directory}/${project.name}-${project.version}.zip"
+											classifier="deployable" type="zip" />
+									</target>
+								</configuration>
+								<goals>
+									<goal>run</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile></pre>
+<p>You invoke this by doing:</p>
+<blockquote><p>mvn clean package -P AetherAntTaskExample</p></blockquote>
+<p>The ant file is invoked and executed. The original pom.xml can be found <a href="https://github.com/paawak/blog/tree/master/code/maven-ant-assembly-example" target="_blank">here</a>.</p>

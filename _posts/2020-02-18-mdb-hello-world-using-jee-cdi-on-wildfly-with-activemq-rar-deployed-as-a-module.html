@@ -1,0 +1,169 @@
+---
+layout: post
+status: publish
+published: true
+title: MDB Hello World Using JEE CDI On WildFly With ActiveMQ RAR Deployed as a Module
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 1149
+wordpress_url: http://palashray.com/?p=1149
+date: '2020-02-18 22:54:47 +0530'
+date_gmt: '2020-02-19 03:54:47 +0530'
+categories:
+- activemq
+- java
+- java11
+- mdb
+tags:
+- activemq
+- java
+- java11
+- mdb
+comments: []
+---
+<h1><a id="post-1149-_1vuf6g5hq9i"></a>Introduction</h1>
+<p>This is the 4<sup>th</sup> increment of the <a href="http://palashray.com/java/java/mdb/">MDB Series</a>. In <a href="http://palashray.com/mdb-hello-world-with-wildfly-and-embedded-artemis-mq/">Part 1</a>, we spoke about what is an MDB? We then, took a simple design problem: a servlet posts user data to a Message Queue. The Message Broker then sends a notification to a MDB. We used the Artemis MQ, which comes embedded in Wildfly, as our Message Broker. In <a href="http://palashray.com/mdb-hello-world-with-wildfly-and-activemq-with-rar-deployment/">Part 2</a>, we demonstrated how to integrate a MDB with an external <a href="https://activemq.apache.org/">Apache ActiveMQ</a> broker running in a separate process. We used the ActiveMQ RAR deployed independently to achieve integration between Wildfly and ActiveMQ.<br />
+In <a href="http://palashray.com/mdb-hello-world-with-wildfly-and-activemq-rar-deployed-as-a-module/">Part 3</a>, we deployed the Active MQ RAR as a Module in Wildfly and communicated with an Active MQ Broker running in a separate process.<br />
+In this increment, we are going to show how to achieve the same thing as <a href="http://palashray.com/mdb-hello-world-with-wildfly-and-activemq-rar-deployed-as-a-module/">Part 3</a>, but using a more bare bones approach. Instead of using Spring for our dependency injection, we would be using the CDI, and instead of a Spring Controller, we are going to use a HttpServlet.</p>
+<h2><a id="post-1149-_sy3fwp7v4624"></a>What is CDI?</h2>
+<p>The CDI or the <a href="https://docs.oracle.com/javaee/6/tutorial/doc/giwhl.html">Context and Dependency Injection</a>, is a dependency injection framework provided by JEE Containers. It is a part of the JEE Specification. With CDI, we could <em>inject</em> any JNDI Resource or any Container Managed Beans, pretty much like we do in the Spring Framework. It also provides various lifecycle hooks like PostConstruct and PreDestroy.</p>
+<h1><a id="post-1149-_2gug3r8ljdc2"></a>Implementation Details</h1>
+<p>We will use the sources from the previous series as a starting point. The previous source can be found here:<br />
+<a href="https://github.com/paawak/blog/tree/master/code/mdb-demo/wildfly/external-activemq/module-deployment/mdb-activemq-module-demo-spring">https://github.com/paawak/blog/tree/master/code/mdb-demo/wildfly/external-activemq/module-deployment/mdb-activemq-module-demo-spring</a><br />
+We would rename the project to <em>mdb-activemq-module-demo-plain</em>.</p>
+<h2><a id="post-1149-_htzgvowy7qcq"></a>The pom.xml</h2>
+<p>We would remove all Spring related dependencies. The only addition would be <em>javax.annotation-api</em> dependency for the CDI annotations.</p>
+<pre class="lang:xhtml decode:true">		<dependency>
+			<groupId>javax.annotation</groupId>
+			<artifactId>javax.annotation-api</artifactId>
+			<version>1.3.2</version>
+			<scope>provided</scope>
+		</dependency></pre>
+<p>This is how the pom.xml would look like:<br />
+<a href="https://github.com/paawak/blog/blob/master/code/mdb-demo/wildfly/external-activemq/module-deployment/mdb-activemq-module-demo-plain/pom.xml">https://github.com/paawak/blog/blob/master/code/mdb-demo/wildfly/external-activemq/module-deployment/mdb-activemq-module-demo-plain/pom.xml</a></p>
+<h2><a id="post-1149-_l930txlqe8g6"></a>The Servlet</h2>
+<p>The <em>HelloWorldMDBServletClient</em> extends the <em>HttpServlet</em>. It uses CDI for injecting the JMS <em>ConnectionFactory</em> and <em>Queue</em> as shown below:</p>
+<pre class="lang:java decode:true">@WebServlet("/rest/author")
+public class HelloWorldMDBServletClient extends HttpServlet {
+    private static final long serialVersionUID = 1L;
+    private static final Logger LOGGER = LoggerFactory.getLogger(HelloWorldMDBServletClient.class);
+    @Resource(mappedName = "java:/ActiveMQConnectionFactory")
+    private ConnectionFactory connectionFactory;
+    @Resource(mappedName = "java:/queue/HELLOWORLDMDBQueue")
+    private Queue queue;
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp)
+	    throws ServletException, IOException {
+	AuthorRequest authorRequest = new AuthorRequest();
+	authorRequest.setAuthorId(Long.valueOf(req.getParameter("authorId")));
+	authorRequest.setAuthorFirstName(req.getParameter("authorFirstName"));
+	authorRequest.setAuthorLastName(req.getParameter("authorLastName"));
+	authorRequest.setGenreShortName(req.getParameter("genreShortName"));
+	authorRequest.setGenreName(req.getParameter("genreName"));
+	LOGGER.debug(" Received authorRequest: {}", authorRequest);
+	resp.setContentType("text/html");
+	PrintWriter out = resp.getWriter();
+	out.write(
+		"<h1>Quickstart: Example demonstrates the use of <strong>JMS 2.0</strong> and <strong>EJB 3.2 Message-Driven Bean</strong> in JBoss EAP.</h1>");
+	try {
+	    Connection connection = connectionFactory.createConnection();
+	    Session session = connection.createSession(true, Session.AUTO_ACKNOWLEDGE);
+	    MessageProducer producer = session.createProducer(queue);
+	    out.write("<p>Sending messages to <em>" + queue + "</em></p>");
+	    out.write("<h2>The following message will be sent to the destination:</h2>");
+	    String text = new ObjectMapper().writeValueAsString(authorRequest);
+	    TextMessage message = session.createTextMessage(text);
+	    producer.send(message);
+	    out.write("Message: " + text + "</br>");
+	    session.close();
+	    connection.close();
+	    out.write(
+		    "<p><i>Go to your JBoss EAP server console or server log to see the result of messages processing.</i></p>");
+	} catch (JMSException e) {
+	    throw new RuntimeException(e);
+	} finally {
+	    if (out != null) {
+		out.close();
+	    }
+	}
+    }
+}
+</pre>
+<p>Note the use of the <em>@WebServlet</em> annotation for path mapping.</p>
+<h2><a id="post-1149-_njjqm4qcf60h"></a>The MDB</h2>
+<p>The MDB remains the same from the <a href="https://github.com/paawak/blog/blob/master/code/mdb-demo/wildfly/external-activemq/module-deployment/mdb-activemq-module-demo-spring/src/main/java/com/swayam/demo/mdb/spring/listener/AuthorRequestListenerBean.java">previous series</a>.</p>
+<h2><a id="post-1149-_yyklato3jq4w"></a>The standalone.xml</h2>
+<p>The standalone.xml is identical to the <a href="https://github.com/paawak/blog/blob/master/code/mdb-demo/wildfly/external-activemq/module-deployment/mdb-activemq-module-demo-spring/src/main/wildfly/standalone-with-activemq-module-deployment-spring.xml">previous series</a>, just renamed to <em>standalone-with-activemq-module-deployment-plain.xml</em>.</p>
+<h1><a id="post-1149-_v8fv7b2rlur"></a>Source Code</h1>
+<p>The complete source can be found here:<br />
+<a href="https://github.com/paawak/blog/tree/master/code/mdb-demo/wildfly/external-activemq/module-deployment/mdb-activemq-module-demo-plain">https://github.com/paawak/blog/tree/master/code/mdb-demo/wildfly/external-activemq/module-deployment/mdb-activemq-module-demo-plain</a></p>
+<h1><a id="post-1149-_tnjp1dn1w75t"></a>Running the Demo</h1>
+<p>For preparing the ActiveMQ RAR as a module, adding users and running ActiveMQ locally, refer to the <a href="http://palashray.com/mdb-hello-world-with-wildfly-and-activemq-rar-deployed-as-a-module/">previous series</a>. Identical steps are to be followed.</p>
+<h1><a id="post-1149-_fyf61nbqn7a6"></a>Starting WildFly</h1>
+<p>Now we can start Wildfly with our custom configuration as below:</p>
+<pre class="wrap:true lang:sh decode:true">WILDFLY_HOME/bin/standalone.sh -c standalone-with-activemq-module-deployment-plain.xml</pre>
+<p>After Wildfly starts successfully, you can access the Author page with the below URL:<br />
+<a href="#">http://localhost:8080/mdb-activemq-module-demo-plain/author.jsp</a></p>
+<h1><a id="post-1149-_1anrdre7fwgj"></a>Problems Faced</h1>
+<h2><a id="post-1149-_573c4tqkh85i"></a>@JMSDestinationDefinition not supported by Wildfly 18</h2>
+<p>This code was running on Wildfly 13. At that time, the <em>HelloWorldMDBServletClient</em> servlet looked like this:</p>
+<pre class="lang:java decode:true">@JMSDestinationDefinitions(value = { @JMSDestinationDefinition(name = HelloWorldMDBServletClient.QUEUE_JNDI_NAME, interfaceName = "javax.jms.Queue", destinationName = "HELLOWORLDMDBQueue") })
+@WebServlet("/rest/author")
+public class HelloWorldMDBServletClient extends HttpServlet {
+...</pre>
+<p>The source can be found here:<br />
+<a href="https://github.com/paawak/blog/blob/c6d644c045257eb12b208f5a5036553cd9ba167c/code/mdb-demo/wildfly/external-activemq/module-deployment/mdb-activemq-module-demo-plain/src/main/java/com/swayam/demo/mdb/plain/web/servlet/HelloWorldMDBServletClient.java">https://github.com/paawak/blog/blob/c6d644c045257eb12b208f5a5036553cd9ba167c/code/mdb-demo/wildfly/external-activemq/module-deployment/mdb-activemq-module-demo-plain/src/main/java/com/swayam/demo/mdb/plain/web/servlet/HelloWorldMDBServletClient.java</a><br />
+Note the use of the <a href="https://docs.oracle.com/javaee/7/api/javax/jms/JMSDestinationDefinition.html">@JMSDestinationDefinition</a> for specifying the Queue. In the <a href="https://github.com/paawak/blog/blob/c6d644c045257eb12b208f5a5036553cd9ba167c/code/mdb-demo/wildfly/external-activemq/module-deployment/mdb-activemq-module-demo-plain/src/main/wildfly/standalone.xml">standalone.xml</a>, under the <em>resource-adapter</em> we did not have the <em>admin-objects</em> section with the Queue details, as it was specified in the Servlet above.<br />
+All was well in Wildfly 13. However, as soon as I deployed this in Wildfly 18, I started getting a huge stack trace and the deployment failed.</p>
+<h3><a id="post-1149-_oeaeghd94272"></a>Stack Trace</h3>
+<pre class="wrap:true lang:java decode:true">07:45:40,398 ERROR [org.jboss.msc.service.fail] (MSC service thread 1-3) MSC000001: Failed to start service jboss.deployment.unit."mdb-activemq-module-demo-plain.war".INSTALL: org.jboss.msc.service.StartException in service jboss.deployment.unit."mdb-activemq-module-demo-plain.war".INSTALL: WFLYSRV0153: Failed to process phase INSTALL of deployment "mdb-activemq-module-demo-plain.war"
+	at org.jboss.as.server@10.0.3.Final//org.jboss.as.server.deployment.DeploymentUnitPhaseService.start(DeploymentUnitPhaseService.java:183)
+	at org.jboss.msc@1.4.11.Final//org.jboss.msc.service.ServiceControllerImpl$StartTask.startService(ServiceControllerImpl.java:1739)
+	at org.jboss.msc@1.4.11.Final//org.jboss.msc.service.ServiceControllerImpl$StartTask.execute(ServiceControllerImpl.java:1701)
+	at org.jboss.msc@1.4.11.Final//org.jboss.msc.service.ServiceControllerImpl$ControllerTask.run(ServiceControllerImpl.java:1559)
+	at org.jboss.threads@2.3.3.Final//org.jboss.threads.ContextClassLoaderSavingRunnable.run(ContextClassLoaderSavingRunnable.java:35)
+	at org.jboss.threads@2.3.3.Final//org.jboss.threads.EnhancedQueueExecutor.safeRun(EnhancedQueueExecutor.java:1982)
+	at org.jboss.threads@2.3.3.Final//org.jboss.threads.EnhancedQueueExecutor$ThreadBody.doRunTask(EnhancedQueueExecutor.java:1486)
+	at org.jboss.threads@2.3.3.Final//org.jboss.threads.EnhancedQueueExecutor$ThreadBody.run(EnhancedQueueExecutor.java:1377)
+	at java.base/java.lang.Thread.run(Thread.java:834)
+Caused by: java.lang.NullPointerException
+	at org.jboss.as.naming@18.0.1.Final//org.jboss.as.naming.deployment.ContextNames.bindInfoFor(ContextNames.java:351)
+	at org.wildfly.extension.messaging-activemq//org.wildfly.extension.messaging.activemq.deployment.JMSConnectionFactoryDefinitionInjectionSource.getDefaulResourceAdapter(JMSConnectionFactoryDefinitionInjectionSource.java:416)
+	at org.wildfly.extension.messaging-activemq//org.wildfly.extension.messaging.activemq.deployment.JMSDestinationDefinitionInjectionSource.getResourceValue(JMSDestinationDefinitionInjectionSource.java:137)
+	at org.jboss.as.ee@18.0.1.Final//org.jboss.as.ee.component.deployers.ModuleJndiBindingProcessor.addJndiBinding(ModuleJndiBindingProcessor.java:289)
+	at org.jboss.as.ee@18.0.1.Final//org.jboss.as.ee.component.deployers.ModuleJndiBindingProcessor$1.handle(ModuleJndiBindingProcessor.java:240)
+	at org.jboss.as.ee@18.0.1.Final//org.jboss.as.ee.component.ClassDescriptionTraversal.run(ClassDescriptionTraversal.java:54)
+	at org.jboss.as.ee@18.0.1.Final//org.jboss.as.ee.component.deployers.ModuleJndiBindingProcessor.processClassConfigurations(ModuleJndiBindingProcessor.java:244)
+	at org.jboss.as.ee@18.0.1.Final//org.jboss.as.ee.component.deployers.ModuleJndiBindingProcessor.deploy(ModuleJndiBindingProcessor.java:158)
+	at org.jboss.as.server@10.0.3.Final//org.jboss.as.server.deployment.DeploymentUnitPhaseService.start(DeploymentUnitPhaseService.java:176)
+	... 8 more
+07:45:40,418 INFO  [org.infinispan.factories.GlobalComponentRegistry] (MSC service thread 1-1) ISPN000128: Infinispan version: Infinispan 'Infinity Minus ONE +2' 9.4.16.Final
+07:45:40,708 INFO  [org.jboss.as.clustering.infinispan] (ServerService Thread Pool -- 80) WFLYCLINF0002: Started client-mappings cache from ejb container
+07:45:40,761 ERROR [org.jboss.as.controller.management-operation] (Controller Boot Thread) WFLYCTL0013: Operation ("deploy") failed - address: ([("deployment" => "mdb-activemq-module-demo-plain.war")]) - failure description: {
+    "WFLYCTL0080: Failed services" => {"jboss.deployment.unit.\"mdb-activemq-module-demo-plain.war\".INSTALL" => "WFLYSRV0153: Failed to process phase INSTALL of deployment \"mdb-activemq-module-demo-plain.war\"
+    Caused by: java.lang.NullPointerException"},
+    "WFLYCTL0412: Required services that are not installed:" => [
+        "jboss.deployment.unit.\"mdb-activemq-module-demo-plain.war\".WeldStartService",
+        "jboss.deployment.unit.\"mdb-activemq-module-demo-plain.war\".beanmanager"
+    ],
+    "WFLYCTL0180: Services with missing/unavailable dependencies" => [
+        "jboss.deployment.unit.\"mdb-activemq-module-demo-plain.war\".batch.artifact.factory is missing [jboss.deployment.unit.\"mdb-activemq-module-demo-plain.war\".beanmanager]",
+        "jboss.deployment.unit.\"mdb-activemq-module-demo-plain.war\".weld.weldClassIntrospector is missing [jboss.deployment.unit.\"mdb-activemq-module-demo-plain.war\".beanmanager, jboss.deployment.unit.\"mdb-activemq-module-demo-plain.war\".WeldStartService]"
+    ]
+}
+07:45:40,839 INFO  [org.jboss.as.server] (ServerService Thread Pool -- 45) WFLYSRV0010: Deployed "mdb-activemq-module-demo-plain.war" (runtime-name : "mdb-activemq-module-demo-plain.war")
+07:45:40,854 INFO  [org.jboss.as.controller] (Controller Boot Thread) WFLYCTL0183: Service status report
+WFLYCTL0184:    New missing/unsatisfied dependencies:
+      service jboss.deployment.unit."mdb-activemq-module-demo-plain.war".WeldStartService (missing) dependents: [service jboss.deployment.unit."mdb-activemq-module-demo-plain.war".weld.weldClassIntrospector]
+      service jboss.deployment.unit."mdb-activemq-module-demo-plain.war".beanmanager (missing) dependents: [service jboss.deployment.unit."mdb-activemq-module-demo-plain.war".weld.weldClassIntrospector, service jboss.deployment.unit."mdb-activemq-module-demo-plain.war".batch.artifact.factory]
+WFLYCTL0186:   Services which failed to start:      service jboss.deployment.unit."mdb-activemq-module-demo-plain.war".INSTALL: WFLYSRV0153: Failed to process phase INSTALL of deployment "mdb-activemq-module-demo-plain.war"
+WFLYCTL0448: 2 additional services are down due to their dependencies being missing or failed
+</pre>
+<h3><a id="post-1149-_ecnj43vdu16o"></a>Solution</h3>
+<p>After quite some effort, I figured out the solution. I removed the <em>@JMSDestinationDefinitions</em> annotation from the <em>HelloWorldMDBServletClient</em>, and instead defined the Queue details in the <em>standalone.xml</em>, within the <em>admin-objects</em> section, under the <em>resource-adapter</em>. With this change, now, all is well, and i was able to deploy this on Wildfly 18.<br />
+&nbsp;</p>

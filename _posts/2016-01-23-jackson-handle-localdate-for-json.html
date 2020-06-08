@@ -1,0 +1,138 @@
+---
+layout: post
+status: publish
+published: true
+title: "[jackson] Handle LocalDate for json"
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 822
+wordpress_url: http://palashray.com/?p=822
+date: '2016-01-23 19:23:38 +0530'
+date_gmt: '2016-01-24 00:23:38 +0530'
+categories:
+- java
+tags:
+- jackson
+- json
+comments: []
+---
+<p>Post Java 8, LocalDate has become mainstream. Of course, Joda Time, from which LocalDate derives, was quite popular as well. I was trying to convert LocalDate to and from json.<br />
+Consider the below simple Person POJO:</p>
+<pre class="lang:java decode:true ">public class Person {
+    private final long id;
+    private final String firstName;
+    private final String lastName;
+    private final LocalDate dateOfBirth;
+    public Person(long id, String firstName, String lastName, LocalDate dateOfBirth) {
+	this.id = id;
+	this.firstName = firstName;
+	this.lastName = lastName;
+	this.dateOfBirth = dateOfBirth;
+    }
+    /** The default constructor is needed for Json to Java conversion */
+    public Person() {
+	this(0, null, null, null);
+    }
+    public long getId() {
+	return id;
+    }
+    public String getFirstName() {
+	return firstName;
+    }
+    public String getLastName() {
+	return lastName;
+    }
+    public LocalDate getDateOfBirth() {
+	return dateOfBirth;
+    }
+    @Override
+    public int hashCode() {
+	final int prime = 31;
+	int result = 1;
+	result = prime * result + ((dateOfBirth == null) ? 0 : dateOfBirth.hashCode());
+	result = prime * result + ((firstName == null) ? 0 : firstName.hashCode());
+	result = prime * result + (int) (id ^ (id >>> 32));
+	result = prime * result + ((lastName == null) ? 0 : lastName.hashCode());
+	return result;
+    }
+    @Override
+    public boolean equals(Object obj) {
+	if (this == obj)
+	    return true;
+	if (obj == null)
+	    return false;
+	if (getClass() != obj.getClass())
+	    return false;
+	Person other = (Person) obj;
+	if (dateOfBirth == null) {
+	    if (other.dateOfBirth != null)
+		return false;
+	} else if (!dateOfBirth.equals(other.dateOfBirth))
+	    return false;
+	if (firstName == null) {
+	    if (other.firstName != null)
+		return false;
+	} else if (!firstName.equals(other.firstName))
+	    return false;
+	if (id != other.id)
+	    return false;
+	if (lastName == null) {
+	    if (other.lastName != null)
+		return false;
+	} else if (!lastName.equals(other.lastName))
+	    return false;
+	return true;
+    }
+}</pre>
+<p>&nbsp;<br />
+The below code converts a Person to Json:</p>
+<pre class="lang:java decode:true">	Person person = new Person(100, "Subodh", "Ghosh", LocalDate.of(1909, 9, 14));
+	ObjectMapper mapper = new ObjectMapper();
+	String personJson = mapper.writeValueAsString(person);</pre>
+<p>The generated json is as below:</p>
+<pre class="lang:js decode:true ">{"id":100,"firstName":"Subodh","lastName":"Ghosh","dateOfBirth":{"year":1909,"month":"SEPTEMBER","dayOfMonth":14,"dayOfWeek":"TUESDAY","era":"CE","dayOfYear":257,"leapYear":false,"monthValue":9,"chronology":{"id":"ISO","calendarType":"iso8601"}}}</pre>
+<p>Notice that the <em>dateOfBirth</em> field has lots of attributes. The next logical thing to do would be to take this string and try to un-marshall it to Java Object:</p>
+<pre class="lang:java decode:true ">	String personJson =
+		"{"id":100,"firstName":"Subodh","lastName":"Ghosh","dateOfBirth":{"year":1909,"month":"SEPTEMBER","dayOfMonth":14,"dayOfWeek":"TUESDAY","era":"CE","dayOfYear":257,"leapYear":false,"monthValue":9,"chronology":{"id":"ISO","calendarType":"iso8601"}}}";
+	ObjectMapper mapper = new ObjectMapper();
+	Person person = mapper.readValue(personJson, Person.class);</pre>
+<p>However, this results in the below exception:</p>
+<pre class="lang:java decode:true">com.fasterxml.jackson.databind.JsonMappingException: No suitable constructor found for type [simple type, class java.time.LocalDate]: can not instantiate from JSON object (missing default constructor or creator, or perhaps need to add/enable type information?)
+ at [Source: {"id":100,"firstName":"Subodh","lastName":"Ghosh","dateOfBirth":{"year":1909,"month":"SEPTEMBER","dayOfMonth":14,"dayOfWeek":"TUESDAY","era":"CE","dayOfYear":257,"leapYear":false,"monthValue":9,"chronology":{"id":"ISO","calendarType":"iso8601"}}}; line: 1, column: 66] (through reference chain: com.swayam.demo.json.simple.Person["dateOfBirth"])
+	at com.fasterxml.jackson.databind.JsonMappingException.from(JsonMappingException.java:148)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializerBase.deserializeFromObjectUsingNonDefault(BeanDeserializerBase.java:1106)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializer.deserializeFromObject(BeanDeserializer.java:294)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializer.deserialize(BeanDeserializer.java:131)
+	at com.fasterxml.jackson.databind.deser.SettableBeanProperty.deserialize(SettableBeanProperty.java:520)
+	at com.fasterxml.jackson.databind.deser.impl.FieldProperty.deserializeAndSet(FieldProperty.java:101)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializer.vanillaDeserialize(BeanDeserializer.java:256)
+	at com.fasterxml.jackson.databind.deser.BeanDeserializer.deserialize(BeanDeserializer.java:125)
+	at com.fasterxml.jackson.databind.ObjectMapper._readMapAndClose(ObjectMapper.java:3702)
+	at com.fasterxml.jackson.databind.ObjectMapper.readValue(ObjectMapper.java:2714)</pre>
+<p>&nbsp;</p>
+<h2>Solution</h2>
+<p>Its very easy to solve it. We would need to add the LocalDate type module in <em>pom.xml</em>:</p>
+<pre class="lang:xhtml decode:true ">		<dependency>
+			<groupId>com.fasterxml.jackson.datatype</groupId>
+			<artifactId>jackson-datatype-jsr310</artifactId>
+			<version>2.6.1</version>
+		</dependency></pre>
+<p>To enable it:</p>
+<pre class="lang:java decode:true ">	ObjectMapper mapper = new ObjectMapper();
+	// register all data type modules
+	// this may have performance implications:
+	// mapper.findAndRegisterModules();
+	mapper.registerModule(new JavaTimeModule());</pre>
+<p>Now we can just go our usual way of using the ObectMapper. Note that now the json string now becomes more concise:</p>
+<pre class="lang:js decode:true">{"id":100,"firstName":"Subodh","lastName":"Ghosh","dateOfBirth":[1909,9,14]}</pre>
+<h2>Sources</h2>
+<p>The entire project is here:<br />
+<a href="https://github.com/paawak/blog/tree/master/code/json-inheritance-demo">https://github.com/paawak/blog/tree/master/code/json-inheritance-demo</a><br />
+The full test case is here:<br />
+<a href="https://github.com/paawak/blog/blob/master/code/json-inheritance-demo/src/test/java/com/swayam/demo/json/simple/LocalDateJsonTest.java">https://github.com/paawak/blog/blob/master/code/json-inheritance-demo/src/test/java/com/swayam/demo/json/simple/LocalDateJsonTest.java</a><br />
+&nbsp;</p>

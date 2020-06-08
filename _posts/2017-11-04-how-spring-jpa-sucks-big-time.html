@@ -1,0 +1,161 @@
+---
+layout: post
+status: publish
+published: true
+title: How Spring-JPA sucks big time
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 902
+wordpress_url: http://palashray.com/?p=902
+date: '2017-11-04 17:23:04 +0530'
+date_gmt: '2017-11-04 21:23:04 +0530'
+categories:
+- java
+- spring
+- hibernate
+tags:
+- hibernate
+- jpa
+- one-to-many
+- spring-jpa
+comments: []
+---
+<p>Ok, so all I am trying to do is save a new Entity into the DB and then retrieving it using its ID.</p>
+<h3>Saving my Entity</h3>
+<p>The entity Book contains an Author, some Chapters and some Genres as shown below:</p>
+<pre class="lang:java decode:true ">@Entity
+@Table(name = "BOOK")
+public class Book implements Serializable {
+	private static final long serialVersionUID = 1L;
+	@Id
+	@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "bookIdGenerator")
+	@SequenceGenerator(name = "bookIdGenerator", sequenceName = "SEQ_BOOK_ID")
+	@Column(name = "id")
+	private Long id;
+	@Column(name = "title")
+	private String title;
+	@OneToOne(fetch = FetchType.EAGER)
+	@JoinColumn(name = "author_id")
+	private Author author;
+	@OneToOne(fetch = FetchType.EAGER, cascade = { CascadeType.PERSIST, CascadeType.MERGE })
+	@JoinColumn(name = "main_chapter_id")
+	private Chapter mainChapter;
+	@OneToMany(fetch = FetchType.EAGER)
+	@JoinTable(name = "BOOK_GENRE", joinColumns = @JoinColumn(name = "book_id", referencedColumnName = "id"), inverseJoinColumns = @JoinColumn(name = "genre_id", referencedColumnName = "id"))
+	private Set<Genre> genres;</pre>
+<p>While saving, the assumption is that the Author and the Genres are already present in the DB. While saving a new Book, I pass all the attributes of the Book and the Chapters. However, since the Author and the Genres are already present in the DB, I am passing their IDs only and not all of their attributes; pretty much like a Foreign Key. I am illustrating this with the below JSON:</p>
+<pre class="lang:js decode:true ">{
+  "title": "The Bazilian Cat",
+  "author": {
+    "id": 10
+  },
+  "mainChapter": {
+    "title": "main CHAPTER for brazilian cat",
+    "plotSummary": null,
+    "contents": {
+      "id": 30
+    },
+    "subChapters": [
+      {
+        "title": "aaaaa",
+        "plotSummary": null,
+        "contents": {
+          "id": 1
+        }
+      }
+    ]
+  },
+  "genres": [
+    {
+      "id": 3
+    },
+    {
+      "id": 2
+    }
+  ]
+}</pre>
+<p>Note that for <em>author</em> and <em>genres</em>, we are only passing their IDs and no other attributes.</p>
+<h3>Fetching the Entity I just now saved</h3>
+<p>Now, after saving the new Book, when I fetch, my expectation is that Spring-JPA fetches the entire object graph faithfully, without missing any attributes. In reality, it never even bothers to hit the DB with a query, but returns the Book from the Session Cache itself. So, when I fetch my newly saved Book, only the IDs are fetched for Author and Genre, and no other attribute.</p>
+<h3>Implementation details with Spring JPA</h3>
+<h4>Repository Layer</h4>
+<p>The interface BookDao defines the contract.</p>
+<pre class="lang:java decode:true ">public interface BookDao {
+	Book getBook(Long bookId);
+	Long saveNewBook(Book book);
+}</pre>
+<p>The implementation looks like:</p>
+<pre class="lang:java decode:true ">public class JpaBasedBookDao implements BookDao {
+	private static final Logger LOGGER = LoggerFactory.getLogger(JpaBasedBookDao.class);
+	private final JpaRepository<Book, Long> bookRepo;
+	public JpaBasedBookDao(JpaRepository<Book, Long> bookRepo) {
+		this.bookRepo = bookRepo;
+	}
+	@Transactional(readOnly = true)
+	@Override
+	public Book getBook(Long bookId) {
+		LOGGER.info("retrieving book with id: {}", bookId);
+		return bookRepo.findOne(bookId);
+	}
+	@Transactional
+	@Override
+	public Long saveNewBook(Book book) {
+		LOGGER.info("saving book: {}", book);
+		return bookRepo.saveAndFlush(book).getId();
+	}
+}
+</pre>
+<h4>Service Layer</h4>
+<pre class="lang:java decode:true ">@Service
+public class BookServiceImpl implements BookService {
+	private final BookDao bookRepo;
+	@Autowired
+	public BookServiceImpl(BookDao bookRepo) {
+		this.bookRepo = bookRepo;
+	}
+	@Override
+	public Book getBook(Long bookId) {
+		return bookRepo.getBook(bookId);
+	}
+	@Override
+	public Book saveOrUpdate(Book book) {
+		Long id = bookRepo.saveNewBook(book);
+		return bookRepo.getBook(id);
+	}
+}</pre>
+<p>Note that the Transactions are started in the Repository layer. So, when I do a saveOrUpdate() in my service, there are 2 transactions that are happening. However, despite that, the Book is returned from the Session Cache and I get an incomplete object graph. Spring JPA does not give me much leverage to clear or evict or refresh the Session Cache after the insert happens.</p>
+<h3>Implementing with standard JPA</h3>
+<p>This can be handled better with the plain vanilla JPA. This is how the Repository looks like:</p>
+<pre class="lang:java decode:true">public class EntityManagerBasedBookDao implements BookDao {
+	private static final Logger LOGGER = LoggerFactory.getLogger(EntityManagerBasedBookDao.class);
+	private final EntityManager entityManager;
+	public EntityManagerBasedBookDao(EntityManager entityManager) {
+		this.entityManager = entityManager;
+	}
+	@Transactional(readOnly = true)
+	@Override
+	public Book getBook(Long bookId) {
+		LOGGER.info("retrieving book with id: {}", bookId);
+		Book book = entityManager.find(Book.class, bookId);
+		entityManager.refresh(book);
+		return book;
+	}
+	@Transactional
+	@Override
+	public Long saveNewBook(Book book) {
+		LOGGER.info("saving book: {}", book);
+		entityManager.persist(book);
+		return book.getId();
+	}
+}</pre>
+<p>The below line is particularly important in the method <em>getBook(Long bookId)</em>:</p>
+<blockquote><p>entityManager.refresh(book);</p></blockquote>
+<p>Without the above line, we will still get an incomplete object graph.</p>
+<h3>Sources</h3>
+<p>An working example of this can be found here:<br />
+<a href="https://github.com/paawak/blog/tree/master/code/one-to-many-example-2">https://github.com/paawak/blog/tree/master/code/one-to-many-example-2</a></p>

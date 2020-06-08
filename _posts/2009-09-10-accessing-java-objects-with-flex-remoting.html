@@ -1,0 +1,160 @@
+---
+layout: post
+status: publish
+published: true
+title: Accessing Java objects with Flex remoting
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 182
+wordpress_url: http://puretech.paawak.com/?p=182
+date: '2009-09-10 20:23:21 +0530'
+date_gmt: '2009-09-10 14:53:21 +0530'
+categories:
+- flex
+- spring
+tags:
+- action script
+- blaze ds
+- flex
+- java
+comments: []
+---
+<p>This post talks about how we:</p>
+<ol>
+<li>Query the database through Flex by invoking a server side Java object (the ItemDao) by Flex remoting with Blaze DS.</li>
+<li>Displays the result, which is a <em>java.util.List<Item></em> in a <em>DataGrid</em> and a <em>ComboBox</em>.</li>
+</ol>
+<p>Now that we have successfully configured Spring with Flex, we would like to access server side Java objects, which we expose through Spring.<br />
+We will query <em>Item</em>s from the database using Spring/Hibernate through the <em>ItemDao</em>.<br />
+This is how my <em>Item.java</em> looks like:</p>
+<pre lang="java">/**
+ *
+ * @author paawak
+ */
+@Entity
+public class Item implements Serializable {
+    private static final long serialVersionUID = 340952899861L;
+    @Id
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    private Long id;
+    @Column(length = 20, unique = true)
+    private String code;
+    @Column(length = 15, unique = true)
+    private String name;
+    @Column(length = 50)
+    private String description;
+    public Long getId() {
+        return id;
+    }
+    public void setId(Long id) {
+        this.id = id;
+    }
+    public String getCode() {
+        return code;
+    }
+    public void setCode(String code) {
+        this.code = code;
+    }
+    public String getName() {
+        return name;
+    }
+    public void setName(String name) {
+        this.name = name;
+    }
+    public String getDescription() {
+        return description;
+    }
+    public void setDescription(String description) {
+        this.description = description;
+    }
+}
+</pre>
+<p>And this is how my <em>ItemDao.java</em> looks like:</p>
+<pre lang="java">/**
+ *
+ * @author paawak
+ */
+public class ItemDao extends HibernateDaoSupport {
+    @SuppressWarnings("unchecked")
+    public List getAll() {
+        return super.getHibernateTemplate().loadAll(Item.class);
+    }
+}
+</pre>
+<p>As is obvious, I configure the ItemDao through Spring and then expose it as below:</p>
+<pre class="lang:xhtml decode:true">...
+<flex:remoting-destination ref="itemDao"/>
+...</pre>
+<p>The one thing to remember here is that, Flex handles remote access through call back mechanism. That is, the call to the Java object, is asynchronous. The call returns immediately. However, the result (or the error) is got asynchronously by registering suitable listeners.<br />
+The following code snippet illustrates this:</p>
+<pre class="lang:xhtml decode:true"><?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml"
+    initialize="initData();">
+    <mx:Script>
+        <![CDATA[
+            import mx.controls.Alert;
+            import mx.rpc.remoting.RemoteObject;
+            import mx.rpc.events.ResultEvent;
+            import mx.rpc.events.FaultEvent;
+            import mx.collections.ArrayCollection;
+            [Bindable]
+            private var itemsMultiArray:ArrayCollection;
+            private function initData():void {
+                //call the getAll() method on the itemDao remote object, which has been exposed
+                var itemRO:RemoteObject = new RemoteObject();
+                itemRO.destination = "itemDao";
+                itemRO.addEventListener(ResultEvent.RESULT, getItemListResultHandler);
+                itemRO.addEventListener(FaultEvent.FAULT, faultHandler);
+                itemRO.getOperation("getAll").send();
+            }
+            private function getItemListResultHandler(event:ResultEvent):void {
+                itemsMultiArray = (ArrayCollection)(event.result);
+            }
+            private function faultHandler (event:FaultEvent):void {
+             // Deal with event.fault.faultString, etc.
+                Alert.show(event.fault.faultString, 'Error');
+            }
+        ]]>
+    </mx:Script>
+	<mx:DataGrid id="itemDetails" width="511" dataProvider="{itemsMultiArray}">
+		<mx:columns>
+			<mx:DataGridColumn headerText="ID" dataField="id"/>
+			<mx:DataGridColumn headerText="Name" dataField="name"/>
+			<mx:DataGridColumn headerText="Code" dataField="code"/>
+		</mx:columns>
+	</mx:DataGrid>
+</mx:Application></pre>
+<p>This is how it looks like:<br />
+<a href="#" rel="attachment wp-att-185"><img class="alignnone size-full wp-image-185" title="flex_remote_object-1" src="http://palashray.com/wp-content/uploads/2009/09/flex_remote_object-1.png" alt="flex_remote_object-1" width="802" height="255" /></a><br />
+The most important thing to note here is that the result that is got back in the call back function, should be cast with the proper data type in Flex. This is the <a href="http://livedocs.adobe.com/flex/3/html/help.html?content=data_access_4.html">link</a> which has the details under the head <strong>Converting data from Java to ActionScript</strong>. From here we get to know the correct casting. In this case, we are casting the result into <em>mx.collections.ArrayCollection</em> since it is of <em>java.util.List</em> type.<br />
+Also note that though each element in the array is of the type Item, it can be accessed by its bean attribute name. That is how we can access the id, name and code in the DataGrid. Note that you cannot invoke the getter method like <em>getId()</em> on the object, it will not work.<br />
+So far, we have used a DataGrid which can extract data based on the attribute names. What if we use a ComboBox which needs a two dimensional array with <em>data</em> and <em>label</em> attributes? This is the code snippet of the modified <em>getItemListResultHandler()</em>:</p>
+<pre lang="javascript">...
+           [Bindable]
+            private var itemComboArray:Array = new Array();
+...
+            private function getItemListResultHandler(event:ResultEvent):void {
+                itemsMultiArray = (ArrayCollection)(event.result);
+                var count:int = 0;
+                for each (var item:Object in itemsMultiArray) {
+                    var content:Object = new Object();
+                    content["label"] = item.name;
+                    content["data"] = item.id;
+                    itemComboArray[count++] = content;
+                }
+            }
+</pre>
+<p>And this is the code to add the ComboBox:</p>
+<pre class="lang:xhtml decode:true"> ...
+<mx:ComboBox id="itemCombo"  dataProvider="{itemComboArray}"></mx:ComboBox>
+...
+</pre>
+<p>The screen looks like this now:<br />
+<a href="#"><img class="alignnone size-full wp-image-190" title="flex_remote_object-2" src="http://palashray.com/wp-content/uploads/2009/09/flex_remote_object-2.png" alt="flex_remote_object-2" width="801" height="296" /></a></p>
+<h3>Sources</h3>
+<p><a href="https://github.com/paawak/legacy-apps-from-desktop/tree/master/products/ims/ims-web/trunk">https://github.com/paawak/legacy-apps-from-desktop/tree/master/products/ims/ims-web/trunk</a></p>

@@ -1,0 +1,27 @@
+---
+layout: post
+status: publish
+published: true
+title: Connecting to MsSql through JDBC
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 20
+wordpress_url: http://technoblogs.paawak.com/?p=20
+date: '2008-07-21 11:39:44 +0530'
+date_gmt: '2008-07-21 06:09:44 +0530'
+categories:
+- java
+tags:
+- java
+comments: []
+---
+<p>I was not able to connect to MsSql using JDBC. I was using the host with the port no. like:<br />
+<em>jdbc:jtds:sqlserver//localhost:3683/TestDB</em><br />
+I would always get "Connection refused" exception.<br />
+Then I chucked out the port no. from the host name, and it works fine now.<br />
+<em>jdbc:jtds:sqlserver://localhost/TestDB</em></p>

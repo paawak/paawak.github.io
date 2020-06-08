@@ -1,0 +1,44 @@
+---
+layout: post
+status: publish
+published: true
+title: How to pass an object from the controller to the view in SpringMVC?
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 19
+wordpress_url: http://technoblogs.paawak.com/?p=18
+date: '2008-07-13 11:38:59 +0530'
+date_gmt: '2008-07-13 06:08:59 +0530'
+categories:
+- spring
+tags:
+- java
+- spring
+comments: []
+---
+<p>The scenario is: I want to show a list of items on my view from the database. My controller picks up the data, passes it to the view which displays it. I am using a sub class of org.springframework.web.servlet.mvc.SimpleFormController:<br />
+@Override<br />
+public ModelAndView handleRequest(HttpServletRequest request,<br />
+HttpServletResponse response) throws Exception {<br />
+ModelAndView view = new ModelAndView("complaintListings");<br />
+List<String> strings = new ArrayList<String>();<br />
+strings.add("AAAAAAAA");<br />
+strings.add("BBBBBBB");<br />
+strings.add("CCCCCCCC");<br />
+strings.add("EEEEEEEE");<br />
+strings.add("FFFFFFFFF");<br />
+//set the object to view<br />
+view.addObject("testStrings", strings);<br />
+return view;<br />
+}<br />
+The view looks like this:<br />
+<c:forEach var="string" items="${testStrings}"><br />
+<c:out value="${string}"/><br />
+<br />
+</c:forEach><br />
+Its that simple!</p>

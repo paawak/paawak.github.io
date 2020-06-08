@@ -1,0 +1,42 @@
+---
+layout: post
+status: publish
+published: true
+title: Replacing all occurances of a given pattern using Regex
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 26
+wordpress_url: http://technoblogs.paawak.com/?p=26
+date: '2008-07-30 11:43:09 +0530'
+date_gmt: '2008-07-30 06:13:09 +0530'
+categories:
+- java
+tags:
+- java
+comments: []
+---
+<p class="entryContent">
+<pre>
+&nbsp;&nbsp;&nbsp; /**
+&nbsp;&nbsp;&nbsp;&nbsp; * Replaces all occurances of the pattern <code>regex</code> with the String
+&nbsp;&nbsp;&nbsp;&nbsp; * <code>replacement</code>
+&nbsp;&nbsp;&nbsp;&nbsp; *
+&nbsp;&nbsp;&nbsp;&nbsp; * @param hayStack
+&nbsp;&nbsp;&nbsp;&nbsp; */
+&nbsp;&nbsp;&nbsp; private String replaceAllWithRegex(String hayStack) {
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; String replacement = "replacement";
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; String regex = "nsw*:";
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Pattern pattern = Pattern.compile(regex);
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Matcher matcher = pattern.matcher(hayStack);
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; StringBuffer sb = new StringBuffer();
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; while (matcher.find()) {
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; matcher.appendReplacement(sb, replacement);
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; }
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; matcher.appendTail(sb);
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; return sb.toString();
+&nbsp;&nbsp;&nbsp; }</pre>

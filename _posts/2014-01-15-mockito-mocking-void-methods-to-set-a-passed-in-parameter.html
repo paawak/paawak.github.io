@@ -1,0 +1,76 @@
+---
+layout: post
+status: publish
+published: true
+title: "[Mockito] Mocking void methods to set a passed in parameter"
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 447
+wordpress_url: http://palashray.com/?p=447
+date: '2014-01-15 03:40:23 +0530'
+date_gmt: '2014-01-15 03:40:23 +0530'
+categories:
+- java
+tags:
+- java
+- junit
+- mock
+- mockito
+comments: []
+---
+<p>Consider the following badly designed code:<br />
+&nbsp;</p>
+<pre lang="java">public interface BadPrecedentService {
+    void setThePassedInList(List items);
+}</pre>
+<p>This is being used as below:</p>
+<pre lang="java">public class BadPrecedentClient {
+    private final BadPrecedentService badPrecedentService;
+    public BadPrecedentClient(BadPrecedentService badPrecedentService) {
+	this.badPrecedentService = badPrecedentService;
+    }
+    public List getNamesOfActiveItems() {
+	List items = new ArrayList(10);
+	badPrecedentService.setThePassedInList(items);
+	List names = new ArrayList(items.size());
+	for (Item item : items) {
+	    if (item.isActive()) {
+		names.add(item.getName());
+	    }
+	}
+	return names;
+    }
+}
+</pre>
+<p>How can I test this method with Mockito? Look at the following snippet:</p>
+<pre lang="java">
+public class BadPrecedentClientTest {
+    @Test
+    public void testGetNamesOfActiveItems() {
+	// given
+	BadPrecedentService badPrecedentService = mock(BadPrecedentService.class);
+	doAnswer(new Answer<object>() {
+	    public Object answer(InvocationOnMock invocation) {
+		List<item> items = (List<item>) invocation.getArguments()[0];
+		items.add(new Item("abc", true));
+		items.add(new Item("def", false));
+		items.add(new Item("ghi", true));
+		items.add(new Item("jkl", false));
+		items.add(new Item("xyz", true));
+		return null;
+	    }
+	}).when(badPrecedentService).setThePassedInList(any(List.class));
+	BadPrecedentClient testClass = new BadPrecedentClient(badPrecedentService);
+	// when
+	List<string> result = testClass.getNamesOfActiveItems();
+	// then
+	assertEquals(Arrays.asList("abc", "ghi", "xyz"), result);
+    }
+}
+</pre>
+<p>The code can be found here: <a href="https://github.com/paawak/blog/tree/master/code/MockitoExample">https://github.com/paawak/blog/tree/master/code/MockitoExample</a></p>

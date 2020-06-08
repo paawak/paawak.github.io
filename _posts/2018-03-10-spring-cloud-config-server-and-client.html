@@ -1,0 +1,183 @@
+---
+layout: post
+status: publish
+published: true
+title: Spring Cloud Config Server and Client
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 978
+wordpress_url: http://palashray.com/?p=978
+date: '2018-03-10 09:01:50 +0530'
+date_gmt: '2018-03-10 14:01:50 +0530'
+categories:
+- spring
+tags:
+- cloud
+- cloud-config-server
+- config-server
+- microservice
+comments: []
+---
+<h1 class="western">What are we trying to solve?</h1>
+<p class="western">With the advent of Microservices based architecture, a lot of stress is given on externalisation of properties. Gone are the days of old when the property files were bundled within the jar or war files. With the advent of 12 Factor App paradigm, we try to store our config files external to our application. How can we do this in a Spring Boot application? Well, the spring-cloud provides support to both config-server (a server storing all our configs, for all environment) and the config-client (client applications that use the configs from the server). After a lot of reading and gleaning a lot of resources, I present to you the perfect, complete guide to implementing a production-ready cloud-config-server and its client.</p>
+<h1 class="western">Architectural Overview</h1>
+<p><img class="aligncenter size-full wp-image-979" src="http://localhost/tech-blog/wp-content/uploads/2018/03/spring-cloud-config-server-architecture.jpg" alt="" width="350" height="495" /></p>
+<p class="western">Well, there are a couple of moving parts to this. Let me list them below:</p>
+<p class="western">1. The Git Repo: The git repo is used as the actual storage for the config files or property files. You can store sentitive properties like passwords, in encrypted form. By the way, in this particular example, this is a Git repo, but this can also be any other store. Spring supports Vault, File System, and many other forms of stores.</p>
+<p class="western">2. The config-server-proxy: The config server acts as a proxy for the Git Repo storing the actual properties. The clients will always point to the config-server for fetching the properties. The clients are completely insulated from the backed store, the Git Repo in our case. The config server clones the Git Repo locally, decrypts the encrypted properties and then serves the properties in plain-text to the clients</p>
+<p class="western">3. In case of any changes to the properties, the Git Repo notifies the config-server through WebHooks. The config-server then publishes the change event onto the default topic called <b>springCloudBus</b>.</p>
+<p class="western">4. The clients are also subscribed to the topic <b>springCloudBus</b>. So, they get notified as soon as any config property changes. Then, the changed properties are re-loaded without having to re-start.</p>
+<h1 class="western">Implementation Details</h1>
+<h2 class="western">Git Repository</h2>
+<h2 class="western">Structure</h2>
+<p class="western">The Git repo stores the .yml or properties files inside folders for specific projects. The git repo in this case is called <b>config-server-props</b>. I have a single project identified by <b>my-spring-config-client</b>. So, all properties for different environments will go inside this.</p>
+<p><img class="aligncenter size-full wp-image-980" src="http://localhost/tech-blog/wp-content/uploads/2018/03/git-repo-structure.png" alt="" width="237" height="129" /></p>
+<h2 class="western">Configuring web-hook</h2>
+<p class="western">We can configure web-hooks in any of the Git Repos (GitHub, BitBucket, GitLab etc.) to post an event to the config server (http://localhost:8888/config-server-proxy/monitor) when any push happens. This is how it is done on the GitHub:</p>
+<p><a href="http://localhost/tech-blog/wp-content/uploads/2018/03/web-hook-on-git-repo.png"><img class="aligncenter size-medium wp-image-981" src="http://localhost/tech-blog/wp-content/uploads/2018/03/web-hook-on-git-repo-300x169.png" alt="" width="300" height="169" /></a></p>
+<h2 class="western">Message Queue</h2>
+<p class="western">Even before we get started, we would need to have a message-queue. This is needed to decouple of the client and the server. The server publishes change events to the bus, and the clients subscribe to the bus and get notified. In this example we are using a dockerised RabbitMQ. This is how we start it:</p>
+<p class="western"><code class="western"><span style="color: #4444cc;"><span style="font-family: monospace;">docker run -it -d -p 5672:5672 -p 15672:15672 -e RABBITMQ_DEFAULT_USER=my_mq_user -e RABBITMQ_DEFAULT_PASS=mq_secret_57*key rabbitmq:3.7.2-management-alpine </span></span></code></p>
+<h2 class="western">Server Configuration</h2>
+<p class="western">This is a Spring Boot project. The name of the project is <b>config-server-proxy</b>.</p>
+<h3 class="western">Dependencies</h3>
+<p class="western">We would need the below dependencies in the pom.xml:</p>
+<pre class="lang:xhtml decode:true "><dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-config-server</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-config-monitor</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-bus-amqp</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency></pre>
+<h3 class="western">Creating a self-signed certificate</h3>
+<p class="western">Since we would be doing encryption and decryption of passwords, we would need to create a key-pair. This is the command:</p>
+<p class="western"><code class="western"><span style="color: #4444cc;"><span style="font-family: monospace;">keytool -genkey -noprompt -trustcacerts -keyalg RSA -alias config-server.palashray.com -dname "CN=Palash Ray, OU=Demo, O=Swayam, L=Bangalore, ST=Karnataka, C=IN" </span></span></code><code class="western"><span style="color: #006d6f;"><span style="font-family: monospace;">-keypass</span></span></code><code class="western"> </code><code class="western"><span style="color: #006d6f;"><span style="font-family: monospace;"><b>Red123</b></span></span></code><code class="western"> </code><code class="western"><span style="color: #f58220;"><span style="font-family: monospace;">-storepass</span></span></code><code class="western"> </code><code class="western"><span style="color: #f58220;"><span style="font-family: monospace;"><b>Yellow98</b></span></span></code><code class="western"><span style="color: #4444cc;"><span style="font-family: monospace;"> -keystore certs/config-server-keystore.jks        </span></span></code></p>
+<h3 class="western">Configuration files</h3>
+<p class="western">We would have to have 2 property files:</p>
+<p align="center"><span style="font-family: Liberation\ Sans, serif;"><span style="font-size: x-large;">bootstrap.yml</span></span></p>
+<pre class="lang:yaml decode:true ">spring:
+  application:
+    name: config-server-proxy  # This is the name/identifier of the project
+encrypt:	# Details used for encryption and decryption
+  keyStore:
+    location: file:certs/config-server-keystore.jks
+    alias: config-server.palashray.com
+    password: Yellow98		# Storepass
+    secret: Red123		# KeyPass</pre>
+<p>&nbsp;</p>
+<p align="center"><span style="font-family: Liberation\ Sans, serif;"><span style="font-size: x-large;">application.yml</span></span></p>
+<pre class="lang:yaml decode:true ">server:
+  contextPath: /config-server-proxy
+  port: 8888
+security:
+  user:
+    name: my_user			# custom user name
+    password: MySecret&amp;23  	# custom password: if not set, spring provides a random password on start-up
+spring:
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: my_mq_user
+    password: mq_secret_57*key
+  cloud:
+    config:
+      server:
+        git:
+          uri: https://github.com/paawak/spring-boot-demo.git   # path to the Git repo
+          addLabelLocations: false
+          searchPaths: /spring-config-server-demo/config-server-props/{application} 	# Path relative to the root of the Git repo, including the name of the client project
+          basedir: target/props-git-checkout	# location where the Git Repo is cloned by the proxy server
+          cloneOnStart: true
+management:
+  security:
+    enabled: false</pre>
+<p class="western">Note that the <span style="color: #00c832;"><span style="font-family: monospace;"><span style="font-size: small;">searchPaths</span></span></span> is appended with <span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">/{application}</span></span></span>. It is a placeholder for the client-project-name.</p>
+<h3 class="western">Main Class</h3>
+<p class="western">You need to decorate the main class with the annotation <span style="color: #646464;"><span style="font-family: monospace;"><span style="font-size: small;">@EnableConfigServer</span></span></span>:</p>
+<pre class="lang:java decode:true ">@SpringBootApplication
+@EnableConfigServer
+public class ConfigServerProxyApplication {
+	public static void main(String[] args) {
+		SpringApplication.run(ConfigServerProxyApplication.class, args);
+	}
+}</pre>
+<p>&nbsp;</p>
+<h3 class="western">Fetching config properties</h3>
+<p class="western">Fetching config properties from the proxy server is a GET request:</p>
+<p class="western"><code class="western"><span style="color: #4444cc;"><span style="font-family: monospace;">http://localhost:8888/config-server-proxy/</span></span></code><code class="western"><span style="color: #00a65d;"><span style="font-family: monospace;">clientName</span></span></code><code class="western"><span style="color: #4444cc;"><span style="font-family: monospace;">-</span></span></code><code class="western"><span style="color: #ed1c24;"><span style="font-family: monospace;">profileName</span></span></code><code class="western"><span style="color: #4444cc;"><span style="font-family: monospace;">.</span></span></code><code class="western"><span style="color: #006d6f;"><span style="font-family: monospace;">format</span></span></code></p>
+<p class="western">For example, the below url will fetch my default profile in yml format:</p>
+<p class="western"><code class="western"><span style="color: #4444cc;"><span style="font-family: monospace;">curl -u "my_user:MySecret&amp;23" -s -X GET "http://localhost:8888/config-server-proxy/my-spring-config-client-default.yml"</span></span></code></p>
+<p class="western">The below url will fetch my prod profile in properties format:</p>
+<p class="western"><code class="western"><span style="color: #4444cc;"><span style="font-family: monospace;">curl -u "my_user:MySecret&amp;23" -s -X GET "http://localhost:8888/config-server-proxy/my-spring-config-client-prod.properties"</span></span></code></p>
+<h3 class="western">Trigerring re-load of properties by the clients</h3>
+<p class="western">Though it is always recommened to configure web-hook on the Git Repo and not notify the clients directly, we can as well do that. The below command tells the clients to reload all their properties without re-start:</p>
+<p class="western"><code class="western"><span style="color: #4444cc;"><span style="font-family: monospace;">curl -s -X POST --header 'Content-Type: application/x-www-form-urlencoded' --header 'Accept: application/json' -d 'path=*' "http://localhost:8888/config-server-proxy/monitor"   </span></span></code></p>
+<h3 class="western">Encrypting a password</h3>
+<p class="western">We can encrypt a password by doing a simple POST:</p>
+<p class="western"><code class="western"><span style="color: #4444cc;"><span style="font-family: monospace;">curl -u "my_user:MySecret&amp;23" -s -X POST "http://localhost:8888/config-server-proxy/encrypt" --data-urlencode my_passwd</span></span></code></p>
+<p class="western">We can then use this encrypted property inside of our .yml files in the Git Repo.</p>
+<h3 class="western">Decrypting a password</h3>
+<p class="western">We can decrypt a password by doing a simple POST:</p>
+<p class="western"><code class="western"><span style="color: #4444cc;"><span style="font-family: monospace;">curl -u "my_user:MySecret&amp;23" -s -X POST "http://localhost:8888/config-server-proxy/decrypt" --data-urlencode my_encoded_passwd</span></span></code></p>
+<p class="western">Note that when the proxy-server serves the properties to the client, it decrypts the encrypted passwords and serve them as plain-texts.</p>
+<h2 class="western">Client Configuration</h2>
+<p class="western">This is again a Spring Boot project. The name of the project is <b>my-spring-config-client</b>.</p>
+<h3 class="western">Dependencies</h3>
+<p class="western">We would need the below dependencies in the pom.xml:</p>
+<pre class="lang:xhtml decode:true ">		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-aop</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.retry</groupId>
+			<artifactId>spring-retry</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-config</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-bus-amqp</artifactId>
+		</dependency></pre>
+<h3 class="western">Configuration files</h3>
+<p class="western">Just a single <b>bootstrap.yml</b> would be enough.</p>
+<pre class="lang:yaml decode:true ">spring:
+  application:
+    name: my-spring-config-client   # This is the client name that would be replaced in the {application} placeholder while resolving the searchPaths for Git Repo
+  cloud:
+    config:
+      uri: http://localhost:8888/config-server-proxy/
+      username: my_user
+      password: MySecret&amp;23
+      fail-fast: true
+      retry:
+        initialInterval: 2000
+        maxAttempts: 3
+        maxInterval: 3000
+        multiplier: 1.5</pre>
+<p class="western">Note that the property <span style="color: #00aaad;">spring.application.name</span> is particularly important. This is the property which the config-server uses to identify the searchPaths, and is represented by the placeholder {application}. This is also the name of the folder in the Git Repo where all the project-specific property files reside.</p>
+<p class="western">It is always a good practice to have a retry mechanism and fail-fast if the config-server is not available. All the properties under retry are self-explanatory.</p>
+<h3 class="western">Testing the client</h3>
+<p class="western">The below curl command will fetch 3 properties that are currently active:</p>
+<p class="western"><span style="font-family: monospace;"><span style="color: #000000;">curl &nbsp;-X GET "http://localhost:8080/my-spring-config-client/"</span></span></p>
+<p class="western">After you configure the web-hook, change some property in the Git Repo. Wait for some time and give the above command. You would be able to see the changed properties.</p>
+<h2 class="western">Sources</h2>
+<p class="western">The sources for all the 3 components are available here: <a href="https://github.com/paawak/spring-boot-demo/tree/master/spring-config-server-demo">https://github.com/paawak/spring-boot-demo/tree/master/spring-config-server-demo</a></p>
+<h2 class="western">References</h2>
+<p class="western"><a href="http://cloud.spring.io/spring-cloud-static/spring-cloud-config/1.4.2.RELEASE/single/spring-cloud-config.html">http://cloud.spring.io/spring-cloud-static/spring-cloud-config/1.4.2.RELEASE/single/spring-cloud-config.html</a></p>
+<p>&nbsp;</p>

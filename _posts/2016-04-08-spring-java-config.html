@@ -1,0 +1,88 @@
+---
+layout: post
+status: publish
+published: true
+title: Spring Java Config
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 839
+wordpress_url: http://palashray.com/?p=839
+date: '2016-04-08 00:01:37 +0530'
+date_gmt: '2016-04-08 04:01:37 +0530'
+categories:
+- java
+- spring
+tags:
+- spring
+comments: []
+---
+<p>After Spring came out with annotations based Java configuration, I found them very handy. Get rid of the xml Spring configs, as the Java configs are safe with refactoring, more readable and less verbose. I will give some of the examples that I used:</p>
+<h2>Configuration of Jdbc Connection Pool</h2>
+<pre class="lang:java decode:true">@Configuration
+public class DaoConfig {
+    @Autowired
+    private Environment environment;
+    @Bean(destroyMethod = "close")
+    public DataSource dataSource() {
+	BasicDataSource dataSource = new BasicDataSource();
+	dataSource.setDriverClassName(environment.getProperty("jdbc.driverClassName"));
+	dataSource.setUrl(environment.getProperty("jdbc.url"));
+	dataSource.setUsername(environment.getProperty("jdbc.username"));
+	dataSource.setPassword(environment.getProperty("jdbc.password"));
+	dataSource.setMaxActive(100);
+	dataSource.setMaxWait(1000);
+	dataSource.setPoolPreparedStatements(true);
+	dataSource.setDefaultAutoCommit(false);
+	dataSource.setValidationQuery(environment.getProperty("jdbc.validationQuery"));
+	dataSource.setTestOnBorrow(true);
+	return dataSource;
+    }
+    @Bean
+    public JdbcTemplate jdbcTemplate(DataSource dataSource) {
+	return new JdbcTemplate(dataSource);
+    }
+}
+</pre>
+<h2>Configuration of Spring MVC</h2>
+<pre class="lang:java decode:true">@Configuration
+@EnableWebMvc
+@ComponentScan("com.swayam.demo.web.rest")
+@PropertySource("classpath:jdbc.properties")
+public class WebConfig extends WebMvcConfigurerAdapter {
+    @Override
+    public void configureMessageConverters(List<HttpMessageConverter<?>> converters) {
+	Jackson2ObjectMapperBuilder jackson2ObjectMapperBuilder = new Jackson2ObjectMapperBuilder();
+	converters.add(new MappingJackson2HttpMessageConverter(jackson2ObjectMapperBuilder.build()));
+	Jaxb2RootElementHttpMessageConverter jaxb2RootElementHttpMessageConverter = new Jaxb2RootElementHttpMessageConverter();
+	converters.add(jaxb2RootElementHttpMessageConverter);
+    }
+    @Bean
+    public ViewResolver viewResolver() {
+	InternalResourceViewResolver viewResolver = new InternalResourceViewResolver();
+	viewResolver.setViewClass(JstlView.class);
+	viewResolver.setPrefix("/WEB-INF/jsp/");
+	viewResolver.setSuffix(".jsp");
+	return viewResolver;
+    }
+    @Bean
+    public static PropertySourcesPlaceholderConfigurer propertyConfig() {
+	return new PropertySourcesPlaceholderConfigurer();
+    }
+}</pre>
+<p>Note the use of <em>WebMvcConfigurerAdapter</em>. It comes in handy when you want to work with Spring MVC. Especially note worthy is the&nbsp;<em>configureMessageConverters()</em> method. You would use that to configure a REST service. It would define how Spring handles the <em>@ResponseBody</em> or <em>@RestController</em> annotation, to translate a POJO to the response type: json, xml, etc. In the above example, we are using <em>MappingJackson2HttpMessageConverter</em> to convert our POJOs to JSON and <em>Jaxb2RootElementHttpMessageConverter</em> to convert them to XML.</p>
+<h2>Excluding a specific class from the config</h2>
+<p>Sometimes it so happens that we would like to selectively disable a couple of classes from the annotation config. This is how it is done:</p>
+<pre class="lang:java decode:true ">@Configuration
+@ComponentScan(basePackages = {"com.swayam.demo.web.xxx",
+        "com.swayam.demo.web.yyy"}, excludeFilters = @Filter(type = FilterType.ASSIGNABLE_TYPE, value = ClassToExcludeFromWiring.class) )
+public class DaoConfig {
+...</pre>
+<p>&nbsp;</p>
+<h2>Sources</h2>
+<p>The sources can be found here:<br />
+<a href="https://github.com/paawak/blog/tree/master/code/simple-spring-rest">https://github.com/paawak/blog/tree/master/code/simple-spring-rest</a></p>

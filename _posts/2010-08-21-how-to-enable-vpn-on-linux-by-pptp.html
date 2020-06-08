@@ -1,0 +1,142 @@
+---
+layout: post
+status: publish
+published: true
+title: "[How To] Enable VPN on Linux by PPTP"
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 288
+wordpress_url: http://puretech.paawak.com/?p=288
+date: '2010-08-21 00:41:40 +0530'
+date_gmt: '2010-08-20 19:11:40 +0530'
+categories:
+- linux
+tags:
+- linux
+- pptp
+- vpn
+comments:
+- id: 23
+  author: Amardeep
+  author_email: amardeep.sarkar@gmail.com
+  author_url: ''
+  date: '2010-08-27 12:18:30 +0530'
+  date_gmt: '2010-08-27 06:48:30 +0530'
+  content: Nice Tutorial , easy to follow and works great for me :)
+---
+<p>PPTP is an wonderful utility to enable VPN on a Linux box. Its secure and compatible with Windows network. I first heard about PPTP from (this wonderful guy called) Nikolaj. I have learnt how to set it up from him.<br />
+I am detailing the steps here:</p>
+<h2>1> Install PPTP</h2>
+<p><!-- 		@page { margin: 0.79in } 		P { margin-bottom: 0.08in } --></p>
+<p style="margin-bottom: 0in; font-style: normal; font-weight: normal;"><span style="font-family: Liberation Serif,Times New Roman,serif;">yum install pptp</span></p>
+<h2 style="margin-bottom: 0in;"><span style="color: #4700b8;"><span style="color: #000000;">2> vi /etc/ppp/options.pptp </span></span></h2>
+<p style="margin-bottom: 0in;"><!-- 		@page { margin: 0.79in } 		P { margin-bottom: 0.08in } --></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;">###############################################################################</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># $Id: options.pptp,v 1.2 2005/08/20 13:16:38 quozl Exp $</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;">#</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># Sample PPTP PPP options file /etc/ppp/options.pptp</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># Options used by PPP when a connection is made by a PPTP client.</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># This file can be referred to by an /etc/ppp/peers file for the tunnel.</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># Changes are effective on the next connection.  See "man pppd".</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;">#</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># You are expected to change this file to suit your system.  As</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># packaged, it requires PPP 2.4.2 or later from http://ppp.samba.org/</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># and the kernel MPPE module available from the CVS repository also on</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># http://ppp.samba.org/, which is packaged for DKMS as kernel_ppp_mppe.</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;">###############################################################################</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"><br />
+</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># Lock the port</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;">lock</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># Authentication</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># We don't need the tunnel server to authenticate itself</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;">noauth</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;">persist </span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;">debug</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># We won't do EAP, CHAP, or MSCHAP, but we will accept MSCHAP-V2</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;">refuse-eap</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;">refuse-chap</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;">refuse-mschap</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"><br />
+</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># Compression</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># Turn off compression protocols we know won't be used</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;">nobsdcomp</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;">nodeflate</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"><br />
+</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># Encryption</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># (There have been multiple versions of PPP with encryption support,</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># choose with of the following sections you will use.  Note that MPPE</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># requires the use of MSCHAP-V2 during authentication)</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"><br />
+</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># http://ppp.samba.org/ the PPP project version of PPP by Paul Mackarras</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># ppp-2.4.2 or later with MPPE only, kernel module ppp_mppe.o</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># {{{</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># Require MPPE 128-bit encryption</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;">#require-mppe-128</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># }}}</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"><br />
+</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># http://polbox.com/h/hs001/ fork from PPP project by Jan Dubiec</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># ppp-2.4.2 or later with MPPE and MPPC, kernel module ppp_mppe_mppc.o</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># {{{</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># Require MPPE 128-bit encryption</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;">#mppe required,stateless</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"># }}}</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;"><br />
+</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;">lcp-echo-failure 36 </span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;">lcp-echo-interval 5</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;">lcp-max-failure 0</span></p>
+<h2 style="margin-bottom: 0in; font-style: normal; font-weight: normal;"><span style="font-family: Liberation Serif,Times New Roman,serif;">3> vi /etc/ppp/chap-secrets</span></h2>
+<p style="margin-bottom: 0in; font-style: normal; font-weight: normal;"><!-- 		@page { margin: 0.79in } 		P { margin-bottom: 0.08in } --></p>
+<p style="margin-bottom: 0in;"><span style="color: #0000ff;"># Secrets for authentication using CHAP</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #0000ff;"># client&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;	server&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;	secret&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;	&nbsp; &nbsp; &nbsp;		IP addresses</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #0000ff;"><br />
+</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #0000ff;">VPNUserName&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; PPTP&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; VPNPassword&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; *</span></p>
+<h2 style="margin-bottom: 0in;"><span style="color: #4700b8;"><span style="color: #000000;">4> Create a file called /etc/ppp/peers/my-company-vpn</span></span></h2>
+<p style="margin-bottom: 0in;"><!-- 		@page { margin: 0.79in } 		P { margin-bottom: 0.08in } --></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;">#pty "pptp my-company.com --nolaunchpppd"</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;">name VPNUserName</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;">remotename PPTP</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;">require-mppe-128</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;">file /etc/ppp/options.pptp</span></p>
+<p style="margin-bottom: 0in;"><span style="color: #333399;">ipparam my-company-vpn</span></p>
+<h2 style="margin-bottom: 0in;"><span style="color: #4700b8;"><span style="color: #000000;">5> Then on the prompt:</span></span></h2>
+<p style="margin-bottom: 0in;"><!-- 		@page { margin: 0.79in } 		P { margin-bottom: 0.08in } --></p>
+<p style="margin-bottom: 0in; padding-left: 30px;">pptp my-company.com call <span style="color: #4700b8;"><span style="color: #000000;">my-company-vpn</span></span></p>
+<h2 style="margin-bottom: 0in;"><span style="color: #4700b8;"><span style="color: #000000;">6> After 10/15 seconds, on the prompt:</span></span></h2>
+<p style="margin-bottom: 0in; padding-left: 30px;"><span style="color: #4700b8;"><span style="color: #000000;">route -n</span></span></p>
+<p style="margin-bottom: 0in;"><span style="color: #4700b8;"><span style="color: #000000;">You should see something like:</span></span></p>
+<p style="margin-bottom: 0in;"><!-- 		@page { margin: 0.79in } 		P { margin-bottom: 0.08in } --></p>
+<p style="margin-bottom: 0in; padding-left: 30px;"><span style="color: #333399;">Kernel IP routing table </span></p>
+<p style="margin-bottom: 0in; padding-left: 30px;"><span style="color: #333399;">Destination     Gateway         Genmask         Flags Metric Ref    Use Iface </span></p>
+<p style="margin-bottom: 0in; padding-left: 30px;"><span style="color: #333399;"><span style="color: #ff0000;">192.168.1.162</span><strong> </strong></span><span style="color: #333399;"> 0.0.0.0         255.255.255.255 UH    0      0        0 <em><strong>ppp0</strong></em></span></p>
+<p style="margin-bottom: 0in; padding-left: 30px;"><span style="color: #333399;">87.61.21.102    192.168.1.1     255.255.255.255 UGH   0      0        0 eth0 </span></p>
+<p style="margin-bottom: 0in; padding-left: 30px;"><span style="color: #333399;">192.168.1.0     0.0.0.0         255.255.255.0   U     1      0        0 eth0 </span></p>
+<p style="margin-bottom: 0in;">If you see <em><strong>ppp0</strong></em>, it means you have successfully connected to the VPN.</p>
+<h2 style="margin-bottom: 0in;"><span style="color: #4700b8;"><span style="color: #000000;">7></span></span> Add required routes</h2>
+<p style="margin-bottom: 0in;"><!-- 		@page { margin: 0.79in } 		P { margin-bottom: 0.08in } --></p>
+<p style="margin-bottom: 0in; padding-left: 30px;">route add -host 192.168.1.30 gw <span style="color: #ff0000;">192.168.1.162</span></p>
+<p>Where <em>192.168.1.30</em> is my internal company IP.</p>
+<h2>8>    	 	 	 	 	After that, to resolve the domains by names</h2>
+<p>vi /etc/resolv.conf</p>
+<p style="margin-bottom: 0in; padding-left: 30px;"><span style="color: #333399;">#to use when connected to the VPN my-company.com</span></p>
+<p style="margin-bottom: 0in; padding-left: 30px;"><span style="color: #333399;">domain my-office.my-company.com</span></p>
+<p style="margin-bottom: 0in; padding-left: 30px;"><span style="color: #333399;">#this, is the most important line: courtesy: Nikolaj</span></p>
+<p style="margin-bottom: 0in; padding-left: 30px;"><span style="color: #333399;">search my-office.my-company.com</span></p>
+<p style="margin-bottom: 0in; padding-left: 30px;"><span style="color: #333399;">#nameserver 192.168.1.1</span></p>
+<p style="margin-bottom: 0in; padding-left: 30px;"><span style="color: #333399;">nameserver 192.168.1.4</span></p>
+<p style="margin-bottom: 0in; padding-left: 30px;"><span style="color: #333399;">nameserver 192.168.1.5</span></p>
+<h2 style="margin-bottom: 0in;">Further reading:</h2>
+<ul>
+<li><a title="Nikolaj's original post on PPTP" href="http://blog.efef.dk/?p=92">Nikolaj's original post</a></li>
+</ul>

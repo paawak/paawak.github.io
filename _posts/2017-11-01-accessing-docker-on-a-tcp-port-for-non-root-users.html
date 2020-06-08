@@ -1,0 +1,49 @@
+---
+layout: post
+status: publish
+published: true
+title: Accessing docker on a tcp port for non-root users
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 890
+wordpress_url: http://palashray.com/?p=890
+date: '2017-11-01 10:02:55 +0530'
+date_gmt: '2017-11-01 14:02:55 +0530'
+categories:
+- linux
+tags:
+- docker
+comments: []
+---
+<p>Well, it seems that running docker for non-root users is trivial. You can just add your user to the <em>docker</em> usergroup as mentioned below:<br />
+<a href="https://docs.docker.com/engine/installation/linux/linux-postinstall/#manage-docker-as-a-non-root-user">https://docs.docker.com/engine/installation/linux/linux-postinstall/#manage-docker-as-a-non-root-user</a><br />
+However, it might not be the best idea, as there are security implications:<br />
+<a href="https://docs.docker.com/engine/security/security/#docker-daemon-attack-surface">https://docs.docker.com/engine/security/security/#docker-daemon-attack-surface</a><br />
+In the default docker installation, the dockerd listens on a Unix socket: /var/run/docker.sock, which in some Linux distros like CentOS and RHEL, can only be accessed by root user or users in the sudo group. This becomes an issue especially, for example, when we try to run docker through a Maven plugin.<br />
+The solution is to enable the docker daemon to listen on a tcp socket. This can be done by:</p>
+<pre class="lang:sh decode:true">vi /lib/systemd/system/docker.service</pre>
+<p>Edit the below line as shown:</p>
+<blockquote><p>ExecStart=/usr/bin/dockerd -H unix:///var/run/docker.sock -H tcp://localhost:2375</p></blockquote>
+<p>This will tell docker daemon to listen on port <em>2375</em> for tcp connection. Next, reload the configuration and restart dockerd:</p>
+<pre class="lang:sh decode:true">systemctl daemon-reload
+service docker restart</pre>
+<p>To test whether it is working, do:</p>
+<pre class="lang:sh decode:true">curl http://localhost:2375/version</pre>
+<p>Now, you should be able to run docker as a non-root user, if you do:</p>
+<pre class="lang:sh decode:true">docker -H localhost:2375 run hello-world</pre>
+<p>Better still, you can define the below variable:</p>
+<blockquote><p>export DOCKER_HOST=tcp://localhost:2375</p></blockquote>
+<p>With that, the below command should work fine:</p>
+<pre class="lang:sh decode:true">docker run hello-world</pre>
+<p>Note that now, we can run the below Maven plugin without any issue:<br />
+<a href="https://github.com/spotify/dockerfile-maven">https://github.com/spotify/dockerfile-maven</a><br />
+<span style="text-decoration: underline;"><strong>References:</strong></span><br />
+https://www.ivankrizsan.se/2016/05/18/enabling-docker-remote-api-on-ubuntu-16-04/<br />
+https://www.virtuallyghetto.com/2014/07/quick-tip-how-to-enable-docker-remote-api.html<br />
+<a href="https://docs.docker.com/engine/reference/commandline/dockerd/#daemon-socket-option">https://docs.docker.com/engine/reference/commandline/dockerd/#daemon-socket-option</a><br />
+&nbsp;</p>

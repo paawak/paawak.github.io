@@ -1,0 +1,34 @@
+---
+layout: post
+status: publish
+published: true
+title: Magic of ps
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 15
+wordpress_url: http://technoblogs.paawak.com/?p=10
+date: '2008-06-01 11:34:30 +0530'
+date_gmt: '2008-06-01 17:34:30 +0530'
+categories:
+- linux
+tags:
+- linux
+comments: []
+---
+<p class="entryContent">
+<p>The command<br />
+$ps -eF<br />
+lists all process along-with the full command which started the process. When I ran this, I could not see the entire command due the width restriction of my terminal. This is the solution to set unlimited width:<br />
+$ps -eF -w -w<br />
+Now, suppose I want to know a specific process by its name:<br />
+$ps -F -C java -w -w<br />
+The -C option accepts a list of process name like:<br />
+$ps -F -C "java xmms" -w -w<br />
+For a list of files opened by a process, use<br />
+$/usr/sbin/lsof -p 3456 | grep XXXX<br />
+[Courtesy Prakash]</p>

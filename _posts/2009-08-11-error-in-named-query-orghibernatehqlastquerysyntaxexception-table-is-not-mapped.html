@@ -1,0 +1,55 @@
+---
+layout: post
+status: publish
+published: true
+title: 'Error in named query: org.hibernate.hql.ast.QuerySyntaxException: table is
+  not mapped'
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 125
+wordpress_url: http://puretech.paawak.com/?p=125
+date: '2009-08-11 02:29:16 +0530'
+date_gmt: '2009-08-10 20:59:16 +0530'
+categories:
+- database
+- hibernate
+tags:
+- java
+comments: []
+---
+<p>I was taking advantage of the NamedQueries feature in Hibernate annotation, when suddenly I was bombed with this queer error:<br />
+<span style="color: #ff0000;">ERROR - SessionFactoryImpl.<init>(363) | Error in named query: findMaxId<br />
+org.hibernate.hql.ast.QuerySyntaxException: AccountGroup is not mapped [SELECT MAX(id) FROM AccountGroup]</span><br />
+My AccountGroup looks like this:</p>
+<pre lang="java">@Entity(name = "account_group")
+@NamedQueries( { @NamedQuery(name = AccountGroup.NAMED_QUERY_FIND_MAX_ID, query = "SELECT MAX(acg.id) FROM AccountGroup acg") })
+public class AccountGroup implements Serializable {
+    private static final long serialVersionUID = 8651011772980546778L;
+    public static final String NAMED_QUERY_FIND_MAX_ID = "findMaxId";
+...
+}</pre>
+<p>As is evident from the error message, the HQL compiler is not able to map any table to "AccountGroup". But this is strange, since I have already mapped it in my hibernate.cfg.xml. After a few minutes of futile googling, the solution dawned upon me.</p>
+<h3>Solution 1:</h3>
+<p>Include an additional annotation <em>@Table</em>:</p>
+<pre lang="java">@Entity
+@Table(name = "account_group")
+@NamedQueries( { @NamedQuery(name = AccountGroup.NAMED_QUERY_FIND_MAX_ID, query = "SELECT MAX(acg.id) FROM AccountGroup acg") })
+public class AccountGroup implements Serializable {
+    private static final long serialVersionUID = 8651011772980546778L;
+    public static final String NAMED_QUERY_FIND_MAX_ID = "findMaxId";
+...
+}</pre>
+<h3>Solution 2:</h3>
+<p>Modify your query to have the <em>fully qualified</em> class name:</p>
+<pre lang="java">@Entity(name = "account_group")
+@NamedQueries( { @NamedQuery(name = AccountGroup.NAMED_QUERY_FIND_MAX_ID, query = "SELECT MAX(acg.id) FROM com.swayam.test.AccountGroup acg") })
+public class AccountGroup implements Serializable {
+    private static final long serialVersionUID = 8651011772980546778L;
+    public static final String NAMED_QUERY_FIND_MAX_ID = "findMaxId";
+...
+}</pre>

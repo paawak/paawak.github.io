@@ -1,0 +1,237 @@
+---
+layout: post
+status: publish
+published: true
+title: 'Demystifying JINI: Non-Secure Server: Part 2'
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 550
+wordpress_url: http://palashray.com/?p=550
+date: '2014-07-09 02:34:05 +0530'
+date_gmt: '2014-07-09 02:34:05 +0530'
+categories:
+- jini
+tags:
+- java
+- jini
+- rmi
+comments:
+- id: 61
+  author: 'Demystifying JINI: Dynamic Code Download | Heart of a hacker'
+  author_email: ''
+  author_url: http://palashray.com/demystifying-jini-dynamic-code-download/
+  date: '2015-01-31 21:25:50 +0530'
+  date_gmt: '2015-01-31 21:25:50 +0530'
+  content: "[&#8230;] In the 2nd part, we had shown how to Spring-ify it: http://palashray.com/demystifying-jini-non-secure-server-part-2/
+    [&#8230;]"
+---
+<p>In <a href="http://palashray.com/demystifying-jini-non-secure-server-part-1/">Part 1</a>, we had sieved through the example available on the JINI site and distilled the Rmi client server code to the bare minimum. But still, its far from production ready. Its not Spring-ified yet. Lets try to do that here. We will build this on top of Part 1.</p>
+<h2>Server</h2>
+<p>I need the following utility which can double up as a Spring bean, will do the export for me.</p>
+<pre lang="java">
+public class ServiceExporter implements InitializingBean {
+    private DiscoveryManagement discoveryManager;
+    private LeaseRenewalManager leaseRenewalManager;
+    private Exporter exporter;
+    private Remote service;
+    private String serviceName;
+    public DiscoveryManagement getDiscoveryManager() {
+        return discoveryManager;
+    }
+    public void setDiscoveryManager(DiscoveryManagement discoveryManager) {
+        this.discoveryManager = discoveryManager;
+    }
+    public LeaseRenewalManager getLeaseRenewalManager() {
+        return leaseRenewalManager;
+    }
+    public void setLeaseRenewalManager(LeaseRenewalManager leaseRenewalManager) {
+        this.leaseRenewalManager = leaseRenewalManager;
+    }
+    public Exporter getExporter() {
+        return exporter;
+    }
+    public void setExporter(Exporter exporter) {
+        this.exporter = exporter;
+    }
+    public Remote getService() {
+        return service;
+    }
+    public void setService(Remote service) {
+        this.service = service;
+    }
+    public String getServiceName() {
+        return serviceName;
+    }
+    public void setServiceName(String serviceName) {
+        this.serviceName = serviceName;
+    }
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        Remote exportedService = exporter.export(service);
+        JoinManager joinManager = new JoinManager(exportedService, new Entry[]{new Name(serviceName)},
+                (ServiceID) null, discoveryManager, leaseRenewalManager);
+    }
+}
+</pre>
+<p>This is the main Spring configuration:</p>
+<pre lang="xml">
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:util="http://www.springframework.org/schema/util"
+	xmlns:tx="http://www.springframework.org/schema/tx" xmlns:aop="http://www.springframework.org/schema/aop"
+	xsi:schemaLocation="
+          http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+          http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util.xsd
+          http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx.xsd
+          http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop.xsd">
+	<bean id="discoveryManager" class="net.jini.discovery.LookupLocatorDiscovery">
+		<constructor-arg>
+			<list>
+				<bean class="net.jini.core.discovery.LookupLocator">
+					<constructor-arg value="jini://localhost:4160" />
+				</bean>
+			</list>
+		</constructor-arg>
+	</bean>
+	<bean id="leaseRenewalManager" class="net.jini.lease.LeaseRenewalManager" />
+	<bean id="serviceExporter" class="net.jini.jrmp.JrmpExporter" scope="prototype" />
+	<bean class="com.swayam.demo.rmi.core.ServiceExporter">
+		<property name="discoveryManager" ref="discoveryManager"/>
+		<property name="leaseRenewalManager" ref="leaseRenewalManager"/>
+		<property name="exporter" ref="serviceExporter" />
+		<property name="serviceName" value="BankAccountService" />
+		<property name="service">
+			<bean class="com.swayam.demo.rmi.service.impl.BankAccountServiceImpl" />
+		</property>
+	</bean>
+	<bean class="com.swayam.demo.rmi.core.ServiceExporter">
+		<property name="discoveryManager" ref="discoveryManager"/>
+		<property name="leaseRenewalManager" ref="leaseRenewalManager"/>
+		<property name="exporter" ref="serviceExporter" />
+		<property name="serviceName" value="UserService" />
+		<property name="service">
+			<bean class="com.swayam.demo.rmi.service.impl.UserServiceImpl" />
+		</property>
+	</bean>
+</beans>
+</pre>
+<p>And, see how simple my main class has become, just loads the Spring file:</p>
+<pre lang="java">
+public class SpringNonSecureRmiServer {
+	public static void main(String[] args) {
+		try(
+				ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("server-application.xml")
+		){
+			System.out.println("SpringNonSecureRmiServer.main(): " + "The server is ready");
+		}
+	}
+}
+</pre>
+<h2>Client</h2>
+<p>The client is a bit tricky, as I need to lookup the remote service from the registry. In Spring's nomenclature, this is nothing but a <strong>FactoryBean</strong>.</p>
+<pre lang="java">
+public class ProxyRemoteFactoryBean implements FactoryBean<remote>, InitializingBean {
+    private LookupLocator lookupLocator;
+    private Class<?> serviceInterface;
+    private String serviceName;
+    private Remote remoteService;
+    @Override
+    public Remote getObject() throws Exception {
+        return remoteService;
+    }
+    @Override
+    public Class<?> getObjectType() {
+        return serviceInterface;
+    }
+    @Override
+    public boolean isSingleton() {
+        return true;
+    }
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        remoteService = (Remote) lookupLocator.getRegistrar().lookup(new ServiceTemplate(null,
+                new Class[]{serviceInterface}, new Entry[]{new Name(serviceName)}));
+    }
+    public LookupLocator getLookupLocator() {
+        return lookupLocator;
+    }
+    public void setLookupLocator(LookupLocator lookupLocator) {
+        this.lookupLocator = lookupLocator;
+    }
+    public String getServiceName() {
+        return serviceName;
+    }
+    public void setServiceName(String serviceName) {
+        this.serviceName = serviceName;
+    }
+    public Class<?> getServiceInterface() {
+        return serviceInterface;
+    }
+    public void setServiceInterface(Class<?> serviceInterface) {
+        this.serviceInterface = serviceInterface;
+    }
+}
+</pre>
+<p>The Spring configuration is:</p>
+<pre lang="xml">
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:util="http://www.springframework.org/schema/util"
+	xmlns:tx="http://www.springframework.org/schema/tx" xmlns:aop="http://www.springframework.org/schema/aop"
+	xsi:schemaLocation="
+          http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+          http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util.xsd
+          http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx.xsd
+          http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop.xsd">
+	<bean id="lookupLocator" class="net.jini.core.discovery.LookupLocator">
+		<constructor-arg value="jini://localhost:4160" />
+	</bean>
+	<bean id="bankAccountService" class="com.swayam.demo.rmi.client.ProxyRemoteFactoryBean">
+		<property name="lookupLocator" ref="lookupLocator" />
+		<property name="serviceInterface" value="com.swayam.demo.rmi.service.BankAccountService" />
+		<property name="serviceName" value="BankAccountService" />
+	</bean>
+	<bean id="userService" class="com.swayam.demo.rmi.client.ProxyRemoteFactoryBean">
+		<property name="lookupLocator" ref="lookupLocator" />
+		<property name="serviceInterface" value="com.swayam.demo.rmi.service.UserService" />
+		<property name="serviceName" value="UserService" />
+	</bean>
+</beans>
+</pre>
+<p>And this is the way we can use it.</p>
+<pre lang="java">
+public class SpringNonSecureRmiClient {
+	/**
+	 * Needs to be run with the following JVM args:<br/>
+	 * <ul>
+	 * <li>
+	 * -Djava.security.policy=/full-path/RmiClient/src/main/resources/policy.all
+	 * </li>
+	 * <li>-Djava.rmi.server.RMIClassLoaderSpi=net.jini.loader.pref.
+	 * PreferredClassProvider</li>
+	 * </ul>
+	 */
+	public static void main(String[] args) throws Exception {
+		try (ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext(
+				"client-application.xml")) {
+			UserService userService = (UserService) context
+					.getBean("userService");
+			System.out.println("Getting current users from remote: "
+					+ userService.getCurrentUsers());
+			BankAccountService bankAccountService = (BankAccountService) context
+					.getBean("bankAccountService");
+			System.out.println("Creating bank account from remote, id: "
+					+ bankAccountService.createBankAccount("aaa"));
+		}
+	}
+}
+</pre>
+<h2>Resources</h2>
+<p>The code can be found in GitHub, under the <em>code/jini/unsecure/plain</em>:<br />
+<a href="https://github.com/paawak/blog.git" target="_blank">https://github.com/paawak/blog.git </a><br />
+&nbsp;</p>

@@ -1,0 +1,242 @@
+---
+layout: post
+status: publish
+published: true
+title: Creating a Java 8 Stream from unbounded data using Spliterator
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 851
+wordpress_url: http://palashray.com/?p=851
+date: '2016-07-17 02:07:39 +0530'
+date_gmt: '2016-07-17 06:07:39 +0530'
+categories:
+- java
+tags:
+- java
+- jaxb
+- stax
+- xml
+comments: []
+---
+<h2>Problem Statement</h2>
+<p>I have a large XML file. I would like to read it, and group-by and aggregate the rows in it using Java 8. DOM parser with JAXB will not be able to handle this, as its a really large file. I would like to create a Stream from the unbounded data contained in the XML file.</p>
+<h2>Solution</h2>
+<p>I read the XML by streaming with Stax. Since I do not load the entire file in memory, I am good. I go a step further, and use JAXB to un-marshall small portions of this file, which I will call a row. I use a Spliterator backed by a BlockingQueue to create a Stream out of it. After I have the stream, I apply the famous grouping-by function and aggregate the rows.</p>
+<h2>The XML</h2>
+<p>The sample XML looks like this:</p>
+<pre class="lang:xhtml decode:true "><table ID="lineitem">
+	<T>
+		<L_ORDERKEY>1</L_ORDERKEY>
+		<L_PARTKEY>1552</L_PARTKEY>
+		<L_SUPPKEY>93</L_SUPPKEY>
+		<L_LINENUMBER>1</L_LINENUMBER>
+		<L_QUANTITY>17</L_QUANTITY>
+		<L_EXTENDEDPRICE>24710.35</L_EXTENDEDPRICE>
+		<L_DISCOUNT>0.04</L_DISCOUNT>
+		<L_TAX>0.02</L_TAX>
+		<L_RETURNFLAG>N</L_RETURNFLAG>
+		<L_LINESTATUS>O</L_LINESTATUS>
+		<L_SHIPDATE>1996-03-13</L_SHIPDATE>
+		<L_COMMITDATE>1996-02-12</L_COMMITDATE>
+		<L_RECEIPTDATE>1996-03-22</L_RECEIPTDATE>
+		<L_SHIPINSTRUCT>DELIVER IN PERSON</L_SHIPINSTRUCT>
+		<L_SHIPMODE>TRUCK</L_SHIPMODE>
+		<L_COMMENT>blithely regular ideas caj</L_COMMENT>
+	</T>
+</table>
+</pre>
+<p>There would be thousands of elements "T". I have modeled my POJO on the element "T". I use Stax to read the xml. When I read one element "T", I use Jaxb to un-marshall it to a Java object and then add it to the Stream.</p>
+<h2>The POJO</h2>
+<p>I have modeled the POJO as below:</p>
+<pre class="lang:java decode:true ">@XmlRootElement(name = "T")
+@XmlAccessorType(XmlAccessType.FIELD)
+public class LineItemRow {
+    @XmlElement(name = "L_ORDERKEY")
+    private int orderKey;
+    @XmlElement(name = "L_PARTKEY")
+    private int partKey;
+    @XmlElement(name = "L_SUPPKEY")
+    private int supplierKey;
+    @XmlElement(name = "L_LINENUMBER")
+    private int lineNumber;
+    @XmlElement(name = "L_QUANTITY")
+    private int quantity;
+    @XmlElement(name = "L_EXTENDEDPRICE")
+    private float extendedPrice;
+    @XmlElement(name = "L_DISCOUNT")
+    private float discount;
+    @XmlElement(name = "L_TAX")
+    private float tax;
+    @XmlElement(name = "L_RETURNFLAG")
+    private String returnFlag;
+    @XmlElement(name = "L_LINESTATUS")
+    private String lineStatus;
+    @XmlElement(name = "L_SHIPDATE")
+    @XmlJavaTypeAdapter(LocalDateAdapter.class)
+    private LocalDate shippingDate;
+    @XmlElement(name = "L_COMMITDATE")
+    @XmlJavaTypeAdapter(LocalDateAdapter.class)
+    private LocalDate commitDate;
+    @XmlElement(name = "L_RECEIPTDATE")
+    @XmlJavaTypeAdapter(LocalDateAdapter.class)
+    private LocalDate receiptDate;
+    @XmlElement(name = "L_SHIPINSTRUCT")
+    private String shippingInstructions;
+    @XmlElement(name = "L_SHIPMODE")
+    private String shipMode;
+    @XmlElement(name = "L_COMMENT")
+    private String comment;
+...</pre>
+<h2>The Stax Parser</h2>
+<p>The heart of this is the Stax parser:</p>
+<pre class="lang:java decode:true ">public class XmlParser<T> {
+    private static final Logger LOGGER = LoggerFactory.getLogger(XmlParser.class);
+    private final String xmlElementName;
+    private final Class<T> classToUnmarshall;
+    private final CountDownLatch countDownLatch;
+    private final JaxbUnmarshaller jaxbUnmarshaller;
+    private final BlockingQueue<T> blockingQueue;
+    private final StaxSpliterator<T> staxSpliterator;
+    private final Stream<T> stream;
+    public XmlParser(String xmlElementName, Class<T> classToUnmarshall, CountDownLatch countDownLatch) {
+	this.xmlElementName = xmlElementName;
+	this.classToUnmarshall = classToUnmarshall;
+	this.countDownLatch = countDownLatch;
+	jaxbUnmarshaller = new JaxbUnmarshaller();
+	blockingQueue = new ArrayBlockingQueue<>(10_000);
+	staxSpliterator = new StaxSpliterator<>(blockingQueue);
+	stream = StreamSupport.stream(staxSpliterator, true);
+    }
+    public Stream<T> parse(InputStream inputStream) {
+	Runnable doParse = () -> {
+	    try {
+		doParse(inputStream);
+	    } catch (XMLStreamException e) {
+		throw new RuntimeException(e);
+	    }
+	};
+	new Thread(doParse).start();
+	return stream;
+    }
+    private void doParse(InputStream inputStream) throws XMLStreamException {
+	XMLInputFactory xmlInputFactory = XMLInputFactory.newInstance();
+	XMLStreamReader xmlStreamReader = xmlInputFactory.createXMLStreamReader(inputStream);
+	StringBuilder buffer = newStringBuilder();
+	while (xmlStreamReader.hasNext()) {
+	    int eventType = xmlStreamReader.next();
+	    if (eventType == XMLStreamConstants.START_ELEMENT) {
+		String element = xmlStreamReader.getLocalName();
+		if (xmlElementName.equals(element)) {
+		    buffer = newStringBuilder();
+		}
+		buffer.append("<").append(element).append(">");
+	    } else if (eventType == XMLStreamConstants.END_ELEMENT) {
+		String element = xmlStreamReader.getLocalName();
+		buffer.append("</").append(element).append(">");
+		if (xmlElementName.equals(element)) {
+		    T newElement = jaxbUnmarshaller.unmarshall(new ByteArrayInputStream(buffer.toString().getBytes(StandardCharsets.UTF_8)), classToUnmarshall);
+		    LOGGER.trace("publishing: {}", newElement);
+		    blockingQueue.add(newElement);
+		    buffer.setLength(0);
+		}
+	    } else if (eventType == XMLStreamConstants.CHARACTERS) {
+		buffer.append(xmlStreamReader.getText().trim());
+	    } else if (eventType == XMLStreamConstants.END_DOCUMENT) {
+		staxSpliterator.endOfDocument();
+		LOGGER.info("end of xml document");
+		countDownLatch.countDown();
+	    }
+	}
+    }
+    private StringBuilder newStringBuilder() {
+	return new StringBuilder(600);
+    }
+}</pre>
+<p>&nbsp;<br />
+I use the CountDownLatch only because I need my JUnit to be alive till the document is read fully. It would not be needed in an actual server environment. Note the usage of the BlockingQueue.</p>
+<h2>Spliterator implementation</h2>
+<pre class="lang:java decode:true ">class StaxSpliterator<T> implements Spliterator<T>, EndOfDocumentListener {
+    private static final Logger LOGGER = LoggerFactory.getLogger(StaxSpliterator.class);
+    private final BlockingQueue<T> buffer;
+    private AtomicBoolean endOfDocument = new AtomicBoolean(false);
+    private static final long TIMEOUT = 100;;
+    StaxSpliterator(BlockingQueue<T> buffer) {
+	this.buffer = buffer;
+    }
+    @Override
+    public boolean tryAdvance(Consumer<? super T> action) {
+	if (endOfDocument.get()) {
+	    return false;
+	}
+	T nonNullElement = null;
+	LOGGER.trace("the buffer is empty, waiting for some time...");
+	try {
+	    nonNullElement = buffer.poll(TIMEOUT, TimeUnit.MILLISECONDS);
+	} catch (InterruptedException e) {
+	    throw new RuntimeException(e);
+	}
+	if (nonNullElement == null) {
+	    LOGGER.trace("terminating as received null after waiting");
+	    return false;
+	}
+	action.accept(nonNullElement);
+	return true;
+    }
+    @Override
+    public Spliterator<T> trySplit() {
+	return null;
+    }
+    @Override
+    public long estimateSize() {
+	return Long.MAX_VALUE;
+    }
+    @Override
+    public int characteristics() {
+	return Spliterator.NONNULL | Spliterator.CONCURRENT;
+    }
+    @Override
+    public void endOfDocument() {
+	LOGGER.info("end of document event received");
+	endOfDocument.set(true);
+    }
+}</pre>
+<p>&nbsp;</p>
+<h2>The grouping logic</h2>
+<p>This part is very simple. We actually stream a GZip file by using a GZIPInputStream:</p>
+<pre class="lang:java decode:true ">public class XmlParserIT {
+    private static final Logger LOGGER = LoggerFactory.getLogger(XmlParserIT.class);
+    @Test
+    public void testParse() throws XMLStreamException, IOException, InterruptedException {
+	CountDownLatch countDownLatch = new CountDownLatch(1);
+	XmlParser<LineItemRow> xmlParser = new XmlParser<LineItemRow>("T", LineItemRow.class, countDownLatch);
+	Stream<LineItemRow> stream = xmlParser.parse(new GZIPInputStream(XmlParserIT.class.getResourceAsStream("/datasets/xml/www.cs.washington.edu/lineitem.xml.gz")));
+	Map<Integer, List<LineItemRow>> groupedByData = stream.collect(Collectors.groupingBy((LineItemRow row) -> {
+	    LOGGER.trace("grouping by: {}", row);
+	    return row.getOrderKey();
+	}));
+	groupedByData.entrySet().parallelStream().map((Entry<Integer, List<LineItemRow>> entry) -> {
+	    int orderKey = entry.getKey();
+	    DoubleStream doubleStream = entry.getValue().parallelStream().mapToDouble((LineItemRow row) -> {
+		return row.getExtendedPrice();
+	    });
+	    LineItemRow aggregatedRow = new LineItemRow();
+	    aggregatedRow.setOrderKey(orderKey);
+	    aggregatedRow.setExtendedPrice((float) doubleStream.sum());
+	    return aggregatedRow;
+	}).forEach((LineItemRow row) -> {
+	    LOGGER.info("new aggregated event: {}", row);
+	});
+	countDownLatch.await();
+    }
+}</pre>
+<p>&nbsp;</p>
+<h2>Sources</h2>
+<p><a href="https://github.com/paawak/blog/tree/master/code/reactive-streams/spliterator-demo">https://github.com/paawak/blog/tree/master/code/reactive-streams/spliterator-demo</a><br />
+I found some large xmls from the below location:<br />
+<a href="http://www.cs.washington.edu/research/xmldatasets/www/repository.html">http://www.cs.washington.edu/research/xmldatasets/www/repository.html</a><br />
+&nbsp;</p>

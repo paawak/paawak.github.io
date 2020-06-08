@@ -1,0 +1,55 @@
+---
+layout: post
+status: publish
+published: true
+title: Installing postgres on Fedora
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 257
+wordpress_url: http://puretech.paawak.com/?p=257
+date: '2010-01-06 14:14:25 +0530'
+date_gmt: '2010-01-06 08:44:25 +0530'
+categories:
+- database
+- postgres
+tags:
+- linux
+- postgres
+comments: []
+---
+<p>In Fedora 7+, postgres is insatlled by default. Its just about a few commands to get started. First of all you have to change the password for the postgres user, <em>postgres</em>. I am pasting the commands below:<br />
+#passwd postgres<br />
+#chown postgres /var/lib/pgsql/data/<br />
+#su - postgres<br />
+~initdb -D /var/lib/pgsql/data/<br />
+#/etc/rc.d/init.d/postgresql start<br />
+You can also install <em>pgadmin3</em>, which is a nice GUI for postgres:<br />
+#yum install pgadmin3<br />
+If you do not have the repository, you can add it from here:<br />
+<a title="Postgres Yum Repo" href="http://yum.pgsqlrpms.org/reporpms/repoview/letter_p.group.html" target="_blank"> http://yum.pgsqlrpms.org/reporpms/repoview/letter_p.group.html</a><br />
+I was inspired by this blog:<br />
+<a href="http://www.postgresonline.com/journal/index.php?/archives/45-An-Almost-Idiots-Guide-to-PostgreSQL-YUM.html">http://www.postgresonline.com/journal/index.php?/archives/45-An-Almost-Idiots-Guide-to-PostgreSQL-YUM.html</a></p>
+<h1><span style="color: #ff0000;">Update As On 18th July 2014</span></h1>
+<p>After a long break, I am again back, trying to install Postgres. It has become lot easier. Just installed it using the rpm available on the site. It was smart enough to create the user <em>postgres</em> for me.<br />
+A few essential post install tweaks are necessary.<br />
+<strong>Note:</strong> The below steps have to be done while logging in as the unix user postgres.</p>
+<h2>Changing the authentication method from peer and ident to md5</h2>
+<p>By default, postgres has the unix user postgres as the only user. Now, you would like to change that. Edit the <strong><code class="filename">pg_hba.conf</code></strong>. Typically in Fedora it would be under the <em>/var/lib/pgsql/data</em>. Change it so that the below section looks like:</p>
+<blockquote><p># "local" is for Unix domain socket connections only<br />
+local&nbsp;&nbsp; all&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; all&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span style="color: #ff0000;">md5</span><br />
+# IPv4 local connections:<br />
+host&nbsp;&nbsp;&nbsp; all&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; all&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 127.0.0.1/32&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span style="color: #ff0000;">md5</span><br />
+# IPv6 local connections:<br />
+host&nbsp;&nbsp;&nbsp; all&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; all&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ::1/128&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <span style="color: #ff0000;">md5</span></p></blockquote>
+<p>Then through psql, change the user role of the <em>postgres</em> user:</p>
+<blockquote><p>alter user postgres with password 'mypassword';</p></blockquote>
+<p>Now restart the service for these changes to take effect.</p>
+<h2>Making the database accept TCP/IP connection</h2>
+<p>Edit the <strong><code class="filename">postgresql.conf</code></strong> and un-comment the below line:</p>
+<blockquote><p>listen_addresses = 'localhost'</p></blockquote>
+<p>After completing the above 2 steps, you should be all set!</p>

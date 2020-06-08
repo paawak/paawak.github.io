@@ -1,0 +1,106 @@
+---
+layout: post
+status: publish
+published: true
+title: Building a REST Server with Spring MVC
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 841
+wordpress_url: http://palashray.com/?p=841
+date: '2016-04-08 00:28:54 +0530'
+date_gmt: '2016-04-08 04:28:54 +0530'
+categories:
+- java
+- spring
+tags:
+- rest
+- spring
+comments: []
+---
+<p>We would like to build a REST server with Spring MVC. It should be very simple to support various formats like JSON and XML for the same request, just by changing the Content header. Example, I have the below url:<br />
+http://localhost:8090/simple-spring-rest/bank-detail<br />
+It should return me either json or xml or some other format depending on the Accept header to application/json or application/xml respectively.<br />
+Lets see how to achieve that.</p>
+<h2>Configuration of Spring MVC</h2>
+<p>We will use pure Java configuration:</p>
+<pre class="lang:java decode:true">@Configuration
+@EnableWebMvc
+@ComponentScan("com.swayam.demo.web.rest")
+@PropertySource("classpath:jdbc.properties")
+public class WebConfig extends WebMvcConfigurerAdapter {
+    @Override
+    public void configureMessageConverters(List<HttpMessageConverter<?>> converters) {
+	Jackson2ObjectMapperBuilder jackson2ObjectMapperBuilder = new Jackson2ObjectMapperBuilder();
+	converters.add(new MappingJackson2HttpMessageConverter(jackson2ObjectMapperBuilder.build()));
+	Jaxb2RootElementHttpMessageConverter jaxb2RootElementHttpMessageConverter = new Jaxb2RootElementHttpMessageConverter();
+	converters.add(jaxb2RootElementHttpMessageConverter);
+    }
+    @Bean
+    public ViewResolver viewResolver() {
+	InternalResourceViewResolver viewResolver = new InternalResourceViewResolver();
+	viewResolver.setViewClass(JstlView.class);
+	viewResolver.setPrefix("/WEB-INF/jsp/");
+	viewResolver.setSuffix(".jsp");
+	return viewResolver;
+    }
+    @Bean
+    public static PropertySourcesPlaceholderConfigurer propertyConfig() {
+	return new PropertySourcesPlaceholderConfigurer();
+    }
+}</pre>
+<p>Note the use of <em>WebMvcConfigurerAdapter</em>. It comes in handy when you want to work with Spring MVC. Especially note worthy is the&nbsp;<em>configureMessageConverters()</em> method. You would use that to configure a REST service. It would define how Spring handles the <em>@ResponseBody</em> or <em>@RestController</em> annotation, to translate a POJO to the response type: json, xml, etc. In the above example, we are using <em>MappingJackson2HttpMessageConverter</em> to convert our POJOs to JSON and <em>Jaxb2RootElementHttpMessageConverter</em> to convert them to XML.</p>
+<h2>Model</h2>
+<pre class="lang:java decode:true">import javax.xml.bind.annotation.XmlRootElement;
+@XmlRootElement
+public class BankDetail {
+    private int id;
+    private int age;
+    private String job;
+    private String marital;
+    private String education;
+    private String defaulted;
+    private BigDecimal balance;
+    private String housing;
+    private String loan;
+    private String contact;
+    private int day;
+    private String month;
+    private int duration;
+    private int campaign;
+    private int pdays;
+    private int previous;
+    private String poutcome;
+    private String y;
+....
+}</pre>
+<p>Note the use of <em>@XmlRootElement</em>. This is absolutely necessary as we are using <em>Jaxb2RootElementHttpMessageConverter</em> to convert our POJOs to xml. If you omit this, you will get a <strong>"Error 406 Not Acceptable"</strong> error, the underlying cause being:</p>
+<blockquote><p>org.springframework.web.HttpMediaTypeNotAcceptableException: Could not find acceptable representation</p></blockquote>
+<h2>Controller</h2>
+<pre class="lang:java decode:true ">@RestController
+public class SimpleBankDetailRestController {
+    private final BankDetailService bankDetailService;
+    @Autowired
+    public SimpleBankDetailRestController(BankDetailService bankDetailService) {
+	this.bankDetailService = bankDetailService;
+    }
+    @RequestMapping(path = { "/bank-detail" }, method = { RequestMethod.GET, RequestMethod.POST })
+    public BankDetail getBankDetail() {
+	return bankDetailService.getBankDetails().get(0);
+    }
+}
+</pre>
+<p>The controller is very simple, and returns the POJO. It is upto the <em>HttpMessageConverter</em> to make sense of it and convert that to either json or xml.<br />
+This makes the perfect sense, as the controller can just return the model, and the conversion can be a configuration detail.</p>
+<h2>Alternate ways of specifying the desired response type</h2>
+<p>Spring gives us the flexibility of doing away with the Accept header to specify the type of response. If we want json output, we can simply say:<br />
+http://localhost:8090/simple-spring-rest/bank-detail.json<br />
+For xml, we can similarly say:<br />
+http://localhost:8090/simple-spring-rest/bank-detail.xml</p>
+<h2>Sources</h2>
+<p>The sources can be found here:<br />
+<a href="https://github.com/paawak/blog/tree/master/code/simple-spring-rest">https://github.com/paawak/blog/tree/master/code/simple-spring-rest</a></p>

@@ -1,0 +1,54 @@
+---
+layout: post
+status: publish
+published: true
+title: Id generation in Hibernate with Sequence
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 386
+wordpress_url: http://puretech.paawak.com/?p=386
+date: '2010-10-31 18:47:33 +0530'
+date_gmt: '2010-10-31 13:17:33 +0530'
+categories:
+- hibernate
+tags:
+- hibernate
+- java
+comments: []
+---
+<p>I have the following SQL Script:</p>
+<pre lang="sql">CREATE SEQUENCE  MY_SEQ
+START WITH 1
+INCREMENT BY 1;
+CREATE TABLE  SEQ_DEMO (
+	ID             INTEGER PRIMARY KEY NOT NULL,
+	NAME     VARCHAR2(20) NOT NULL
+    ) ;</pre>
+<p>The Hibernate entity for this would be:</p>
+<pre lang="java">@Entity
+@Table(name = "SEQ_DEMO")
+public class SeqDemo {
+    @Id
+    @SequenceGenerator(name = "seq", allocationSize = 1, initialValue = 1, sequenceName = "MY_SEQ")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "seq")
+    private long id;
+    @Column
+    private String name;
+    public long getId() {
+        return id;
+    }
+    public void setId(long id) {
+        this.id = id;
+    }
+    public String getName() {
+        return name;
+    }
+    public void setName(String name) {
+        this.name = name;
+    }
+}</pre>

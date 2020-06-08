@@ -1,0 +1,36 @@
+---
+layout: post
+status: publish
+published: true
+title: Playing mp3 on Fedora
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 282
+wordpress_url: http://puretech.paawak.com/?p=282
+date: '2010-05-20 00:07:18 +0530'
+date_gmt: '2010-05-19 18:37:18 +0530'
+categories:
+- linux
+tags:
+- linux
+- mp3
+comments: []
+---
+<p>By default, the codecs to play mp3/mp4 are not included due to licensing issues. First you need to add the non-standard repositories:<br />
+<em><span style="color: #000080;">rpm -ivh http://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-stable.noarch.rpm<br />
+rpm -ivh http://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-stable.noarch.rpm<br />
+rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-rpmfusion-*</span></em><br />
+That done, if you just double click on a mp3 file (starting Fedora 8 onwards), it will pop-up a dialogue saying that you must install missing codecs.&nbsp; Click on yes and go along.<br />
+You can also explicitly install them like this:<br />
+<em><span style="color: #000080;">yum install gstreamer-plugins-ugly gstreamer-plugins-bad gstreamer-ffmpeg</span></em><br />
+Further reading:</p>
+<ul>
+<li><a href="http://rpmfusion.org/Configuration" target="_blank">http://rpmfusion.org/Configuration</a></li>
+<li><a href="http://www.fedorafaq.org/#mp3" target="_blank">http://www.fedorafaq.org/#mp3</a></li>
+<li><a href="http://amarok.kde.org/wiki/MP3_on_Fedora_Core" target="_blank">http://amarok.kde.org/wiki/MP3_on_Fedora_Core</a></li>
+</ul>
