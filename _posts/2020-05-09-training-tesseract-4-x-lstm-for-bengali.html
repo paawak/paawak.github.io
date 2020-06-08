@@ -59,7 +59,7 @@ I have also checked in the <a href="https://github.com/paawak/blog/blob/master/d
 <p>For training Tesseract, creating <em>box files</em> is the first step. A <em>box file</em> is a <em>plain-text</em> file that is used to specify the text, or a character, at a given coordinate in the image. For the <em>lstm</em> system, the coordinates of an entire line is considered and <strong>NOT</strong> the individual coordinates of the character in the image. Note that this is <a href="https://github.com/tesseract-ocr/tesseract/issues/2357#issuecomment-477239316">significantly different</a> from the earlier <em>Tesseract 3.x</em>, where the coordinates of a given character was needed. The format of the box file is:</p>
 <pre class="wrap:true lang:vim decode:true"><character> <LeftBottom x1> <LeftBottom y1> <RightTop x2> <RightTop y2> <tiff image page number></pre>
 <p>The coordinate system used in the box file has <strong>(0,0)</strong> at the <strong>bottom-left</strong> as shown below:<br />
-<img class="wp-image-1160" src="http://localhost/tech-blog/wp-content/uploads/2020/05/word-image.png" /><br />
+<img class="wp-image-1160" src="/assets/2020/05/word-image.png" /><br />
 In a box file, every end of a word is marked with:</p>
 <pre class="wrap:true lang:vim decode:true"><space> <LeftBottom x1> <LeftBottom y1> <RightTop x2> <RightTop y2> <tiff image page number></pre>
 <p>Similarly, every end of a line is marked with:</p>

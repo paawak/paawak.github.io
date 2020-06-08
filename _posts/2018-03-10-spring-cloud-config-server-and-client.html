@@ -26,7 +26,7 @@ comments: []
 <h1 class="western">What are we trying to solve?</h1>
 <p class="western">With the advent of Microservices based architecture, a lot of stress is given on externalisation of properties. Gone are the days of old when the property files were bundled within the jar or war files. With the advent of 12 Factor App paradigm, we try to store our config files external to our application. How can we do this in a Spring Boot application? Well, the spring-cloud provides support to both config-server (a server storing all our configs, for all environment) and the config-client (client applications that use the configs from the server). After a lot of reading and gleaning a lot of resources, I present to you the perfect, complete guide to implementing a production-ready cloud-config-server and its client.</p>
 <h1 class="western">Architectural Overview</h1>
-<p><img class="aligncenter size-full wp-image-979" src="http://localhost/tech-blog/wp-content/uploads/2018/03/spring-cloud-config-server-architecture.jpg" alt="" width="350" height="495" /></p>
+<p><img class="aligncenter size-full wp-image-979" src="/assets/2018/03/spring-cloud-config-server-architecture.jpg" alt="" width="350" height="495" /></p>
 <p class="western">Well, there are a couple of moving parts to this. Let me list them below:</p>
 <p class="western">1. The Git Repo: The git repo is used as the actual storage for the config files or property files. You can store sentitive properties like passwords, in encrypted form. By the way, in this particular example, this is a Git repo, but this can also be any other store. Spring supports Vault, File System, and many other forms of stores.</p>
 <p class="western">2. The config-server-proxy: The config server acts as a proxy for the Git Repo storing the actual properties. The clients will always point to the config-server for fetching the properties. The clients are completely insulated from the backed store, the Git Repo in our case. The config server clones the Git Repo locally, decrypts the encrypted properties and then serves the properties in plain-text to the clients</p>
@@ -36,10 +36,10 @@ comments: []
 <h2 class="western">Git Repository</h2>
 <h2 class="western">Structure</h2>
 <p class="western">The Git repo stores the .yml or properties files inside folders for specific projects. The git repo in this case is called <b>config-server-props</b>. I have a single project identified by <b>my-spring-config-client</b>. So, all properties for different environments will go inside this.</p>
-<p><img class="aligncenter size-full wp-image-980" src="http://localhost/tech-blog/wp-content/uploads/2018/03/git-repo-structure.png" alt="" width="237" height="129" /></p>
+<p><img class="aligncenter size-full wp-image-980" src="/assets/2018/03/git-repo-structure.png" alt="" width="237" height="129" /></p>
 <h2 class="western">Configuring web-hook</h2>
 <p class="western">We can configure web-hooks in any of the Git Repos (GitHub, BitBucket, GitLab etc.) to post an event to the config server (http://localhost:8888/config-server-proxy/monitor) when any push happens. This is how it is done on the GitHub:</p>
-<p><a href="http://localhost/tech-blog/wp-content/uploads/2018/03/web-hook-on-git-repo.png"><img class="aligncenter size-medium wp-image-981" src="http://localhost/tech-blog/wp-content/uploads/2018/03/web-hook-on-git-repo-300x169.png" alt="" width="300" height="169" /></a></p>
+<p><a href="http://localhost/tech-blog/wp-content/uploads/2018/03/web-hook-on-git-repo.png"><img class="aligncenter size-medium wp-image-981" src="/assets/2018/03/web-hook-on-git-repo-300x169.png" alt="" width="300" height="169" /></a></p>
 <h2 class="western">Message Queue</h2>
 <p class="western">Even before we get started, we would need to have a message-queue. This is needed to decouple of the client and the server. The server publishes change events to the bus, and the clients subscribe to the bus and get notified. In this example we are using a dockerised RabbitMQ. This is how we start it:</p>
 <p class="western"><code class="western"><span style="color: #4444cc;"><span style="font-family: monospace;">docker run -it -d -p 5672:5672 -p 15672:15672 -e RABBITMQ_DEFAULT_USER=my_mq_user -e RABBITMQ_DEFAULT_PASS=mq_secret_57*key rabbitmq:3.7.2-management-alpine </span></span></code></p>

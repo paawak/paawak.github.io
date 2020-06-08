@@ -117,7 +117,7 @@ public class BankDetailController {
 <p class="western">While making a request to the server, you have to always ensure that the <em><strong><span style="color: #ff0000;">content-type</span></strong></em> is set to <em><strong><span style="color: #ff0000;">text/event-stream</span></strong></em>. If that is not done, the server will not publish the content reactively, and we have to wait till the server finishes publishing all data. &nbsp;We would use the ServerSentEvents to consume the stream of data published. Also, we would use RxJs to make our code reactive.</p>
 <h3 class="western">HTML</h3>
 <p class="western">This is how our web page looks like:</p>
-<p><img class="alignnone size-full wp-image-969" src="http://localhost/tech-blog/wp-content/uploads/2018/03/reactive-stream-html.png" alt="" width="620" height="137" /></p>
+<p><img class="alignnone size-full wp-image-969" src="/assets/2018/03/reactive-stream-html.png" alt="" width="620" height="137" /></p>
 <p class="western">This is the source:</p>
 <pre class="lang:xhtml decode:true "><html>
 <head>
@@ -173,7 +173,7 @@ var fetchClickStream = Rx.Observable.fromEvent(fetchButton, 'click');</pre>
 <p class="western">Note the use of flatMap(): we need to use faltMap() here as the eventSourceObserver returns an Observable. The beauty of reactive programming is that we can lazily chain our data transformation logic, and then the actual action happens in the subscribe() block.</p>
 <h1 class="western">Running this example</h1>
 <p class="western">This is a typical Spring Boot Application and can be run by running the main class <span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">ReactiveDemoApplication</span></span></span>. Browse to <span style="color: #000080;"><span lang="zxx"><u><a href="http://localhost:8080/index.html">http://localhost:8080/index.html</a></u></span></span>. Click on Fetch. You will see that as soon as the server publishes the data, it is added as a row on the table almost real time. You can also stop it at any point by clicking on the Stop link.</p>
-<p><a href="http://localhost/tech-blog/wp-content/uploads/2018/03/reactive-stream-server-request-details.png"><img class="aligncenter size-large wp-image-987" src="http://localhost/tech-blog/wp-content/uploads/2018/03/reactive-stream-server-request-details-1024x466.png" alt="" width="604" height="275" /></a><br />
+<p><a href="http://localhost/tech-blog/wp-content/uploads/2018/03/reactive-stream-server-request-details.png"><img class="aligncenter size-large wp-image-987" src="/assets/2018/03/reactive-stream-server-request-details-1024x466.png" alt="" width="604" height="275" /></a><br />
 This is deployed on Heroku:<br />
 <a href="https://reactive-demo.herokuapp.com/index.html">https://reactive-demo.herokuapp.com/index.html</a></p>
 <h1 class="western">Sources</h1>

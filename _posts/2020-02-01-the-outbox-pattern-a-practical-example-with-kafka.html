@@ -40,7 +40,7 @@ comments: []
 <p>One of the ways of solving this is through the Outbox Pattern.</p>
 <h2><a id="post-1087-_vchfu1myqc7a"></a>High Level Design</h2>
 <h3><a id="post-1087-_ry8wdkittk83"></a>The Outbox Persister</h3>
-<p><img class="wp-image-1088" src="http://localhost/tech-blog/wp-content/uploads/2020/02/word-image.png" /></p>
+<p><img class="wp-image-1088" src="/assets/2020/02/word-image.png" /></p>
 <ol>
 <li>Messages are consumed by the Aggregtor from a given Kafka Topic</li>
 <li>The Aggregator saves a reference of the 1st Message (the CorrelationId for the batch, the Kafka Topic, Partition ID, Message Offset and the Timestamp) of a given batch into a Persistent Data Store, called the Outbox</li>
@@ -48,7 +48,7 @@ comments: []
 <li>If the Aggregator instance crashes before the aggregation is completed, the reference of the 1st message of the batch remains in the Data Store</li>
 </ol>
 <h3><a id="post-1087-_16gv3rynkfg1"></a>The Message Replayer</h3>
-<p><img class="wp-image-1089" src="http://localhost/tech-blog/wp-content/uploads/2020/02/word-image-1.png" /></p>
+<p><img class="wp-image-1089" src="/assets/2020/02/word-image-1.png" /></p>
 <ol>
 <li>The Message Replayer is a scheduled job that runs every N seconds</li>
 <li>It polls the Persistent Data Store to see if any records exists</li>

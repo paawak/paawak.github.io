@@ -174,13 +174,13 @@ We need to read the response of the url: $serverUrl/api/qualitygates/project_sta
 <h2>Specifying Sonar Qube Installation</h2>
 <p>We would need to tell Jenkins about our SonarQube installation. This is done by logging into Jenkins and then navigating to <strong>Manage Jenkins</strong> -> <strong>Configure System</strong></p>
 <h4>Step 1</h4>
-<p><img class="alignnone wp-image-951 size-full" src="http://localhost/tech-blog/wp-content/uploads/2018/01/add-sonar-qube-1.png" alt="" width="863" height="106" /></p>
+<p><img class="alignnone wp-image-951 size-full" src="/assets/2018/01/add-sonar-qube-1.png" alt="" width="863" height="106" /></p>
 <h4>Step 2</h4>
 <p>Click on <strong>Add Sonar instance</strong> and give a unique name: <strong>MySonarQubeLocal</strong>. This would be used later for Jenkins Pipeline Project.<br />
-<a href="http://localhost/tech-blog/wp-content/uploads/2018/01/add-sonar-qube-2.png"><img class="alignnone wp-image-952 size-full" src="http://localhost/tech-blog/wp-content/uploads/2018/01/add-sonar-qube-2.png" alt="" width="952" height="534" /></a></p>
+<a href="http://localhost/tech-blog/wp-content/uploads/2018/01/add-sonar-qube-2.png"><img class="alignnone wp-image-952 size-full" src="/assets/2018/01/add-sonar-qube-2.png" alt="" width="952" height="534" /></a></p>
 <h2>Integration with Jenkins Freestyle Project</h2>
 <p>Go to the <strong>Build</strong> section -> <strong>Add build step</strong> -> <strong>Execute SonarQube Scanner</strong><br />
-<a href="http://localhost/tech-blog/wp-content/uploads/2018/01/sonar-jenkins-traditional.png"><img class="alignnone wp-image-954 size-full" src="http://localhost/tech-blog/wp-content/uploads/2018/01/sonar-jenkins-traditional.png" alt="" width="1280" height="720" /></a><br />
+<a href="http://localhost/tech-blog/wp-content/uploads/2018/01/sonar-jenkins-traditional.png"><img class="alignnone wp-image-954 size-full" src="/assets/2018/01/sonar-jenkins-traditional.png" alt="" width="1280" height="720" /></a><br />
 You can specify the sonar properties either as a separate file in the section Path to project properties or in the section Analysis properties. <strong>Both of these approaches are equally bad.</strong> Instead, the properties should be passed through a Maven plugin in the build step as shown above:</p>
 <blockquote><p>clean install sonar:sonar -P sonar</p></blockquote>
 <p>In the Jenkins Freestyle Project, thats all the configuration you need.</p>
