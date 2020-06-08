@@ -69,12 +69,19 @@ If you look at the source code <a href="http://kickjava.com/src/org/hibernate/ty
 <p>So in line 78, the EMF model is casted into Serializable, and hence the cause of exception.</p>
 <h2>Solution</h2>
 <p>There is no other go, but to make the EMF models Serializable. How do we do that? We have to edit the default JET Templates so that all generated interfaces by EMF are Serializable. <a href="http://blog.eclipse-tips.com/2008/08/using-dynamic-templates-in-emf.html" target="_blank">Here</a> is an excellent article which will guide you. The template to edit is <em>templates/model/Class.javajet</em>.<br />
-<span style="color: #0000ff;"><%if (isImplementation) {%><br />
-public<%if (genClass.isAbstract()) {%> abstract<%}%> class <%=genClass.getClassName()%><%=genClass.getTypeParameters().trim()%><%=genClass.getClassExtends()%><%=genClass.getClassImplements()%><br />
-<%} else {%><br />
-public interface <%=genClass.getInterfaceName()%><%=genClass.getTypeParameters().trim()%><%=genClass.getInterfaceExtends()%><br />
-<%}%>, <span style="color: #339966;">java.io.Serializable</span><br />
-{</span><br />
+
+{% raw %}
+<pre lang="java">
+  <%if (isImplementation) {%>
+  public<%if (genClass.isAbstract()) {%> abstract<%}%> class <%=genClass.getClassName()%><%=genClass.getTypeParameters().trim()%><%=genClass.getClassExtends()%><%=genClass.getClassImplements()%>
+  <%} else {%>
+  public interface <%=genClass.getInterfaceName()%><%=genClass.getTypeParameters().trim()%><%=genClass.getInterfaceExtends()%>
+  <%}%>, java.io.Serializable
+  {
+</pre>
+{% endraw %}
+
+<br />
 Now re-generate the model code from genmodel and try again.<br />
 With this, some operations, of course will work. But if you are using Teneo lesser than 1.0.4 (1.0.3 is the latest release as of now ), for most of the operations you will get a trace which looks something like:</p>
 <h3>Stack Trace III</h3>
