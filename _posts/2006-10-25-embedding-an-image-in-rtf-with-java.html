@@ -1,0 +1,115 @@
+---
+layout: post
+status: publish
+published: true
+title: Embedding an image in RTF with Java
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 432
+wordpress_url: http://technoblogs.paawak.com/?p=4
+date: '2006-10-25 11:22:25 +0530'
+date_gmt: '2006-10-25 05:52:25 +0530'
+categories:
+- java
+tags:
+- java
+- rtf
+comments:
+- id: 2
+  author: aya
+  author_email: ay2ouye@gmail.com
+  author_url: ''
+  date: '2009-04-14 23:00:41 +0530'
+  date_gmt: '2009-04-14 17:30:41 +0530'
+  content: Thanks a million this was so useful for me!
+- id: 3
+  author: chee khen
+  author_email: cheekhen@lycos.com
+  author_url: ''
+  date: '2009-05-04 00:59:50 +0530'
+  date_gmt: '2009-05-03 19:29:50 +0530'
+  content: This is just what i m looking for! Thanks a million!!
+- id: 4
+  author: Branislav Kalas
+  author_email: idi@hlavki.eu
+  author_url: ''
+  date: '2010-07-08 22:17:35 +0530'
+  date_gmt: '2010-07-08 16:47:35 +0530'
+  content: |-
+    Thanks man, i dit a  lot of googling about this with no result. Finally something really useful.
+    Thanks
+---
+<p>Ever wondered how to embed images in RTF docs? I was trying to do that for a couple of days...<br />
+The blasted MS Office application has obfuscated the RTF format so badly, that it is difficult to read it by opening it in another simple editor like NotePad or TextPad. A beginner like me is lost simply in the sheer volume of redundant control words and back-slashes.<br />
+So, if you want to learn the RTF format frtom the pros, a good idea to install <a href="http://www.openoffice.org/">OpenOffice</a> (you can dowload it for free) in your PC and save the documents in RTF format and opening them in NotePad or TextPad.<br />
+Some basics facts about RTF format:</p>
+<ul>
+<li>All RTF control words start with a back-slash</li>
+<li>All RTF documents should start with <span style="font-weight: bold;">{rtf1ansi</span> and end with a <span style="font-weight: bold;">}</span></li>
+</ul>
+<p>If you want to embed a picture, you have to write the entire binary data of the picture in the RTF file. This is done as follows:<br />
+<span>{*shppict{pictpicw800pich600jpegblip</span><br />
+<span>ffd8ffe000104a46494600010201006000600000ffed182e50686f746f73686f</span><br />
+<span>7020332e30003842494d03ed0a5265736f6c7574696f6e000000001000600000</span><br />
+<span>0001000100600000000100013842494d040d18465820476c6f62616c204c6967}}</span><br />
+<span>picw800</span> dictates that the picture is <span style="font-style: italic;">800 pixels</span> wide.<br />
+Similarly, <span>pich600</span> means that the height of the picture is <span style="font-style: italic;">600 pixels</span>.<br />
+<span>jpegblip</span> is used when the given image is in JPEG format. For PNG images, use <span>pngblip<span>.</span></span><br />
+After these control words, the actual binary data of the image starts.<br />
+The following rules are followed:</p>
+<ol>
+<li>The raw data is from the image file is read in bytes and formatted as hexadecimal values.</li>
+<li>If a given byte is single digit, it is prepended by <span style="font-weight: bold;">0</span>. For example, if a byte value is <span style="font-weight: bold;">f</span>, it is made <span style="font-weight: bold;">0f</span>.</li>
+<li>When all the bytes are written, immediately indicate the end of the data by closing the braces.</li>
+</ol>
+<p>The second point is most important.<br />
+Given below is the java source-code. In order to make it look nice, I have gone to a new line after every 64 bytes of raw data. But this is not necessary.</p>
+<pre lang="java">import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import javax.swing.ImageIcon;
+public class PictureReader {
+ public static void main(String[] args) {
+  String ImageName = "/images/WaterLilies.jpg";
+  InputStream imageIp = PictureReader.class.getResourceAsStream(ImageName);
+  ImageIcon icon = new ImageIcon(PictureReader.class.getResource(ImageName));
+  StringBuffer sb = new StringBuffer("{rtf1ansiparpardplain");
+  sb.append("n{*shppict{pict")
+  .append("picw").append(icon.getIconWidth())
+  .append("pich").append(icon.getIconHeight())
+  .append("jpegblipn"); //   for PNG images, use pngblip
+  int count = 0;
+  while(true) {
+   try {
+    int i = imageIp.read();
+    if (i == -1) {
+     break;
+    }
+    String hexStr = Integer.toHexString(i);
+    if (hexStr.length() == 1) {
+     hexStr = "0" + hexStr;
+    }
+    count += 2;
+    sb.append(hexStr);
+    if (count == 64) {
+     count = 0;
+     sb.append("n");
+    }
+   } catch (IOException e) {
+    e.printStackTrace();
+   }
+  }
+  sb.append("}}n}n");
+  try {
+   FileOutputStream fos = new FileOutputStream("Pic.rtf");
+   fos.write(sb.toString().getBytes());
+  } catch (IOException e) {
+   e.printStackTrace();
+  }
+ }
+}</pre>

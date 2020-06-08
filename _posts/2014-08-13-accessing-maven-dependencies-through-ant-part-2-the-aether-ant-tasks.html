@@ -1,0 +1,84 @@
+---
+layout: post
+status: publish
+published: true
+title: 'Accessing Maven dependencies through Ant: Part 2: The Aether Ant Tasks'
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 621
+wordpress_url: http://palashray.com/?p=621
+date: '2014-08-13 02:33:42 +0530'
+date_gmt: '2014-08-13 02:33:42 +0530'
+categories:
+- ant
+- maven
+tags:
+- ant
+- build
+- maven
+comments:
+- id: 69
+  author: 'Invoking Ant from Maven: The Maven AntRun Plugin | Heart of a hacker'
+  author_email: ''
+  author_url: http://palashray.com/invoking-ant-from-maven-the-maven-antrun-plugin/
+  date: '2014-08-13 03:33:33 +0530'
+  date_gmt: '2014-08-13 03:33:33 +0530'
+  content: "[&#8230;] my previous entries, Accessing Maven dependencies through Ant:
+    Part 1 and Part 2 , I had been talking about how we can explore Maven dependencies
+    from Ant. Here, we will talk about [&#8230;]"
+---
+<h2>Context</h2>
+<p>This is the 2nd increment of this series. Here is Part 1:<br />
+<a href="http://palashray.com/accessing-maven-dependencies-through-ant-part-1-the-maven-ant-tasks/">http://palashray.com/accessing-maven-dependencies-through-ant-part-1-the-maven-ant-tasks/</a><br />
+The context and the problem remains same: we want to access Maven dependencies through Ant. We will continue using the <a href="https://github.com/paawak/blog/tree/master/code/maven-ant-assembly-example" target="_blank">Rmi Server</a> as an example.</p>
+<h2>What is Aether?</h2>
+<p><a href="http://www.eclipse.org/aether/" target="_blank">Aether</a> is an API which facilitates accessing artifacts from various repositories like Maven, Nexus, Central, etc. From Maven 3 onwards, Maven is fully Aether compliant.</p>
+<h2>Disclaimer</h2>
+<p>I was not able to get Aether work on a complex Maven project having both Spring 2.x and 3.x: it invariably messes up. But with simpler modules, it seems to work fine. Though Aether is still very much bleeding edge and yet to stabilize, I believe thats the way to go, as it makes accessing artifacts language agnostic.</p>
+<h2>Using the Aether Ant Tasks</h2>
+<p>This is how my ant file<em>&nbsp;build-with-aether-ant-task.xml</em> looks like:</p>
+<pre class="lang:java decode:true "><project name="Rmi Server builder which works with aether-ant-task" default="create-zip" basedir="." xmlns:aether="antlib:org.eclipse.aether.ant">
+	<taskdef uri="antlib:org.eclipse.aether.ant" resource="org/eclipse/aether/ant/antlib.xml">
+		<classpath>
+			<fileset dir="lib" includes="aether-ant-tasks-*uber.jar"/>
+		</classpath>
+	</taskdef>
+	<!-- The below properties should either come from Maven or from command line while invoking ant -->
+	<condition property="maven.local.repo" else="${user.home}/.m2/repository">
+		<isset property="maven.local.repo"/>
+	</condition>
+	<condition property="project.name" else="no-name">
+		<isset property="project.name"/>
+	</condition>
+	<condition property="project.version" else="no-version">
+		<isset property="project.version"/>
+	</condition>
+	<property name="ant.build.directory" value="${basedir}/target/ant-build"/>
+	<target name="clean">
+		<delete dir="${ant.build.directory}"/>
+		<mkdir dir="${ant.build.directory}"/>
+	</target>
+	<target name="gather-dependencies-from-maven" depends="clean">
+		<aether:pom file="pom.xml" id="pom" />
+		<aether:localrepo dir="${maven.local.repo}"/>
+		<aether:resolve>
+			<dependencies pomRef="pom"/>
+			<path refid="cp" classpath="runtime"/>
+		</aether:resolve>
+		<copy todir="${ant.build.directory}/lib" flatten="true">
+			<path refid="cp"/>
+		</copy>
+	</target>
+	<target name="create-zip" depends="gather-dependencies-from-maven">
+		<zip destfile="${basedir}/target/${project.name}-${project.version}.zip" basedir="${ant.build.directory}"/>
+	</target>
+</project></pre>
+<h2>Invoking Ant</h2>
+<p>Use the following command:</p>
+<blockquote><p>ant -f build-with-aether-ant-task.xml -Dproject.name=rmi-server -Dproject.version=1.0</p></blockquote>
+<p>You should see a zip with all the dependencies in the target folder.</p>

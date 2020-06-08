@@ -1,0 +1,47 @@
+---
+layout: post
+status: publish
+published: true
+title: Tweaking MySQL on Fedora
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 290
+wordpress_url: http://puretech.paawak.com/?p=290
+date: '2010-08-21 00:57:36 +0530'
+date_gmt: '2010-08-20 19:27:36 +0530'
+categories:
+- database
+- linux
+tags:
+- linux
+- mysql
+comments: []
+---
+<p>MySQL is installed on Fedora and most Linuxes by default. Its just about some tweaking before you can use it. I am detailing some of the rather useful commands.</p>
+<h2>To Install MySQL and start it</h2>
+<p><span style="color: #000080;">mysql_install_db<br />
+mysqld_safe &amp;</span></p>
+<h2>Make MySQL case insensitive</h2>
+<p>This is useful when the DB Script is also expected to run on Windows server.<br />
+vi /etc/my.cnf<br />
+<span style="color: #000080;"><br />
+[mysqld]<br />
+lower_case_table_names=1</span></p>
+<h2>To change the root password</h2>
+<p><strong><span style="color: #000080;">mysql></span></strong><br />
+update user set password=password("newPassword")&nbsp; where user='root';<br />
+Query OK, 2 rows affected (0.00 sec)<br />
+Rows matched: 2&nbsp; Changed: 2&nbsp; Warnings: 0<br />
+grant all on *.* to 'root'@'192.168.%' identified by 'newPassword';<br />
+FLUSH PRIVILEGES;</p>
+<h2>Adding a user</h2>
+<p><strong><span style="color: #000080;">mysql></span></strong><br />
+insert into user (host, user, password) values('localhost','newUser',password('xx123'));<br />
+insert into&nbsp; host(host,db,Select_priv, Insert_priv, Update_priv, Delete_priv, Create_priv, Drop_priv)&nbsp; values('localhost','dbName','Y','Y','Y','Y','Y','Y');<br />
+grant all on dbName.* to 'newUser'@'localhost' identified by 'xx123';<br />
+FLUSH PRIVILEGES;</p>

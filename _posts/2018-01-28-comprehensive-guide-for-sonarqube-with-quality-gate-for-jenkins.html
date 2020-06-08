@@ -1,0 +1,392 @@
+---
+layout: post
+status: publish
+published: true
+title: Comprehensive Guide for SonarQube with Quality Gate for Jenkins
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 948
+wordpress_url: http://palashray.com/?p=948
+date: '2018-01-28 08:20:05 +0530'
+date_gmt: '2018-01-28 13:20:05 +0530'
+categories:
+- java
+tags:
+- ci/cd
+- jacoco
+- jenkins
+- jenkinsfile
+- pipleline
+- sonar
+comments:
+- id: 79
+  author: Romain Ciaccafava
+  author_email: rciaccafava@gmail.com
+  author_url: https://romain-ciaccafava.fr
+  date: '2018-03-13 14:52:07 +0530'
+  date_gmt: '2018-03-13 18:52:07 +0530'
+  content: |-
+    Thank you for your post !
+    I was looking for a specific Jenkinsfile example and I finally found this which fit exactly with my needs.
+    Have a nice day :)
+---
+<h1>Configuring JaCoCo code coverage Maven plugin</h1>
+<pre class="lang:xhtml decode:true "><plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>0.7.9</version>
+				<configuration>
+					<includes>
+						<include>com/swayam/demo/springbootdemo/rest/**</include>
+					</includes>
+					<excludes>
+						<exclude>com/swayam/demo/springbootdemo/rest/config/**</exclude>
+						<exclude>com/swayam/demo/springbootdemo/rest/entity/**</exclude>
+						<exclude>**/RestFulMicroserviceApplication.class</exclude>
+					</excludes>
+				</configuration>
+				<executions>
+					<execution>
+						<id>prepare-agent</id>
+						<configuration>
+							<destFile>${jacoco.test.unit.dataFile}</destFile>
+							<propertyName>surefireArgLine</propertyName>
+						</configuration>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>post-unit-test</id>
+						<phase>test</phase>
+						<goals>
+							<goal>report</goal>
+						</goals>
+						<configuration>
+							<dataFile>${jacoco.test.unit.dataFile}</dataFile>
+							<outputDirectory>target/jacoco/site-unit-test</outputDirectory>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+</pre>
+<h2>Including or excluding packages or class</h2>
+<p>It is a good practice to include only project-specific classes. Otherwise, it tends to have the coverage for 3rd party libraries as well. The way to include/exclude a package is to name it like: <em>com/swayam/demo/springbootdemo/rest/config/**</em><br />
+For including a single class: <em>**/RestFulMicroserviceApplication.class</em></p>
+<h2>Prepare Agent</h2>
+<p>First, we would need to prepare the JaCoCo Agent for instrumentation:<br />
+<a href="http://www.jacoco.org/jacoco/trunk/doc/prepare-agent-mojo.html">http://www.jacoco.org/jacoco/trunk/doc/prepare-agent-mojo.html</a><br />
+This would set a property having the agent details, which is then passed o to the surefire plugin so that the tests are run with this agent. This is how the surefire plugin is configured:</p>
+<pre class="lang:xhtml decode:true ">			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<!-- Sets the VM argument line used when unit tests are run. -->
+					<argLine>${surefireArgLine}</argLine>
+				</configuration>
+			</plugin></pre>
+<h2>Generating Report</h2>
+<p>After the Junit Tests are run, we can specify the directory for generating the coverage report:<br />
+<a href="http://www.jacoco.org/jacoco/trunk/doc/report-mojo.html">http://www.jacoco.org/jacoco/trunk/doc/report-mojo.html</a></p>
+<h1>Configuring Sonar Maven plugin</h1>
+<p>SonarQube&rsquo;s documentation for configuring a Maven plugin is scant, misleading and difficult to decipher. Its high time that they start hiring some good Tech Writer!<br />
+<a href="https://docs.sonarqube.org/display/SCAN/Analyzing+with+SonarQube+Scanner+for+Maven">https://docs.sonarqube.org/display/SCAN/Analyzing+with+SonarQube+Scanner+for+Maven</a><br />
+This is how the plugin is configured in your pom.xml. No global setting bullshit in settings.xml. Whoever suggested that is an idiot! The global settings.xml should kept as pristine as possible.</p>
+<pre class="lang:xhtml decode:true "><plugin>
+						<groupId>org.sonarsource.scanner.maven</groupId>
+						<artifactId>sonar-maven-plugin</artifactId>
+						<version>3.4.0.905</version>
+						<executions>
+							<execution>
+								<goals>
+									<goal>sonar</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins></pre>
+<p>Apart from this, SonarQube also expects certain properties to be set.<br />
+<a href="https://docs.sonarqube.org/display/SONAR/Analysis+Parameters">https://docs.sonarqube.org/display/SONAR/Analysis+Parameters</a><br />
+It is recommended to pass this from the Maven plugin. I have included this under the sonar profile as below:</p>
+<pre class="lang:xhtml decode:true "><profile>
+			<id>sonar</id>
+			<properties>
+				<sonar.projectKey>${project.artifactId}</sonar.projectKey>
+				<sonar.projectName>${project.artifactId}</sonar.projectName>
+				<sonar.projectVersion>${project.version}</sonar.projectVersion>
+				<sonar.host.url>http://192.168.1.4:9000/</sonar.host.url>
+	<sonar.verbose>true</sonar.verbose>
+				<sonar.showProfiling>true</sonar.showProfiling>
+				<!--
+				Sonar plugin is BUGGY!! It will not run when the below property is set
+				<sonar.scanner.dumpToFile>target/sonar-properties.txt</sonar.scanner.dumpToFile>
+				-->
+				<!--
+				<sonar.login>admin</sonar.login>
+				<sonar.password>admin</sonar.password>
+				-->
+				<sonar.sources>src/main/java</sonar.sources>
+				<sonar.exclusions>
+					**/com/swayam/demo/springbootdemo/rest/config/**,
+					**/com/swayam/demo/springbootdemo/rest/entity/**,
+					**/RestFulMicroserviceApplication.java
+				</sonar.exclusions>
+				<sonar.sourceEncoding>UTF-8</sonar.sourceEncoding>
+				<sonar.language>java</sonar.language>
+				<sonar.tests>src/test/java</sonar.tests>
+				<sonar.dynamicAnalysis>reuseReports</sonar.dynamicAnalysis>
+				<sonar.junit.reportPaths>target/surefire-reports</sonar.junit.reportPaths>
+				<sonar.java.binaries>target/classes</sonar.java.binaries>
+				<sonar.jacoco.reportPaths>${jacoco.test.unit.dataFile}</sonar.jacoco.reportPaths>
+				<sonar.java.coveragePlugin>jacoco</sonar.java.coveragePlugin>
+			</properties>
+			...
+		</profile></pre>
+<h2>Including or excluding packages or class</h2>
+<p>Remember that Sonar works on Java source code. The way to include/exclude a package is to name it like: <em>**/com/swayam/demo/springbootdemo/rest/config/**</em><br />
+Similarly, you can exclude individual class like this: <em>**/RestFulMicroserviceApplication.java</em></p>
+<h1>Running SonarQube Analysis and Fetching the results of QualityGate</h1>
+<p>Run the Maven command:</p>
+<blockquote><p>mvn clean install sonar:sonar -P sonar</p></blockquote>
+<p>This will create the file: <em><strong>target/sonar/report-task.txt</strong></em><br />
+There are the below 2 urls that has to be read from here:<br />
+1. serverUrl=<strong>http://192.168.1.4:9000</strong><br />
+2. ceTaskUrl=<strong>http://192.168.1.4:9000/api/ce/task?id=AWE3eRSZAEMe8tTgpicn</strong><br />
+Read the response from the ceTaskUrl using curl, and save it to a file ceTask.json:</p>
+<blockquote><p>curl http://192.168.1.4:9000/api/ce/task?id=AWE3eRSZAEMe8tTgpicn -o ceTask.json</p></blockquote>
+<p>The element we are interested in is <em><strong>task.analysisId</strong></em>:<br />
+"analysisId": "AWE3eRcyxJqMzJgr501D"<br />
+We need to read the response of the url: $serverUrl/api/qualitygates/project_status?analysisId=$analysisId</p>
+<blockquote><p>curl http://192.168.1.4:9000/api/qualitygates/project_status?analysisId=AWE3eRcyxJqMzJgr501D -o qualityGate.json</p></blockquote>
+<p>If the Json value projectStatus.status is <strong>ERROR</strong>, the project has failed QualityGate.</p>
+<h1>Integration with Jenkins</h1>
+<p>To start with, we would need to install the below Jenkins plugins:</p>
+<h4>Sonar Quality Gates Plugin</h4>
+<p><a href="https://plugins.jenkins.io/sonar-quality-gates">https://plugins.jenkins.io/sonar-quality-gates</a><br />
+<a href="https://github.com/arkanjoms/sonar-quality-gates-plugin/blob/master/README.md"> https://github.com/arkanjoms/sonar-quality-gates-plugin/blob/master/README.md</a></p>
+<h4>SonarQube Scanner for Jenkins</h4>
+<p><a href="https://docs.sonarqube.org/display/SCAN/Analyzing+with+SonarQube+Scanner+for+Jenkins">https://docs.sonarqube.org/display/SCAN/Analyzing+with+SonarQube+Scanner+for+Jenkins</a></p>
+<h2>Specifying Sonar Qube Installation</h2>
+<p>We would need to tell Jenkins about our SonarQube installation. This is done by logging into Jenkins and then navigating to <strong>Manage Jenkins</strong> -> <strong>Configure System</strong></p>
+<h4>Step 1</h4>
+<p><img class="alignnone wp-image-951 size-full" src="http://localhost/tech-blog/wp-content/uploads/2018/01/add-sonar-qube-1.png" alt="" width="863" height="106" /></p>
+<h4>Step 2</h4>
+<p>Click on <strong>Add Sonar instance</strong> and give a unique name: <strong>MySonarQubeLocal</strong>. This would be used later for Jenkins Pipeline Project.<br />
+<a href="http://localhost/tech-blog/wp-content/uploads/2018/01/add-sonar-qube-2.png"><img class="alignnone wp-image-952 size-full" src="http://localhost/tech-blog/wp-content/uploads/2018/01/add-sonar-qube-2.png" alt="" width="952" height="534" /></a></p>
+<h2>Integration with Jenkins Freestyle Project</h2>
+<p>Go to the <strong>Build</strong> section -> <strong>Add build step</strong> -> <strong>Execute SonarQube Scanner</strong><br />
+<a href="http://localhost/tech-blog/wp-content/uploads/2018/01/sonar-jenkins-traditional.png"><img class="alignnone wp-image-954 size-full" src="http://localhost/tech-blog/wp-content/uploads/2018/01/sonar-jenkins-traditional.png" alt="" width="1280" height="720" /></a><br />
+You can specify the sonar properties either as a separate file in the section Path to project properties or in the section Analysis properties. <strong>Both of these approaches are equally bad.</strong> Instead, the properties should be passed through a Maven plugin in the build step as shown above:</p>
+<blockquote><p>clean install sonar:sonar -P sonar</p></blockquote>
+<p>In the Jenkins Freestyle Project, thats all the configuration you need.</p>
+<h2>Integration with Jenkins Pipeline Project</h2>
+<p>The SonarQube Scanner plugin has support for Jenkins Pipeline. It can be used as follows:</p>
+<pre class="lang:java decode:true ">withSonarQubeEnv('MySonarQubeLocal') {
+sh "/var/jenkins_home/apache-maven-3.5.0/bin/mvn clean install sonar:sonar -P sonar"
+}</pre>
+<p>To determine whether the project has passed the QualityGate, we need to use the logic stated in the section <em><strong>Running SonarQube Analysis and Fetching the results of QualityGate</strong></em>. Since we are using Groovy DSL, it is very easy for us to do this. I am pasting the full content of the Jenkinsfile:</p>
+<pre class="lang:java decode:true ">pipeline {
+    agent {
+		label 'master'
+    }
+    stages {
+        stage('Build') {
+            steps {
+                withSonarQubeEnv('MySonarQubeLocal') {
+                	dir('restful-microservice') {
+	                    sh "/var/jenkins_home/apache-maven-3.5.0/bin/mvn clean install sonar:sonar -P sonar"
+	                    script {
+	                        def sonarProps = readFile encoding: 'utf-8', file: 'target/sonar/report-task.txt'
+	                        echo "sonarProps: " + sonarProps
+	                        def ceTaskUrl = 'ceTaskUrl'
+	                        sonarProps.split('\n').each { line ->
+	                            if (line.startsWith(ceTaskUrl)) {
+	                                 env.SONAR_CE_TASK_URL = line.substring(ceTaskUrl.length() + 1)
+	                                 echo "env.SONAR_CE_TASK_URL: " + env.SONAR_CE_TASK_URL
+	                            }
+	                            if (line.startsWith('serverUrl')) {
+	                            	 def sonarServerUrl = line.split('=')[1]
+	                            	 if (!sonarServerUrl.endsWith('/')) {
+	                            	      sonarServerUrl += '/'
+	                            	 }
+	                                 env.SONAR_SERVER_URL = sonarServerUrl
+	                                 echo "env.SONAR_SERVER_URL: " + env.SONAR_SERVER_URL
+	                            }
+	                        }
+	                    }
+	                }
+                }
+            }
+        }
+        stage('Quality Gate') {
+            steps {
+            	dir('restful-microservice') {
+	                script {
+	                    sleep time: 3000, unit: 'MILLISECONDS'
+	                    timeout(time: 1, unit: 'MINUTES') {
+	                        waitUntil {
+	                            def jsonOutputFile = 'target/sonar/ceTask.json'
+	                            sh 'curl $SONAR_CE_TASK_URL -o ' + jsonOutputFile
+	                            def jsonOutputFileContents = readFile encoding: 'utf-8', file: jsonOutputFile
+	                            def ceTask = new groovy.json.JsonSlurper().parseText(jsonOutputFileContents)
+	                            env.SONAR_ANALYSIS_ID = ceTask['task']['analysisId']
+	                            return 'SUCCESS'.equals(ceTask['task']['status'])
+	                        }
+	                        def qualityGateUrl = env.SONAR_SERVER_URL + 'api/qualitygates/project_status?analysisId=' + env.SONAR_ANALYSIS_ID
+	                        echo "qualityGateUrl: " + qualityGateUrl
+	                        def qualityGateJsonFile = 'target/sonar/qualityGate.json'
+	                        sh 'curl ' + qualityGateUrl + ' -o ' + qualityGateJsonFile
+	                        def qualityGateJsonFileContents = readFile encoding: 'utf-8', file: qualityGateJsonFile
+	                        def qualityGateJson = new groovy.json.JsonSlurper().parseText(qualityGateJsonFileContents)
+	                        echo 'qualityGateJson: ' + qualityGateJson
+	                        if ("ERROR".equals(qualityGateJson['projectStatus']['status'])) {
+	                               error "Quality Gate Failure"
+	                        }
+	                        echo "Quality Gate Success"
+	                    }
+	                }
+                }
+            }
+        }
+        stage('Code Coverage') {
+			steps {
+				jacoco()
+			}
+        }
+    }
+}
+</pre>
+<h1>Appendix</h1>
+<h2>Sample report-task.txt</h2>
+<pre class="lang:vim decode:true ">projectKey=spring-boot-demo
+serverUrl=http://192.168.1.4:9000
+serverVersion=6.7.0.33306
+dashboardUrl=http://192.168.1.4:9000/dashboard/index/spring-boot-demo
+ceTaskId=AWBlpOuTAmeRAKOg4E_E
+ceTaskUrl=http://192.168.1.4:9000/api/ce/task?id=AWBlpOuTAmeRAKOg4E_E
+</pre>
+<h2>Sample ceTask.json</h2>
+<pre class="lang:js decode:true ">{
+	"task": {
+		"id": "AWBlpOuTAmeRAKOg4E_E",
+		"type": "REPORT",
+		"componentId": "AWBg3FFS8C0jOgq5kO1m",
+		"componentKey": "spring-boot-demo",
+		"componentName": "spring-boot-demo",
+		"componentQualifier": "TRK",
+		"analysisId": "AWBlpPPI5a3_SsAmFvXW",
+		"status": "SUCCESS",
+		"submittedAt": "2017-12-17T18:03:15+0000",
+		"submitterLogin": "admin",
+		"startedAt": "2017-12-17T18:03:17+0000",
+		"executedAt": "2017-12-17T18:03:18+0000",
+		"executionTimeMs": 1169,
+		"logs": false,
+		"hasScannerContext": true,
+		"organization": "default-organization"
+	}
+}</pre>
+<h2>Sample qualityGate.json for PASS</h2>
+<pre class="lang:js decode:true ">{
+	"projectStatus": {
+		"status": "OK",
+		"conditions": [
+			{
+				"status": "OK",
+				"metricKey": "new_security_rating",
+				"comparator": "GT",
+				"periodIndex": 1,
+				"errorThreshold": "1",
+				"actualValue": "1"
+			},
+			{
+				"status": "OK",
+				"metricKey": "new_reliability_rating",
+				"comparator": "GT",
+				"periodIndex": 1,
+				"errorThreshold": "1",
+				"actualValue": "1"
+			},
+			{
+				"status": "OK",
+				"metricKey": "new_maintainability_rating",
+				"comparator": "GT",
+				"periodIndex": 1,
+				"errorThreshold": "1",
+				"actualValue": "1"
+			},
+			{
+				"status": "OK",
+				"metricKey": "new_duplicated_lines_density",
+				"comparator": "GT",
+				"periodIndex": 1,
+				"errorThreshold": "3",
+				"actualValue": "0.0"
+			}
+		],
+		"periods": [
+			{
+				"index": 1,
+				"mode": "previous_version",
+				"date": "2017-12-16T19:50:29+0000"
+			}
+		],
+		"ignoredConditions": false
+	}
+}</pre>
+<p>&nbsp;</p>
+<h2>Sample qualityGate.json for FAIL</h2>
+<pre class="lang:js decode:true ">{
+	"projectStatus": {
+		"status": "ERROR",
+		"conditions": [
+			{
+				"status": "OK",
+				"metricKey": "new_security_rating",
+				"comparator": "GT",
+				"periodIndex": 1,
+				"errorThreshold": "1",
+				"actualValue": "1"
+			},
+			{
+				"status": "OK",
+				"metricKey": "new_reliability_rating",
+				"comparator": "GT",
+				"periodIndex": 1,
+				"errorThreshold": "1",
+				"actualValue": "1"
+			},
+			{
+				"status": "OK",
+				"metricKey": "new_maintainability_rating",
+				"comparator": "GT",
+				"periodIndex": 1,
+				"errorThreshold": "1",
+				"actualValue": "1"
+			},
+			{
+				"status": "ERROR",
+				"metricKey": "coverage",
+				"comparator": "LT",
+				"errorThreshold": "80",
+				"actualValue": "12.6"
+			}
+		],
+		"periods": [
+			{
+				"index": 1,
+				"mode": "previous_version",
+				"date": "2017-12-31T18:00:19+0000"
+			}
+		],
+		"ignoredConditions": false
+	}
+}</pre>
+<p>&nbsp;</p>
+<h2>Sources</h2>
+<p>The complete sources can be found here: <a href="https://github.com/paawak/spring-boot-demo/tree/master/restful-microservice">https://github.com/paawak/spring-boot-demo/tree/master/restful-microservice</a></p>

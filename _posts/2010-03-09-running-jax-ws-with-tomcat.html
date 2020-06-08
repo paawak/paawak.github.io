@@ -1,0 +1,108 @@
+---
+layout: post
+status: publish
+published: true
+title: Running JAX-WS with Tomcat
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 269
+wordpress_url: http://puretech.paawak.com/?p=269
+date: '2010-03-09 00:18:17 +0530'
+date_gmt: '2010-03-08 18:48:17 +0530'
+categories:
+- java
+tags:
+- jax-ws
+- webservice
+comments:
+- id: 20
+  author: Dyutiman
+  author_email: dyutiman.chaudhuri@gmail.com
+  author_url: ''
+  date: '2010-09-02 19:38:59 +0530'
+  date_gmt: '2010-09-02 14:08:59 +0530'
+  content: very useful post.... saved a lot of time for me....
+- id: 21
+  author: Web Service for Lucene Search on Tomcat &laquo; The Other Side
+  author_email: ''
+  author_url: http://dyutiman.wordpress.com/2010/10/01/web-service-for-lucene-search-on-tomcat/
+  date: '2010-10-01 14:21:59 +0530'
+  date_gmt: '2010-10-01 08:51:59 +0530'
+  content: "[...] There is one more configuration in Tomcat we have to do to make
+    the web service working. Details of that can be found at Running JAX-WS with Tomcat
+    [...]"
+- id: 22
+  author: Irina Marudina
+  author_email: devel@marudina.net
+  author_url: http://blog.marudina.net
+  date: '2013-03-06 01:12:31 +0530'
+  date_gmt: '2013-03-05 19:42:31 +0530'
+  content: Thanks a lot! The only issue I had is that I needed to generate myself
+    some artifacts with wsgen (the jaxws package inside the web service package).
+    But I was using Eclipse and have done it all manually, no wizards.
+---
+<p>JAX-WS is not supported out of the box. But its very easy to make it run on Tomcat or any other web server for that matter.<br />
+I would recommend Netbeans IDE for starters, as its very easy to quickly code and run a webservice.<br />
+This is how the implementation looks like. Note that its a POJO with a few annotations.</p>
+<pre lang="java">
+package com.swayam.webservice;
+import javax.jws.WebMethod;
+import javax.jws.WebParam;
+import javax.jws.WebService;
+/**
+ *
+ * @author paawak
+ */
+@WebService()
+public class UserManager {
+    /**
+     * Web service operation
+     */
+    @WebMethod(operationName = "addUser")
+    public boolean addUser(@WebParam(name = "userName")
+    String userName) {
+        System.out.println(userName);
+        return true;
+    }
+}
+</pre>
+<p>In addition to this, you also have to edit the <strong>WEB-INF/web.xml</strong> as follows:</p>
+<pre lang="xml">
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app version="2.5" xmlns="http://java.sun.com/xml/ns/javaee" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd">
+    <listener>
+        <listener-class>com.sun.xml.ws.transport.http.servlet.WSServletContextListener</listener-class>
+    </listener>
+    <servlet>
+        <servlet-name>jax-ws</servlet-name>
+        <servlet-class>com.sun.xml.ws.transport.http.servlet.WSServlet</servlet-class>
+        <load-on-startup>1</load-on-startup>
+        </servlet>
+    <servlet-mapping>
+        <servlet-name>jax-ws</servlet-name>
+        <url-pattern>/UserManager</url-pattern>
+    </servlet-mapping>
+    <session-config>
+        <session-timeout>
+            30
+        </session-timeout>
+    </session-config>
+    <welcome-file-list>
+        <welcome-file>index.jsp</welcome-file>
+        </welcome-file-list>
+    </web-app>
+</pre>
+<p>Also, you have to tell the JAX-WS runtime about the endpoint or the implementation. This is done by having a non-standard file called <strong>WEB-INF/sun-jaxws.xml</strong>. The entry is:</p>
+<pre lang="xml">
+<?xml version="1.0" encoding="UTF-8"?>
+<endpoints version="2.0" xmlns="http://java.sun.com/xml/ns/jax-ws/ri/runtime">
+  <endpoint implementation="com.swayam.webservice.UserManager" name="UserManager" url-pattern="/UserManager"/>
+</endpoints>
+</pre>
+<p>Once this is done, download JAX-WS from <a href="https://jax-ws.dev.java.net/">here</a>. A small word of warning. Version 2.2 is buggy, so its advisable to use an older one. I used 2.1.7 without any issues. Put all the jars from the <strong>lib</strong> folder into the <strong>WEB-INF/lib</strong> folder of your webapp. Now you are ready to go. Deploy it on Tomcat, it should work like breeze.<br />
+You will find the sources <a href="https://github.com/paawak/blog/tree/master/code/WebServiceExample">https://github.com/paawak/blog/tree/master/code/WebServiceExample</a>. This is a Netbeans project. Also, you can try the <a href="https://github.com/paawak/blog/tree/master/code/WebServiceExample/dist">war file</a> directly.</p>

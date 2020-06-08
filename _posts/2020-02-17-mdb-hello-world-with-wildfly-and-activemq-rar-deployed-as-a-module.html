@@ -1,0 +1,136 @@
+---
+layout: post
+status: publish
+published: true
+title: MDB Hello World With WildFly And ActiveMQ RAR Deployed as a Module
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 1141
+wordpress_url: http://palashray.com/?p=1141
+date: '2020-02-17 11:59:12 +0530'
+date_gmt: '2020-02-17 16:59:12 +0530'
+categories:
+- activemq
+- java
+- java11
+- mdb
+- spring
+tags:
+- activemq
+- java11
+- mdb
+- spring
+- spring mvc
+comments: []
+---
+<h1><a id="post-1141-_1vuf6g5hq9i"></a>Introduction</h1>
+<p>This is the 3rd increment of the <a href="http://palashray.com/java/java/mdb/">MDB Series</a>. In <a href="http://palashray.com/mdb-hello-world-with-wildfly-and-embedded-artemis-mq/">Part 1</a>, we spoke about what is an MDB? We then, took a simple design problem: a servlet posts user data to a Message Queue. The Message Broker then sends a notification to a MDB. We used the Artemis MQ, which comes embedded in Wildfly, as our Message Broker. In <a href="http://palashray.com/mdb-hello-world-with-wildfly-and-activemq-with-rar-deployment/">Part 2</a>, we demonstrated how to integrate a MDB with an external <a href="https://activemq.apache.org/">Apache ActiveMQ</a> broker running in a separate process. We used the ActiveMQ RAR deployed independently to achieve integration between Wildfly and ActiveMQ.<br />
+In this increment, we are going to talk about how to deploy the ActiveMQ RAR as a Module in Wildfly.</p>
+<h1><a id="post-1141-_z3hlq6oibkt4"></a>Implementation Details</h1>
+<p>We will use the sources from the <a href="http://palashray.com/mdb-hello-world-with-wildfly-and-activemq-with-rar-deployment/">previous series</a> as a starting point. The previous source can be found here:<br />
+<a href="https://github.com/paawak/blog/tree/master/code/mdb-demo/wildfly/external-activemq/rar-archive-deployment/mdb-activemq-rar-demo-spring">https://github.com/paawak/blog/tree/master/code/mdb-demo/wildfly/external-activemq/rar-archive-deployment/mdb-activemq-rar-demo-spring</a><br />
+We would keep all the Java and Resource files as is. The only change would be the standalone.xml.</p>
+<h2><a id="post-1141-_2e4jrtalohd9"></a>The standalone.xml</h2>
+<p>We need to rename the <a href="https://github.com/paawak/blog/blob/master/code/mdb-demo/wildfly/external-activemq/rar-archive-deployment/mdb-activemq-rar-demo-spring/src/main/wildfly/standalone-with-external-activemq-rar-deployment.xml">standalone-with-external-activemq-rar-deployment.xml</a> to <em>standalone-with-activemq-module-deployment-spring.xml</em>. We would need to tweak this a bit.</p>
+<h3><a id="post-1141-_aav8ftv867yi"></a>The mdb section</h3>
+<p>In the <em>mdb section</em>, we would need to change the name of the <em>resource-adapter-name</em> to <em>activemq-rar</em>.</p>
+<pre class="lang:xhtml decode:true">            <mdb>
+                <resource-adapter-ref resource-adapter-name="activemq-rar"/>
+                <bean-instance-pool-ref pool-name="mdb-strict-max-pool"/>
+            </mdb>
+</pre>
+<h3><a id="post-1141-_4c1o8s59btv0"></a>The resource-adapter section</h3>
+<p>The <em>resource-adpater section</em> needs some changes as well. We would need to have the <em>id</em> as <em>activemq-rar.rar</em>. Also, we would need to add a <em>module</em> section, and remove the existing <em>archive</em> section as shown below:</p>
+<pre class="lang:xhtml decode:true">            <resource-adapters>
+                <resource-adapter id="activemq-rar.rar">
+	                <module slot="main" id="org.apache.activemq.ra" />
+                    <transaction-support>XATransaction</transaction-support>
+...</pre>
+<p>Rest of the sections are identical. You can find the differences between the 2 versions here:<br />
+<a href="https://github.com/paawak/blog/commit/356922b74e01c245e28186c152c3c56aa10ad4dd#diff-d39b537e052761d25f736f35d27b728a">https://github.com/paawak/blog/commit/356922b74e01c245e28186c152c3c56aa10ad4dd#diff-d39b537e052761d25f736f35d27b728a</a><br />
+The complete <em>standalone-with-activemq-module-deployment-spring.xml</em> can be found here:<br />
+<a href="https://github.com/paawak/blog/blob/master/code/mdb-demo/wildfly/external-activemq/module-deployment/mdb-activemq-module-demo-spring/src/main/wildfly/standalone-with-activemq-module-deployment-spring.xml">https://github.com/paawak/blog/blob/master/code/mdb-demo/wildfly/external-activemq/module-deployment/mdb-activemq-module-demo-spring/src/main/wildfly/standalone-with-activemq-module-deployment-spring.xml</a></p>
+<h1><a id="post-1141-_btbhrgskryh6"></a>Source Code</h1>
+<p>The complete source can be found here:<br />
+<a href="https://github.com/paawak/blog/tree/master/code/mdb-demo/wildfly/external-activemq/module-deployment/mdb-activemq-module-demo-spring">https://github.com/paawak/blog/tree/master/code/mdb-demo/wildfly/external-activemq/module-deployment/mdb-activemq-module-demo-spring</a></p>
+<h1><a id="post-1141-_snsctnsjmwk8"></a>Running the Demo</h1>
+<p>Instructions for building the war, creating guest user and starting ActiveMQ remain the same. The only change is creating a module from the ActiveMQ RAR.</p>
+<h2><a id="post-1141-_r5rqg663rvgp"></a>Creating the ActiveMQ RAR module</h2>
+<h3><a id="post-1141-_34hfjcabamr0"></a>Downloading the RAR</h3>
+<p>The RAR can be downloaded from here:<br />
+<a href="https://repo1.maven.org/maven2/org/apache/activemq/activemq-rar/">https://repo1.maven.org/maven2/org/apache/activemq/activemq-rar/</a></p>
+<h3><a id="post-1141-_xbi0bv3wkybj"></a>Creating the module directory structure</h3>
+<p>Create the module directory structure by running the below command:</p>
+<pre class="wrap:true lang:sh decode:true">mkdir -p WILDFLY_HOME/modules/system/layers/base/org/apache/activemq/ra/main</pre>
+<h3><a id="post-1141-_bgkst4kignob"></a>Extract the RAR contents</h3>
+<p>Copy the RAR file into the <em>main</em> directory. The, use the below command to extract the contents of the RAR:<br />
+jar -xvf activemq-rar-5.15.4.rar</p>
+<h3><a id="post-1141-_ddc72e2l82x0"></a>Copy the module.xml</h3>
+<p>Copy the <em>src/main/wildfly/module.xml</em> into the <em>main</em> directory.</p>
+<pre class="wrap:true lang:sh decode:true">cp src/main/wildfly/module.xml WILDFLY_HOME/modules/system/layers/base/org/apache/activemq/ra/main/</pre>
+<p>The module.xml looks like this:</p>
+<pre class="lang:xhtml decode:true"><?xml version='1.0' encoding='UTF-8'?>
+<module xmlns="urn:jboss:module:1.5"
+	name="org.apache.activemq.ra">
+	<resources>
+		<resource-root path="." />
+		<resource-root path="activemq-amqp-5.15.4.jar" />
+		<resource-root path="activemq-broker-5.15.4.jar" />
+		<resource-root path="activemq-client-5.15.4.jar" />
+		<resource-root path="activemq-jms-pool-5.15.4.jar" />
+		<resource-root path="activemq-kahadb-store-5.15.4.jar" />
+		<resource-root path="activemq-mqtt-5.15.4.jar" />
+		<resource-root
+			path="activemq-openwire-legacy-5.15.4.jar" />
+		<resource-root path="activemq-pool-5.15.4.jar" />
+		<resource-root path="activemq-protobuf-1.1.jar" />
+		<resource-root path="activemq-ra-5.15.4.jar" />
+		<resource-root path="activemq-spring-5.15.4.jar" />
+		<resource-root path="commons-net-3.6.jar" />
+		<resource-root path="commons-pool2-2.4.2.jar" />
+		<resource-root
+			path="geronimo-j2ee-management_1.1_spec-1.0.1.jar" />
+		<resource-root path="guava-18.0.jar" />
+		<resource-root path="hawtbuf-1.11.jar" />
+		<resource-root path="hawtdispatch-1.22.jar" />
+		<resource-root path="hawtdispatch-transport-1.22.jar" />
+		<resource-root path="jackson-annotations-2.9.4.jar" />
+		<resource-root path="jackson-core-2.9.4.jar" />
+		<resource-root path="jackson-databind-2.9.4.jar" />
+		<resource-root path="mqtt-client-1.14.jar" />
+		<resource-root path="proton-j-0.27.1.jar" />
+		<resource-root path="spring-aop-4.3.17.RELEASE.jar" />
+		<resource-root path="spring-beans-4.3.17.RELEASE.jar" />
+		<resource-root path="spring-context-4.3.17.RELEASE.jar" />
+		<resource-root path="spring-core-4.3.17.RELEASE.jar" />
+		<resource-root
+			path="spring-expression-4.3.17.RELEASE.jar" />
+		<resource-root path="xbean-spring-4.2.jar" />
+	</resources>
+	<exports>
+		<exclude path="org/springframework/**" />
+		<exclude path="org/apache/xbean/**" />
+		<exclude path="org/apache/commons/**" />
+		<exclude path="org/aopalliance/**" />
+		<exclude path="org/fusesource/**" />
+	</exports>
+	<dependencies>
+		<module name="javax.api" slot="main" />
+		<module name="javax.jms.api" slot="main" />
+		<module name="javax.management.j2ee.api" slot="main" />
+		<module name="javax.resource.api" slot="main" />
+		<module name="org.slf4j" />
+		<module name="org.slf4j.impl" />
+	</dependencies>
+</module>
+</pre>
+<h2><a id="post-1141-_t7aa3ull36ct"></a>Starting WildFly</h2>
+<p>Now we can start Wildfly with our custom configuration as below:</p>
+<pre class="wrap:true lang:sh decode:true ">WILDFLY_HOME/bin/standalone.sh -c standalone-with-activemq-module-deployment-spring.xml</pre>
+<p>After Wildfly starts successfully, you can access the Author page with the below URL:<br />
+<a href="#">http://localhost:8080/mdb-activemq-module-demo-spring/author.html</a></p>

@@ -1,0 +1,43 @@
+---
+layout: post
+status: publish
+published: true
+title: Jar Browser
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 77
+wordpress_url: http://puretech.paawak.com/?p=77
+date: '2009-04-18 18:42:02 +0530'
+date_gmt: '2009-04-18 13:12:02 +0530'
+categories:
+- java
+tags:
+- java
+comments:
+- id: 8
+  author: "//ikolaj"
+  author_email: knb@efef.dk
+  author_url: http://blog.efef.dk
+  date: '2009-04-29 01:55:20 +0530'
+  date_gmt: '2009-04-28 20:25:20 +0530'
+  content: |-
+    My favorite is maven search through eclipse (or netbeans if one has that preference). I have not found an easy way to bring it up with eclipse. But type the classname in a java file. Now there are wiggles under it because you cannot find it. Ctrl + 1 and choose the "fix project setup" with a little M on the icon. Now you can search through your maven repos (and add new ones).
+    The old fashioned way of doing it is:
+    find -name "*.jar" -print0  | xargs -0 grep -i SomeClassName
+    Stay cool ;) !
+    //
+---
+<p>This is a Swing app to look for a class, package or any resource in a set of given jar/zip files.</p>
+<h2>Use case</h2>
+<p>I have got an ugly NoClassDef exception and I suspect the class to be present in some 5 or so odd jars present in a certain folder. I Enter the class name in the text box and point the probable jars form <strong><em>AddJars...</em></strong> and click <strong><em>Search</em></strong>. The matches are shown in the tree view.</p>
+<h2>How to run?</h2>
+<p>You need to have JDK1.6 or above. If you want to run it with 1.5, compile the sources with 1.5.<br />
+<strong>On Linux:</strong> java -jar JarBrowser.jar<br />
+<strong>On Windows:</strong> just double click on the JarBrowser.jar or use the same command.<br />
+Find the binaries <a title="JarBrowser binaries" href="http://palashray.com/resources/java/JarBrowser.zip">here</a> and the source <a title="JarBrowser sources" href="http://palashray.com/resources/java/JarBrowser-src.zip">here</a>.<br />
+[caption id="attachment_76" align="alignnone" caption="JarBrowser"]<a rel="attachment wp-att-76" href="#"><img class="size-full wp-image-76" title="jarbrowser" src="http://palashray.com/wp-content/uploads/2009/04/jarbrowser.png" alt="JarBrowser" /></a>[/caption]</p>

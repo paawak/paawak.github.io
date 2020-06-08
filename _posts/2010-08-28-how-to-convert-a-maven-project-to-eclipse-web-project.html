@@ -1,0 +1,124 @@
+---
+layout: post
+status: publish
+published: true
+title: "[How To] Convert a Maven Project to Eclipse Web Project"
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 334
+wordpress_url: http://puretech.paawak.com/?p=334
+date: '2010-08-28 12:18:37 +0530'
+date_gmt: '2010-08-28 06:48:37 +0530'
+categories:
+- java
+tags:
+- maven
+comments:
+- id: 25
+  author: Jan
+  author_email: jan.vesely@gmail.com
+  author_url: ''
+  date: '2010-10-27 12:13:08 +0530'
+  date_gmt: '2010-10-27 06:43:08 +0530'
+  content: |-
+    Thanks, I was aware of the Maven approach, didn't know about Facted project. Looks like you saved me a lot of time and taught me something new - thanks!
+    Regards,
+    Jan
+- id: 26
+  author: Dyutiman
+  author_email: dyutiman.chaudhuri@gmail.com
+  author_url: https://dyutiman.wordpress.com/
+  date: '2010-12-07 19:22:47 +0530'
+  date_gmt: '2010-12-07 13:52:47 +0530'
+  content: |-
+    I created a project with Maven and then tried to make that a web project in Eclipse. After running the maven command mentioned here, the project become an eclipse project but not a web project.
+    I needed to change one thing in the generated pom.xml file by maven,
+    jar
+    to
+    war
+    and then everything was smooth.
+---
+<p>Eclipse WTP has this nice feature where it allows you to deploy, run and debug Web Applications from the IDE. You start by going to the Server View, adding the target server (like Apache Tomcat in our case) and then adding the Web Project to the server. This is how the view looks like:<br />
+<img class="aligncenter size-full wp-image-346" title="addremovewebprojects_1" src="http://palashray.com/wp-content/uploads/2010/08/addremovewebprojects_1.png" alt="addremovewebprojects_1" width="882" height="669" /><br />
+But I have often faced this problem: when I run <em>mvn eclipse:eclipse</em> on a Maven Web Project to convert it to an Eclipse project, it is not recognised as a Web Project by Eclipse. When I right-click on the server and select <em>Add Remove Projects</em>, it does not appear in the option box. But to me&nbsp; <em>mvn eclipse:eclipse -DdownloadSources=true -DdownloadJavadocs=true</em> is indispensable as it downloads and links all the sources and JavaDocs, which comes very handy. On the other hand if I cannot add my project as a Web Project in Eclipse, running and debugging becomes a big issue. So how do I reconcile these two?</p>
+<h2>Solution 1: Specify the WTP Version</h2>
+<p>While running <em>mvn eclipse:eclipse</em>, specify the WTP Version by passing the <em>-Dwtpversion=2.0</em> argument. The command looks like:<br />
+<em>mvn eclipse:clean eclipse:eclipse -DdownloadSources=true -DdownloadJavadocs=true <span style="color: #0000ff;">-Dwtpversion=2.0</span></em><br />
+Note that as of this writing, the supported versions of WTP are&nbsp; 1.0, 1.5, 2.0 and R7.</p>
+<h2>Solution 2: Convert it to a Facted Project</h2>
+<p>Right click on the project, go to <em>Properties</em>, then select <em>Project Facets</em>.<br />
+<img class="aligncenter size-full wp-image-349" title="converttofacetedproject" src="http://palashray.com/wp-content/uploads/2010/08/converttofacetedproject.png" alt="converttofacetedproject" width="442" height="380" /><br />
+Another dialog appears having the available facets.<br />
+<img class="aligncenter size-full wp-image-350" title="selectdynamicwebproject" src="http://palashray.com/wp-content/uploads/2010/08/selectdynamicwebproject.png" alt="selectdynamicwebproject" width="638" height="560" /><br />
+Select <em>Dynamic Web Module</em>.</p>
+<h2>Solution 3: Manual editing</h2>
+<p>I like this best as it gives lot of flexibility around configuration. First you need to modify the <em>.project</em> file as shown:</p>
+<pre lang="xml">
+<?xml version="1.0" encoding="UTF-8"?>
+<projectDescription>
+	<name>MyWebProject</name>
+	<comment></comment>
+	<projects>
+	</projects>
+	<buildSpec>
+		<buildCommand>
+			<name>org.eclipse.wst.jsdt.core.javascriptValidator</name>
+			<arguments>
+			</arguments>
+		</buildCommand>
+		<buildCommand>
+			<name>org.eclipse.jdt.core.javabuilder</name>
+			<arguments>
+			</arguments>
+		</buildCommand>
+		<buildCommand>
+			<name>org.eclipse.wst.common.project.facet.core.builder</name>
+			<arguments>
+			</arguments>
+		</buildCommand>
+		<buildCommand>
+			<name>org.eclipse.wst.validation.validationbuilder</name>
+			<arguments>
+			</arguments>
+		</buildCommand>
+	</buildSpec>
+	<natures>
+		<nature>org.eclipse.jem.workbench.JavaEMFNature</nature>
+		<nature>org.eclipse.wst.common.modulecore.ModuleCoreNature</nature>
+		<nature>org.eclipse.wst.common.project.facet.core.nature</nature>
+		<nature>org.eclipse.jdt.core.javanature</nature>
+		<nature>org.eclipse.wst.jsdt.core.jsNature</nature>
+	</natures>
+</projectDescription>
+</pre>
+<p>Then, inside the <em>.settings</em> directory, you need to create two files called <em>org.eclipse.wst.common.component</em> and <em>org.eclipse.wst.common.project.facet.core.xml</em>.</p>
+<h3>org.eclipse.wst.common.component</h3>
+<pre lang="xml">
+<?xml version="1.0" encoding="UTF-8"?>
+<project-modules id="moduleCoreId" project-version="1.5.0">
+    <wb-module deploy-name="MyWebProject">
+        <wb-resource deploy-path="/" source-path="/src/main/webapp"/>
+        <wb-resource deploy-path="/WEB-INF/classes" source-path="/src/main/java"/>
+        <property name="context-root" value="MyWebProject"/>
+        <property name="java-output-path" value="/MyWebProject/build/classes"/>
+    </wb-module>
+</project-modules>
+</pre>
+<h3>org.eclipse.wst.common.project.facet.core.xml</h3>
+<pre lang="xml">
+<?xml version="1.0" encoding="UTF-8"?>
+<faceted-project>
+  <runtime name="Apache Tomcat v7.0"/>
+  <fixed facet="jst.web"/>
+  <fixed facet="wst.jsdt.web"/>
+  <fixed facet="java"/>
+  <installed facet="java" version="1.6"/>
+  <installed facet="jst.web" version="3.0"/>
+  <installed facet="wst.jsdt.web" version="1.0"/>
+</faceted-project>
+</pre>

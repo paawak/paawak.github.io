@@ -1,0 +1,83 @@
+---
+layout: post
+status: publish
+published: true
+title: 'Tomcat 8: SSL configuration with self-signed certificate'
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 877
+wordpress_url: http://palashray.com/?p=877
+date: '2017-10-28 23:02:13 +0530'
+date_gmt: '2017-10-29 03:02:13 +0530'
+categories:
+- java
+tags:
+- docker
+- ssl
+- tomcat
+comments:
+- id: 76
+  author: Gopi
+  author_email: king@gmail.com
+  author_url: ''
+  date: '2018-08-29 22:18:15 +0530'
+  date_gmt: '2018-08-30 02:18:15 +0530'
+  content: |-
+    Hi, I followed up these setps but server doesn't load the cert.  I belive the Alias is not aded in the config above. So i added in my server.xml but still not working.
+    30-Aug-2018 10:43:16.493 INFO [http-nio-7080-exec-9] org.apache.coyote.http11.AbstractHttp11Processor.process Error parsing HTTP request header
+     Note: further occurrences of HTTP header parsing errors will be logged at DEBUG level.
+     java.lang.IllegalArgumentException: Invalid character found in method name. HTTP method names must be tokens
+            at org.apache.coyote.http11.AbstractNioInputBuffer.parseRequestLine(AbstractNioInputBuffer.java:236)
+            at org.apache.coyote.http11.AbstractHttp11Processor.process(AbstractHttp11Processor.java:1069)
+            at org.apache.coyote.AbstractProtocol$AbstractConnectionHandler.process(AbstractProtocol.java:684)
+            at org.apache.tomcat.util.net.NioEndpoint$SocketProcessor.doRun(NioEndpoint.java:1539)
+            at org.apache.tomcat.util.net.NioEndpoint$SocketProcessor.run(NioEndpoint.java:1495)
+            at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1149)
+            at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:624)
+            at org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(TaskThread.java:61)
+            at java.lang.Thread.run(Thread.java:748)
+- id: 77
+  author: Palash
+  author_email: paawak@gmail.com
+  author_url: ''
+  date: '2018-08-30 01:06:36 +0530'
+  date_gmt: '2018-08-30 05:06:36 +0530'
+  content: |-
+    Not sure, please look at:
+    <a href="https://github.com/paawak/blog/blob/master/code/apache-http-client/src/main/docker/server.xml" rel="nofollow">https://github.com/paawak/blog/blob/master/code/apache-http-client/src/main/docker/server.xml</a>
+    This is a working example, so, no reason it would not work. Dis you generate the self-signed certificate properly? The <strong>keypass</strong> and <strong>storepass</strong> are important. If you do not specify that properly, it wont work.
+---
+<p>Download and unpack a Tomcat8 distribution. Lets say the location is <strong>/usr/local/tomcat8</strong>.<br />
+First, we will create a self-signed certificate using the java keytool. This is the command:</p>
+<blockquote><p>keytool -genkey -noprompt -trustcacerts -keyalg RSA -alias tomcat -dname "CN=Palash Ray, OU=Demo, O=Swayam, L=Bangalore, ST=Karnataka, C=IN" -keypass changeme -keystore /usr/local/tomcat8/keystore/my_keystore -storepass changeme</p></blockquote>
+<p>This will create the keypair at the location <strong>/usr/local/tomcat8/keystore/my_keystore</strong>.<br />
+Now, go to the <strong>/usr/local/tomcat8/conf</strong> directory. In the <strong>server.xml</strong>, look for commented lines:</p>
+<blockquote><p><Connector port="8443" protocol="org.apache.coyote.http11.Http11NioProtocol" ...</p></blockquote>
+<p>Uncomment that and replace it with:</p>
+<pre class="lang:xhtml decode:true "><Connector port="8443" protocol="org.apache.coyote.http11.Http11NioProtocol"
+maxThreads="150" SSLEnabled="true" scheme="https" secure="true"
+keystoreFile="keystore/my_keystore" keystorePass="changeme"
+clientAuth="false" sslProtocol="TLS" /></pre>
+<p>&nbsp;<br />
+You should be all set now. Save the server.xml and start tomcat. Go to: https://localhost:8443<br />
+This can be embedded into a docker image. This is how the docker file would look:</p>
+<pre class="lang:sh decode:true ">FROM tomcat:8.5
+RUN mkdir "$CATALINA_HOME/keystore"
+RUN keytool -genkey -noprompt -trustcacerts -keyalg RSA -alias tomcat -dname "CN=Palash Ray, OU=Demo, O=Swayam, L=Bangalore, ST=Karnataka, C=IN" -keypass changeme -keystore "$CATALINA_HOME/keystore/my_keystore" -storepass changeme
+COPY server.xml "$CATALINA_HOME/conf/server.xml"
+EXPOSE 8443</pre>
+<p>The sources can be found here:<br />
+<a href="https://github.com/paawak/blog/tree/master/code/apache-http-client/src/main/docker">https://github.com/paawak/blog/tree/master/code/apache-http-client/src/main/docker</a><br />
+The docker image can be found here:<br />
+<a href="https://hub.docker.com/r/paawak/self-signed-tomcat8/">https://hub.docker.com/r/paawak/self-signed-tomcat8/</a><br />
+You can run the image by using:<br />
+docker pull paawak/self-signed-tomcat8<br />
+docker run -d -p 9090:8443 paawak/self-signed-tomcat8<br />
+&nbsp;<br />
+&nbsp;<br />
+&nbsp;</p>

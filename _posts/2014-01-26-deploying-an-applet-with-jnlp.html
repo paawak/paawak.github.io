@@ -1,0 +1,114 @@
+---
+layout: post
+status: publish
+published: true
+title: Deploying an Applet with JNLP
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 488
+wordpress_url: http://palashray.com/?p=488
+date: '2014-01-26 05:12:00 +0530'
+date_gmt: '2014-01-26 05:12:00 +0530'
+categories:
+- java
+tags:
+- applet
+- java
+comments: []
+---
+<p>JNLP is supposed to be the latest and greatest in the Java Applet world post 1.6 release! Personally, I was never a great fan of Applets. I have always felt that Applets are a pain in the wrong place. Inherently difficult and cumbersome to use and deploy.<br />
+But some of these concerns have been addressed with the <a title="deployJava Javacript API" href="https://www.java.com/js/deployJava.txt" target="_blank">deployJava</a> javascript API. For example, it is now possible to ask the users to automatically install Java plugin or upgrade to a higher version with no extra effort on part of the developer. Java realised this quite late in the game that its very important to make it as user friendly as possible.<br />
+Anyway, enough of ranting :), lets outline the steps one by one.</p>
+<h2>Creating the Applet</h2>
+<p>An applet is any class which extends the <em>javax.swing.JApplet</em>. A typical applet is shown below:</p>
+<pre lang="java">public class MyApplet extends JApplet {
+    @Override
+    public void init() {
+	try {
+	    SwingUtilities.invokeAndWait(new Runnable() {
+		@Override
+		public void run() {
+		    getContentPane().add(new MyPanel(), BorderLayout.CENTER);
+		}
+	    });
+	} catch (InvocationTargetException | InterruptedException e) {
+	    e.printStackTrace();
+	}
+    }
+}</pre>
+<p>Note that the initialization code which actually adds components to the <em>contentPane</em> should be included in the <em>init()</em> method.</p>
+<h2>Creating a Jar with proper entries in its Manifest file</h2>
+<p>Its recommended that we create the following entries in the Jar's Manifest file:<br />
+<span style="color: #000080;"> Application-Name: CountDownLatchDemo</span><br />
+<span style="color: #000080;">Permissions: sandbox</span><br />
+<span style="color: #000080;">Codebase: palashray.com</span><br />
+The first parameter is the name of the application. The second is the kind of permission that the Applet needs to run. And the third is the domain name from where the Applet will be hosted. Please refer to <a title="Enhancing Security with Manifest Attributes" href="http://docs.oracle.com/javase/tutorial/deployment/jar/secman.html" target="_blank">this</a> for details.<br />
+This can either be achieved by manually creating the jar and specifying the manifest file with the <em>m</em> option:</p>
+<blockquote><p>jar -cvmf my_manifest_file.txt myjar.jar</p></blockquote>
+<p>Or it can be done elegantly with Maven. This is the sample pom.xml:</p>
+<pre lang="xml">
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<version>2.4</version>
+				<configuration>
+					<archive>
+						<manifestEntries>
+							<permissions>sandbox</permissions>
+							<codebase>palashray.com</codebase>
+							<application-Name>CountDownLatchDemo</application-Name>
+						</manifestEntries>
+					</archive>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+</pre>
+<p>&nbsp;</p>
+<h2>Signing the Jar</h2>
+<p>We need to sign the Jar that has been created above. You can refer to my earlier blog <a href="http://palashray.com/steps-to-create-signed-applet/" title="Creating a signed jar">here</a>.</p>
+<h2>Creating the JNLP file</h2>
+<pre lang="xml">
+<?xml version="1.0" encoding="UTF-8"?>
+<jnlp spec="1.0+" codebase="http://palashray.com/abc/xyz/" href="def.jnlp">
+    <information>
+        <title>CountDownLatchDemo</title>
+        <vendor>Palash Ray</vendor>
+    </information>
+    <resources>
+        <!-- Application Resources -->
+        <j2se version="1.7"
+            href="http://java.sun.com/products/autodl/j2se" />
+        <jar href="my.jar" main="true" />
+    </resources>
+    <applet-desc
+         name="CountDownLatchDemo"
+         main-class="com.swayam.MyApplet"
+         width="500"
+         height="500">
+     </applet-desc>
+     <update check="background"/>
+</jnlp>
+</pre>
+<p>Please note that this jnlp file should be accessible by: http://palashray.com/abc/xyz/def.jnlp<br />
+And the <em>my.jar</em> and <em>def.jnlp</em> should be in the same directory.</p>
+<h2>Use the JNLP file in a HTML file to display the Applet</h2>
+<pre lang="html">
+	<div id="my_applet_div">
+	    <script  language="javascript">
+	        var attributes = {
+	            code:'com.swayam.demo.countdownlatch.CountDownLatchApplet',  width:500, height:300} ;
+	        var parameters = {jnlp_href: 'http://palashray.com/abc/xyz/def.jnlp'} ;
+	        deployJava.runApplet(attributes, parameters, '1.7');
+	    </script>
+	 </div>
+</pre>
+<p>Since we are invoking the applet through the <em>deployJava</em> API, the user will be prompted for installing or upgrading the java plugin in the browser.<br />
+For more information, please refer to <a href="http://docs.oracle.com/javase/tutorial/deployment/deploymentInDepth/index.html" title="Deployment details" target="_blank">this </a>url.</p>

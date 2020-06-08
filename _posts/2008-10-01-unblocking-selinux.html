@@ -1,0 +1,33 @@
+---
+layout: post
+status: publish
+published: true
+title: Unblocking SELinux
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 28
+wordpress_url: http://technoblogs.paawak.com/?p=28
+date: '2008-10-01 11:44:05 +0530'
+date_gmt: '2008-10-01 06:14:05 +0530'
+categories:
+- linux
+tags:
+- linux
+comments: []
+---
+<p class="entryContent">
+<p>Today, while I was trying to access MySQL through PHP on HTTPD Apache server, I was getting a connection fail. Since I installed PHP for the first time, I double checked on whether I had installed the PHP-MySQL module as well. Yes, I had, all seemed to be fine... but... try again... hey a yellow asterisk pops-up in my task-bar... SELinux is preventing httpd to access MySQL.<br />
+What now? Followed the link to the FAQ:<br />
+http://docs.fedoraproject.org/selinux-faq-fc5/#id2961385<br />
+I am summarising it as follows:<br />
+Copy the &lsquo;raw message&lsquo; which appears at the end of the SELinux service denied screen. Save it as selinux_httpd_mysql_alert.txt, and run the following command.<br />
+audit2allow -M local < selinux_httpd_mysql_alert.txt<br />
+This will generate a file called local.pp. Load this by either running the command<br />
+semodule -i local.pp<br />
+Or by going to the SELinuxManagement [from the System menu -> Administration] and then do a load policy.<br />
+Thats simple <img class="smiley<a href=" src="http://www.jroller.com/images/smileys/smile.gif" alt="" /> alt=title=":)" />.</p>

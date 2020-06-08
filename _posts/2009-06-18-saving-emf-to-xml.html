@@ -1,0 +1,33 @@
+---
+layout: post
+status: publish
+published: true
+title: Saving EMF to XML
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 113
+wordpress_url: http://puretech.paawak.com/?p=113
+date: '2009-06-18 00:58:05 +0530'
+date_gmt: '2009-06-17 19:28:05 +0530'
+categories:
+- emf
+tags:
+- emf
+- java
+comments: []
+---
+<p>Lets say we want to serialize an EObject to XML. The code is given below. This will print the XML to the error stream.</p>
+<pre lang="java">
+            EObject eObject = ...;
+            Resource resource = new XMLResourceImpl();
+            resource.getContents().add(eObject);
+            Map options = new HashMap();
+            options.put(XMLResource.OPTION_ENCODING, "UTF-8");
+            options.put(XMLResource.OPTION_XML_VERSION, "1.0");
+            new XMLProcessor().save(System.err, resource, options);
+</pre>

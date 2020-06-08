@@ -1,0 +1,159 @@
+---
+layout: post
+status: publish
+published: true
+title: 'Flex: mxml vs ActionScript'
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 200
+wordpress_url: http://puretech.paawak.com/?p=200
+date: '2009-09-11 01:40:44 +0530'
+date_gmt: '2009-09-10 20:10:44 +0530'
+categories:
+- flex
+tags:
+- action script
+- flex
+comments: []
+---
+<p>This might look rather silly, but still had to give in to temptation :). Since I had worked on Swings as well, had to see if I could code a create a popup window with ActionScript. Well, of course you can, but I am rather new to Flex and most of the tutorial, for some unknown reason, choose not to mention this topic. So I decided to give it a shot.<br />
+Below is a popup window coded in mxml. Its called <em>ItemSelectDialog.mxml</em>.</p>
+<pre lang="xml">
+<?xml version="1.0" encoding="utf-8"?>
+<mx:TitleWindow xmlns:mx="http://www.adobe.com/2006/mxml" layout="absolute"
+    showCloseButton="true" close="close();">
+    <mx:Script>
+        <![CDATA[
+            import mx.managers.PopUpManager;
+            private function close():void {
+                // Put any clean-up code here.
+                PopUpManager.removePopUp(this);
+            }
+        ]]>
+    </mx:Script>
+	<mx:Label x="39" y="77" text="ItemName:"/>
+	<mx:Label x="0" y="10" text="Item Search" width="400" textAlign="center" fontSize="18" fontWeight="bold"/>
+	<mx:ComboBox x="140" y="75" id="itemNames">
+	    <mx:ArrayCollection id="itemArray">
+	    <mx:Object data="0" label="Item-0"/>
+	    <mx:Object data="1" label="Item-1"/>
+	    <mx:Object data="2" label="Item-2"/>
+	    </mx:ArrayCollection>
+	</mx:ComboBox>
+	<mx:Button x="103" y="214" label="Cancel" id="cancel" click="close();"/>
+	<mx:Button x="230" y="214" label="Add" id="add" click="close();"/>
+</mx:TitleWindow>
+</pre>
+<p>This is how you invoke it from another mxml:</p>
+<pre lang="xml">
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml" >
+    <mx:Script>
+        <![CDATA[
+            import mx.managers.PopUpManager;
+            import mx.core.IFlexDisplayObject;
+            private function showAddItemDialog():void {
+                // Create a modal TitleWindow container.
+                var itemWindow:IFlexDisplayObject = PopUpManager.createPopUp(this, ItemSelectDialog, true);
+            }
+        ]]>
+    </mx:Script>
+	<mx:Button x="556" y="249" label="Add Item" id="addItem" click="showAddItemDialog();"/>
+</mx:Application>
+</pre>
+<p>And this is how its ActionScript counterpart looks like. Its called <em>ItemSelectionDialog.as</em>.</p>
+<pre lang="javascript">
+package com.swayam.flex.exp {
+    import  mx.containers.TitleWindow;
+    import  mx.controls.Label;
+    import  mx.controls.ComboBox;
+    import  mx.controls.Button;
+    import mx.managers.PopUpManager;
+    import mx.events.CloseEvent;
+    import flash.events.IEventDispatcher;
+    import flash.events.MouseEvent;
+    public class ItemSelectionDialog extends TitleWindow {
+        [Bindable]
+        private var itemsArray:Array = new Array();
+        private var cbItemList:ComboBox;
+        public function ItemSelectionDialog() {
+            initComponents();
+            showCloseButton=true;
+            layout="absolute";
+            width = 500;
+            height = 300;
+            addEventListener(CloseEvent.CLOSE, closeWindow);
+        }
+        private function initComponents():void {
+            var lbTitle:Label = new Label();
+            lbTitle.text = "Item Search";
+            lbTitle.x = 0;
+            lbTitle.y = 10;
+            /*lbTitle.textAlign="center";
+            lbTitle.fontSize=18;
+            lbTitle.fontWeight="bold";*/
+            addChild(lbTitle);
+            var lbItemName:Label = new Label();
+            lbItemName.text = "ItemName:";
+            lbItemName.x = 39;
+            lbItemName.y = 75;
+            addChild(lbItemName);
+            //put some elements in the combo
+            var count:int = 0;
+            for (; count < 10; count++) {
+                var content:Object = new Object();
+                content["label"] = "Item-" + count;
+                content["data"] = count;
+                itemsArray[count] = content;
+            }
+            cbItemList = new ComboBox();
+            cbItemList.x = 140;
+            cbItemList.y = 75;
+            cbItemList.dataProvider = itemsArray;
+            addChild(cbItemList);
+            var btCancel:Button = new Button();
+            btCancel.label = "Cancel";
+            btCancel.x = 103;
+            btCancel.y = 214;
+            btCancel.addEventListener(MouseEvent.CLICK, closeOnClick);
+            addChild(btCancel);
+            var btAdd:Button = new Button();
+            btAdd.label = "Add";
+            btAdd.x = 230;
+            btAdd.y = 214;
+            btAdd.addEventListener(MouseEvent.CLICK, addAndClose);
+            addChild(btAdd);
+        }
+        private function closeWindow(event:CloseEvent):void {
+            close();
+        }
+        private function closeOnClick(event:MouseEvent):void {
+            close();
+        }
+        private function addAndClose(event:MouseEvent):void {
+        	if (cbItemList.selectedItem != null) {
+                close();
+        	}
+        }
+        private function close():void {
+            PopUpManager.removePopUp(this);
+        }
+    }
+}
+</pre>
+<p>You can use it just like its mxml counterpart, just make sure that you import the class.</p>
+<pre lang="xml">
+...
+            private function showAddItemDialog():void {
+                // Create a modal TitleWindow container.
+                var itemWindow:IFlexDisplayObject = PopUpManager.createPopUp(this, ItemSelectionDialog, true);
+            }
+...
+</pre>
+<p>This is how it looks like:<br />
+<a href="#" rel="attachment wp-att-201"><img src="http://palashray.com/wp-content/uploads/2009/09/popup-actionscript.png" alt="popup-actionscript" title="popup-actionscript" width="514" height="318" class="aligncenter size-full wp-image-201" /></a></p>

@@ -1,0 +1,56 @@
+---
+layout: post
+status: publish
+published: true
+title: "[How To] Rip VCD on Linux"
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 286
+wordpress_url: http://puretech.paawak.com/?p=286
+date: '2010-08-21 00:03:48 +0530'
+date_gmt: '2010-08-20 18:33:48 +0530'
+categories:
+- linux
+tags:
+- linux
+- vcd
+comments: []
+---
+<p>I have always had problems while playing VCDs on my Linux machine. The VCD file system is still not supported by the Linux kernel. After browsing the net and trying out various options, I will enlist the following which I find most useful.</p>
+<h1>Using <em>cdrdao</em></h1>
+<p>This is the most flexible command and copies the contents of VCD in the .bin and .toc format. This can be played by mplayer, or can be burnt into another cd. First we need to determine the device name for the cd drive. We do this either by:</p>
+<blockquote><p>parted -l</p></blockquote>
+<p>or</p>
+<blockquote><p>cdrdao scanbus</p></blockquote>
+<p>Suppose the device is /dev/sr0. We then need to unmount this device:</p>
+<blockquote><p>umount /dev/sr0</p></blockquote>
+<p>Next, the following command will extract the contents of the VCD into .bin and a .toc files:</p>
+<blockquote><p>cdrdao read-cd --read-raw --read-subchan rw_raw --datafile fileName.bin --device /dev/sr0 --driver generic-mmc-raw fileName.toc</p></blockquote>
+<p>We can directly play the .bin file using mplayer. In case we want to create an iso from the .bin and .toc, we can use the <strong>bchunk</strong>. In order to install it, just do:</p>
+<blockquote><p>yum install bchunk</p></blockquote>
+<p>bchunk works only with cue. So, you need to convert the .toc to .cue:</p>
+<blockquote><p>toc2cue fileName.toc&nbsp; fileName.cue</p></blockquote>
+<p>Then:</p>
+<blockquote><p>bchunk -v -r fileName.bin fileName.cue fileName</p></blockquote>
+<p>This will give you .iso</p>
+<h1>Using <em>mencoder</em></h1>
+<blockquote><p>mencoder vcd://2 -oac lavc -ovc lavc -o fileName.avi</p></blockquote>
+<h1>Using <em>vcdxrip</em></h1>
+<blockquote><p>vcdxrip -i /dev/sr0 -v -p -t 1 --nofiles --nosegments</p></blockquote>
+<p>Here <em><strong>i</strong></em> denotes the mount point of the CDROM drive,&nbsp; <strong><em>t </em></strong>denotes the Track Number. This way, a VCD can be ripped from a Linux machine. I have tested this on Fedora (10) and it works great.</p>
+<h1>Further Reading</h1>
+<p>The following sites have more detailed info about the above:</p>
+<ul>
+<li><a href="http://forums.freebsd.org/showthread.php?t=18809" target="_blank">http://forums.freebsd.org/showthread.php?t=18809&nbsp;<br />
+</a></li>
+<li><a href="https://help.ubuntu.com/community/cdrdao" target="_blank">https://help.ubuntu.com/community/cdrdao&nbsp;<br />
+</a></li>
+<li><a href="http://pandorawiki.org/Creating_images_of_PSX_games_using_Linux" target="_blank">http://pandorawiki.org/Creating_images_of_PSX_games_using_Linux&nbsp;<br />
+</a></li>
+</ul>
+<p>&nbsp;</p>

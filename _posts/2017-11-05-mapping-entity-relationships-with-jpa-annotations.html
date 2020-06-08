@@ -1,0 +1,147 @@
+---
+layout: post
+status: publish
+published: true
+title: Mapping Entity relationships with JPA annotations
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 908
+wordpress_url: http://palashray.com/?p=908
+date: '2017-11-05 07:24:16 +0530'
+date_gmt: '2017-11-05 12:24:16 +0530'
+categories:
+- java
+- hibernate
+tags:
+- entity
+- hibernate
+- jpa
+- one-to-many
+- relation
+comments: []
+---
+<p>We will look at some practical examples of how to wire in Entity relationships using standard JPA annotations.</p>
+<h2>Generating Primary Key Id from Sequence</h2>
+<p>Consider the below SQL:</p>
+<pre class="lang:pgsql decode:true">CREATE SEQUENCE SEQ_GENRE_ID;
+CREATE TABLE GENRE (
+	id NUMERIC(20, 0) NOT NULL PRIMARY KEY,
+	short_name VARCHAR(10) NOT NULL,
+	name VARCHAR(100) NOT NULL
+);
+</pre>
+<p>I would like to auto-generate the ID of GENRE from the SEQ_GENRE_ID.<br />
+This is how my Entity would look like:</p>
+<pre class="lang:java decode:true">@Entity
+@Table(name = "SECTION")
+public class Section implements Serializable {
+	private static final long serialVersionUID = 1L;
+	@Id
+	@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "sectionIdGenerator")
+	@SequenceGenerator(name = "sectionIdGenerator", sequenceName = "SEQ_SECTION_ID")
+	@Column(name = "id")
+	private Long id;
+...</pre>
+<p>Here, the <em>@SequenceGenerator</em> contains the name of the sequence used for ID generation. This can be ignored for DB like MySQL, which has support for AUTO GENERATION at the table level itself. The <em>@GeneratedValue</em> has the strategy used to generate the value.</p>
+<h2>Simple One to One Relationship</h2>
+<p>Consider the below tables:</p>
+<pre class="lang:pgsql decode:true">CREATE TABLE CHAPTER (
+	id NUMERIC(20, 0) NOT NULL PRIMARY KEY,
+	title TEXT NOT NULL,
+	plot_summary TEXT,
+	content_id NUMERIC(20, 0) NOT NULL,
+	FOREIGN KEY (content_id) REFERENCES SECTION(id)
+);
+CREATE TABLE SECTION (
+	id NUMERIC(20, 0) NOT NULL PRIMARY KEY,
+	section_text TEXT NOT NULL,
+	style TEXT,
+	section_length INTEGER NOT NULL
+);</pre>
+<h4>Chapter</h4>
+<pre class="lang:java decode:true">@Entity
+@Table(name = "CHAPTER")
+public class Chapter implements Serializable {
+	private static final long serialVersionUID = 1L;
+	@Column(name = "id")
+	private Long id;
+	@Column(name = "title")
+	private String title;
+	@Column(name = "plot_summary")
+	private String plotSummary;
+	@OneToOne(fetch = FetchType.EAGER)
+	@JoinColumn(name = "content_id")
+	private Section contents;
+...</pre>
+<h4>Section</h4>
+<pre class="lang:java decode:true">@Entity
+@Table(name = "SECTION")
+public class Section implements Serializable {
+	private static final long serialVersionUID = 1L;
+	@Column(name = "id")
+	private Long id;
+	@Column(name = "section_text")
+	private String sectionText;
+	@Column(name = "style")
+	private String style;
+	@Column(name = "section_length")
+	private int length;
+...</pre>
+<p>The simple One-to-One can be wired up by using the below 2 annotations:</p>
+<blockquote><p>@OneToOne(fetch = FetchType.EAGER)<br />
+@JoinColumn(name = "content_id")<br />
+private Section contents;</p></blockquote>
+<p>Specify the name of the column in the CHAPTER table which is the FOREIGN KEY to the SECTION table.</p>
+<h2>One to Many Relationship using a Mapping table</h2>
+<p>Consider the below entity:</p>
+<pre class="lang:java decode:true">@Entity
+@Table(name = "BOOK")
+public class Book implements Serializable {
+	private static final long serialVersionUID = 1L;
+	private Long id;
+	@Column(name = "title")
+	private String title;
+	@OneToMany(fetch = FetchType.EAGER)
+	@JoinTable(name = "BOOK_GENRE", joinColumns = @JoinColumn(name = "book_id", referencedColumnName = "id"), inverseJoinColumns = @JoinColumn(name = "genre_id", referencedColumnName = "id"))
+	private Set<Genre> genres;
+...</pre>
+<p>In terms of SQL, we can have a main table called BOOK and then a mapping table called BOOK_GENRE. This mapping table would contain the IDs of BOOK and GENRE tables.</p>
+<pre class="lang:pgsql decode:true ">CREATE TABLE BOOK (
+	id NUMERIC(20, 0) NOT NULL PRIMARY KEY,
+	title TEXT NOT NULL,
+	author_id NUMERIC(20, 0) NOT NULL,
+	main_chapter_id NUMERIC(20, 0) NOT NULL,
+	FOREIGN KEY (author_id) REFERENCES AUTHOR(id),
+	FOREIGN KEY (main_chapter_id) REFERENCES CHAPTER(id)
+);
+CREATE TABLE BOOK_GENRE (
+	book_id NUMERIC(20, 0) NOT NULL,
+	genre_id NUMERIC(20, 0) NOT NULL,
+	FOREIGN KEY (book_id) REFERENCES BOOK(id),
+	FOREIGN KEY (genre_id) REFERENCES GENRE(id)
+);</pre>
+<p>This relationship can be represented by:</p>
+<blockquote><p>@OneToMany(fetch = FetchType.EAGER)<br />
+@JoinTable(name = "BOOK_GENRE", joinColumns = @JoinColumn(name = "book_id", referencedColumnName = "id"), inverseJoinColumns = @JoinColumn(name = "genre_id", referencedColumnName = "id"))</p></blockquote>
+<p>The @JoinTable takes in the name of the Mapping table. It has the below 2 attributes:</p>
+<ol>
+<li>joinColumns: You need to provide the FOREIGN KEY from the owning part of the relationship, in this case,&nbsp; BOOK</li>
+<li>inverseJoinColumns: You need to provide the FOREIGN KEY of the non-owning side of the entity, in this case, GENRE</li>
+</ol>
+<h2>Saving Entity relationships</h2>
+<p>By default, none of the Entity relations are inserted or updated. You need to explicitly specify the <em>cascade</em> attribute in the <em>OneToOne</em> or <em>OneToMany</em> annotation.</p>
+<blockquote><p>@OneToOne(fetch = FetchType.EAGER, cascade = { CascadeType.PERSIST, CascadeType.MERGE })<br />
+@JoinColumn(name = "main_chapter_id")<br />
+private Chapter mainChapter;</p></blockquote>
+<p>If you do not want to save the Entity, do not specify the cascade attribute:</p>
+<blockquote><p>@OneToOne(fetch = FetchType.EAGER)<br />
+@JoinColumn(name = "author_id")<br />
+private Author author;</p></blockquote>
+<h2>Sources</h2>
+<p>A working example can be found here:<br />
+<a href="https://github.com/paawak/blog/tree/master/code/one-to-many-example-2">https://github.com/paawak/blog/tree/master/code/one-to-many-example-2</a></p>

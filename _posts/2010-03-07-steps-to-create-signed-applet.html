@@ -1,0 +1,40 @@
+---
+layout: post
+status: publish
+published: true
+title: Steps to create a signed applet
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 267
+wordpress_url: http://puretech.paawak.com/?p=267
+date: '2010-03-07 11:23:10 +0530'
+date_gmt: '2010-03-07 05:53:10 +0530'
+categories:
+- java
+tags:
+- jarsigner
+- signed applet
+comments:
+- id: 19
+  author: Deploying an Applet with JNLP | The heart of a Hacker
+  author_email: ''
+  author_url: http://palashray.com/deploying-an-applet-with-jnlp/
+  date: '2014-01-26 05:44:48 +0530'
+  date_gmt: '2014-01-26 10:44:48 +0530'
+  content: "[&#8230;] We need to sign the Jar that has been created above. You can
+    refer to my earlier blog here. [&#8230;]"
+---
+<p>Many times while working with Applets, you need a signed jar to circumvent the security restrictions placed on an unsigned applet. Here are three simple steps of creating a self-signed applet:<br />
+<em>keytool -genkey<br />
+keytool -selfcert<br />
+jarsigner myapplet.jar mykey</em><br />
+<em><br />
+</em><br />
+Further reading:<br />
+<a href="http://www-personal.umich.edu/~lsiden/tutorials/signed-applet/signed-applet.html" target="_blank">http://www-personal.umich.edu/~lsiden/tutorials/signed-applet/signed-applet.html</a><br />
+<a href="http://java.sun.com/javase/6/docs/technotes/tools/solaris/keytool.html" target="_blank">http://java.sun.com/javase/6/docs/technotes/tools/solaris/keytool.html</a></p>

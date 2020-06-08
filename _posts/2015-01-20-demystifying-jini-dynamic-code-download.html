@@ -1,0 +1,148 @@
+---
+layout: post
+status: publish
+published: true
+title: 'Demystifying JINI: Dynamic Code Download'
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 641
+wordpress_url: http://palashray.com/?p=641
+date: '2015-01-20 01:23:58 +0530'
+date_gmt: '2015-01-20 01:23:58 +0530'
+categories:
+- jini
+tags:
+- jini
+- rmi
+comments: []
+---
+<p class="western">In the 1st part of the <span style="color: #000080;"><span lang="en-US"><span style="text-decoration: underline;"><a href="http://palashray.com/category/java/jini/">Demystifying JINI series</a></span></span></span>, we had explored how to write a bare bones non secured client/server: <span style="color: #000080;"><span lang="en-US"><span style="text-decoration: underline;"><a href="http://palashray.com/demystifying-jini-non-secure-server-part-1/">http://palashray.com/demystifying-jini-non-secure-server-part-1/</a></span></span></span></p>
+<p class="western">In the 2nd part, we had shown how to Spring-ify it: <span style="color: #000080;"><span lang="en-US"><span style="text-decoration: underline;"><a href="http://palashray.com/demystifying-jini-non-secure-server-part-2/">http://palashray.com/demystifying-jini-non-secure-server-part-2/</a></span></span></span></p>
+<p class="western">In the latest increment, we will explore how to handle dynamic code download.</p>
+<p class="western">I have been working with JINI for the past couple of years. And the more I explore its features, its versatility, the more I come across new ones. This project was built with the famous &ldquo;<span style="color: #000080;"><span lang="en-US"><span style="text-decoration: underline;"><a href="http://en.wikipedia.org/wiki/Fallacies_of_distributed_computing"><b>Eight Fallacies of Distributed Computing</b></a></span></span></span>&rdquo;. So, needless to say, it does not disappoint in terms of scalability or reliability.</p>
+<p class="western"><span style="font-size: large;"><b>Why need dynamic code download?</b></span></p>
+<p class="western">At the heart of JINI lies its flexibility. It decouples the interface from the implementation (of the Proxy), and makes it independent of the transport protocol as well. All these details are transparent to the end user.</p>
+<p class="western">However, there needs to be a way in which the Stubs are downloaded. These stubs will actually help the remote client to connect to the server, and make calls on the remote JVM. This is where dynamic code download is needed. And this comes out of the box with JINI.</p>
+<p class="western"><span style="font-size: large;"><b>Why should I care about dynamic code download?</b></span></p>
+<p class="western"><span style="font-size: medium;">The dynamic code download is a very powerful feature. In normal client/server distributed architecture, the client and the server agrees on a common API. This is commonly known as the </span><span style="font-size: medium;"><b>shared module</b></span><span style="font-size: medium;">, be it JEE or RMI. And it is mandatory for us to bundle the shared module with the server as well as the client modules. Otherwise, the application will blow up with hosts of NoClassDefFoundError-s.</span></p>
+<p class="western"><span style="font-size: medium;">But, with this interesting feature in JINI, the client does not even have to depend on this shared module at all. The reason is, it can be downloaded when doing the lookup. Of course, every feature comes with its costs, and in this case, the only downside to this is, we need to use reflection to query the remote service. Either that, or use a scripting language like Groovy.</span></p>
+<p class="western"><a name="__DdeLink__696_1062380955"></a> <span style="font-size: large;"><b>How does it work?</b></span></p>
+<p class="western">To enable dynamic code download, we need to specify the code base property (similar to the Applet's) on the JINI server. When the client connects to the server via lookup, this will be available to the JINI client. In its simplest form, it can be as below:</p>
+<p class="western" align="LEFT"><span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">System.</span></span></span><span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;"><i>setProperty</i></span></span></span><span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">(</span></span></span><span style="color: #2a00ff;"><span style="font-family: monospace;"><span style="font-size: small;">"java.rmi.server.codebase"</span></span></span><span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">, </span></span></span><span style="color: #2a00ff;"><span style="font-family: monospace;"><span style="font-size: small;">"</span></span></span><span style="color: #0000ff;"><span style="font-family: monospace;"><span style="font-size: small;">http://localhost:8080/rmi-service-api-1.0.jar</span></span></span><span style="color: #2a00ff;"><span style="font-family: monospace;"><span style="font-size: small;">"</span></span></span><span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">);</span></span></span></p>
+<p class="western">This should be called while starting the JINI server.</p>
+<p class="western"><span style="font-size: large;"><b>Getting started</b></span></p>
+<p class="western"><span style="font-size: medium;">Download the folder: <a href="https://github.com/paawak/blog/tree/master/code/jini/unsecure/jini-services">https://github.com/paawak/blog/tree/master/code/jini/unsecure/jini-services</a></span></p>
+<p class="western"><span style="font-size: medium;">cd into it and first start up the reggie by using the </span><span style="font-size: medium;"><b>./start-reggie.sh</b></span></p>
+<p class="western"><span style="font-size: medium;">Then, again, we need to start a http server to serve the jars for dynamic code download. Use the </span><span style="font-size: medium;"><b>./httpd.sh</b></span><span style="font-size: medium;"> to start that server. This server starts at port 8080 and makes any jar placed inside of the </span><span style="font-size: medium;"><b>service-interface</b></span><span style="font-size: medium;"> directory, available over </span><span style="color: #000080;"><span lang="en-US"><span style="text-decoration: underline;"><a href="http://localhost:8080/"><span style="font-size: medium;">http://localhost:8080</span></a></span></span></span><span style="font-size: medium;">. This is a small utility provided y JINI, in production, we would need a more secured web server.</span></p>
+<p class="western"><span style="font-size: large;"><b>The Service API</b></span></p>
+<pre class="lang:java decode:true ">public interface BankDetailService extends Remote {
+    Map<String, List<BankDetail>> getBankDetails(BankDetailGroups group) throws RemoteException;
+}</pre>
+<p class="western"><span style="font-size: medium;">The API jar is built and put in the </span><span style="font-size: medium;"><b>service-interface</b></span><span style="font-size: medium;"> directory above to make it available for dynamic downloads. Note that it is bundled with the Server, but </span><span style="font-size: medium;"><b>not</b></span><span style="font-size: medium;"> with the Client.</span></p>
+<p class="western"><span style="font-size: large;"><b>The Server</b></span></p>
+<p class="western"><span style="font-size: medium;">We have built this on top of the Spring-ified server that we saw in </span><span style="color: #000080;"><span lang="en-US"><span style="text-decoration: underline;"><a href="http://palashray.com/demystifying-jini-non-secure-server-part-2/"><span style="font-size: medium;">part 2</span></a></span></span></span><span style="font-size: medium;">.</span></p>
+<pre escaped="true" lang="java">public class SpringNonSecureRmiServer {
+    private static final String CODE_BASE_URL = "http://localhost:8080/";
+    private static final String[] JARS_DOWNLOADED_DYNAMICALLY = new String[] { "rmi-service-api-1.0.jar" };
+    private static String getRmiServerCodebase() {
+        StringBuilder urlBuilder = new StringBuilder(200);
+        // the urls are separated by space
+        for (String jar : JARS_DOWNLOADED_DYNAMICALLY) {
+            urlBuilder.append(CODE_BASE_URL).append(jar).append(" ");
+        }
+        urlBuilder.setLength(urlBuilder.length() - 1);
+        return urlBuilder.toString();
+    }
+    public static void main(String[] args) {
+        String codebase = getRmiServerCodebase();
+        // set the below property to enable dynamic code download
+        System.setProperty("java.rmi.server.codebase", codebase);
+        try (ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("server-application.xml")) {
+            System.out.println("SpringNonSecureRmiServer.main(): " + "The server is ready");
+        }
+    }
+}</pre>
+<p class="western"><span style="font-size: medium;">Note that its is almost similar, just has the extra line setting the </span><span style="font-size: medium;"><b>rmi-codebase property</b></span><span style="font-size: medium;">.</span></p>
+<p class="western"><span style="font-size: large;"><b>The Client</b></span></p>
+<p class="western"><span style="font-size: medium;">Since the client does not have the API as its dependency, we have to use reflection. But remember to use the </span><span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">RMIClassLoader</span></span></span><span style="font-size: medium;"> to load classes from the API jar. Let us demo a Swing app which uses the remote </span><span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">BankDetailService</span></span></span><span style="font-size: medium;"> to fetch data to be displayed on the JtreeTable.</span></p>
+<p class="western"><span style="font-size: medium;"><b>The Main Class</b></span></p>
+<pre escaped="true" lang="java">public class SpringNonSecureRmiClient {
+    public static void main(String[] args) throws Exception {
+        System.setProperty("java.security.policy", System.getProperty("user.home") + "/jini/policy.all");
+        // the below line is put only for debugging purposes, its not needed, as
+        // the default class loader is good enough
+        System.setProperty(RMIClassLoaderSpi.class.getName(), DelegatingRMIClassLoader.class.getName());
+        if (System.getSecurityManager() == null) {
+            System.setSecurityManager(new SecurityManager());
+        }
+        try (ClassPathXmlApplicationContext context = new ClassPathXmlApplicationContext("client-application.xml")) {
+            Remote bankDetailService = context.getBean("bankDetailService", Remote.class);
+            showFrame(bankDetailService);
+        }
+    }
+    private static void showFrame(Remote bankDetailService) {
+        for (LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
+            if ("Nimbus".equals(info.getName())) {
+                try {
+                    UIManager.setLookAndFeel(info.getClassName());
+                } catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e) {
+                    throw new RuntimeException(e);
+                }
+                break;
+            }
+        }
+        EventQueue.invokeLater(() -> {
+            new GroupingDemoFrame(bankDetailService).setVisible(true);
+        });
+    }
+}</pre>
+<p class="western"><span style="font-size: medium;"><b>The Method to Query the Remote Service</b></span></p>
+<pre class="lang:java decode:true ">    private Map<String, List<?>> queryRemoteService(String bankDetailGroupsEnumString) {
+        Class<?> bankDetailGroupsEnumClass;
+        try {
+            bankDetailGroupsEnumClass = RMIClassLoader.loadClass("http://localhost:8080/rmi-service-api-1.0.jar", "com.swayam.demo.rmi.dto.BankDetailGroups");
+        } catch (MalformedURLException | ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+        Field field;
+        try {
+            field = bankDetailGroupsEnumClass.getDeclaredField(bankDetailGroupsEnumString);
+        } catch (NoSuchFieldException | SecurityException e) {
+            throw new RuntimeException(e);
+        }
+        Object bankDetailGroupsEnumValue;
+        try {
+            bankDetailGroupsEnumValue = field.get(bankDetailGroupsEnumClass);
+        } catch (IllegalArgumentException | IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+        Method getBankDetails;
+        try {
+            getBankDetails = bankDetailService.getClass().getDeclaredMethod("getBankDetails", bankDetailGroupsEnumClass);
+        } catch (NoSuchMethodException | SecurityException e) {
+            throw new RuntimeException(e);
+        }
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, List<?>> groupedBankDetails = (Map<String, List<?>>) getBankDetails.invoke(bankDetailService, bankDetailGroupsEnumValue);
+            return groupedBankDetails;
+        } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+            throw new RuntimeException(e);
+        }
+    }</pre>
+<p class="western"><span style="font-size: large;"><b>Sources</b></span></p>
+<p class="western">The sources for the <b>server</b> be found here:</p>
+<p><a href="https://github.com/paawak/blog/tree/master/code/jini/unsecure/dynamic-code-download/spring-rmi-server">https://github.com/paawak/blog/tree/master/code/jini/unsecure/dynamic-code-download/spring-rmi-server</a></p>
+<p class="western">The sources for the <b>client</b> be found here:</p>
+<p class="western"><a href="https://github.com/paawak/blog/tree/master/code/jini/unsecure/dynamic-code-download/rmi-client-dynamic-code-download">https://github.com/paawak/blog/tree/master/code/jini/unsecure/dynamic-code-download/rmi-client-dynamic-code-download</a></p>
+<p>You can download the sources and then run:</p>
+<p class="western"><b>mvn clean install -P create_dist</b></p>
+<p class="western">This will create the distribution inside the <b>target/appassembler</b> directory. You can go inside the <b>appassembler/bin</b> directory and run the <b>./launch_swing_app</b> to launch the application.</p>
+<p class="western"><span style="font-size: large;"><b>Reference</b></span></p>
+<p class="western"><span style="color: #000080;"><span lang="en-US"><span style="text-decoration: underline;"><a href="http://www.softwarematters.org/jini-intro.html">http://www.softwarematters.org/jini-intro.html</a> </span></span></span></p>
+<p class="western"><a href="http://jan.newmarch.name/java/jini/tutorial/Overview.html">Jan Newmarch's Guide to Jini Technologies </a></p>

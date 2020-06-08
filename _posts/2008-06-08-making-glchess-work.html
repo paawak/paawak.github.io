@@ -1,0 +1,26 @@
+---
+layout: post
+status: publish
+published: true
+title: Making glchess work
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 16
+wordpress_url: http://technoblogs.paawak.com/?p=12
+date: '2008-06-08 11:35:45 +0530'
+date_gmt: '2008-06-08 06:05:45 +0530'
+categories:
+- linux
+tags:
+- linux
+comments: []
+---
+<p class="entryContent">I am using Fedora 7. To begin with, glchess used to work fine for me. Then suddenly it stopped working. It was giving a strange error. After googling a bit, I realised that it stopped working because I upgraded my Python from 2.0 to 2.5. Lucky for me though, I had python2 in my /usr/bin. So, this is the fix: I opened <em>/usr/bin/glchess</em>, and changed the header to</p>
+<div><strong><em>!  /usr/bin/python2</em></strong></div>
+<p>And voila, it started working again!<br />
+The moral of the story is, glchess does not work with Python 2.5. It needs Python 2.</p>

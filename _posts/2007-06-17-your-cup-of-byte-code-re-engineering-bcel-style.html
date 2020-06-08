@@ -1,0 +1,114 @@
+---
+layout: post
+status: publish
+published: true
+title: Your cup of Byte-Code-Re-Engineering, BCEL style
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 13
+wordpress_url: http://technoblogs.paawak.com/?p=6
+date: '2007-06-17 11:26:21 +0530'
+date_gmt: '2007-06-17 05:56:21 +0530'
+categories:
+- java
+tags:
+- byte code
+- java
+comments: []
+---
+<p><span style="font-weight: bold; font-size: medium;">Your cup of Byte-Code-Re-Engineering, <a href="http://jakarta.apache.org/bcel/index.html">BCEL</a> style</span><br />
+In case you are wondering what this means? To put it simply, its a way to modify a class at runtime using the <a href="http://jakarta.apache.org/bcel/index.html">Jakarta's BCEL</a>. When I say <span style="font-style: italic;">modify</span>, I mean altering the behaviour of the class by inserting instructions dynamically. The modus operandi is very simple:</p>
+<ul>
+<li>Load the class with BCEL</li>
+<li>Modify it</li>
+<li>Save it so that the original .class file is over-written with the modified one</li>
+<li>Use the modified class</li>
+</ul>
+<p>As annotations start getting popular and the scene is cleared for Aspect Oriented Programming and the likes, byte code re-engineering assumes significance.<br />
+But it can be very cumbersome and a bit dangerous as it might lead to very unpredictable results. Nonetheless, it is a very powerful and handy tool.<br />
+I will try to brush on how to use the BCEL to achieve our end. I, myself am a novice.<br />
+You may start at their <a href="http://jakarta.apache.org/bcel/manual.html">official manual</a>, but the examples there doesnt help much. Also, you you go through the extensive Javadocs that can be had by downloading the <a href="https://commons.apache.org/proper/commons-bcel/">binaries</a>.<br />
+The first thing to do is to definitely use the immensely handy utility <span style="font-weight: bold;">BCELifier </span>which translates Java-code we understand to the somewhat difficult to follow BCEL grammar(which is closer to the <a href="http://java.sun.com/docs/books/jvms/first_edition/html/VMSpecTOC.doc.html">JVM's instruction set</a>). Write a small class with a couple of methods and a few simple printlns, etc and do a:</p>
+<pre>
+BCELifier.main(new String[] {TestClass.class.getName()});</pre>
+<p>This class will print back the instructions in order to create the TestClass from scratch.<br />
+While working with BCEL, you will have to get used to the fact that most of these classes do not work directly with our own dear <span style="font-style: italic;">java.lang.Class</span>. Instead you have to get a <span style="font-style: italic;">org.apache.bcel.classfile.<span style="font-weight: bold;">JavaClass</span></span><span style="font-weight: bold;"> </span>in order to bring home the bacon. But you will be thankful for that in a while. Confused? I will tell you the reason: when you want to modify .class files dynamically, the last thing you would want is to mess-around with Java's default class-loaders. Once a class is loaded in the JVM's memory, it is very cumbersome to dislodge it and load it afresh. So, the trick is not to load the class in the JVM until you have BCEL-ed it and saved it. And the only way to prevent it is to refrain from temptation of doing a <span style="font-style: italic;">new TestClass()</span> or a <span style="font-style: italic;">TestClass.class</span> or the like.<br />
+Here is how to get an instance of JavaClass:</p>
+<pre>
+String fullyQualifiedClassName = ...;
+JavaClass clazz = Repository.lookupClass(fullyQualifiedClassName);</pre>
+<p>Before we go into specifics, a small gyan:</p>
+<ul>
+<li>To create a class file from scratch or to modify an existing one, you use <span style="font-weight: bold;">ClassGen</span></li>
+<li>To create/modify a method, you use <span style="font-weight: bold;">MethodGen</span></li>
+<li>To create a JVM instruction, you use <span style="font-weight: bold;">InstructionFactory</span></li>
+</ul>
+<p>InstructionFactory comes with many constructors, but this one is most handy:<br />
+new InstructionFactory(classGen, constantPoolGen);<br />
+In case you are wondering what is constantPoolGen, it represents the class file's ConstantPool area. Refer to <a href="http://java.sun.com/docs/books/jvms/first_edition/html/ClassFile.doc.html#20080">JVM Specs</a> for details.<br />
+You can get a constantPoolGen thus:<br />
+ConstantPoolGen constantPoolGen = new ConstantPoolGen(clazz.getConstantPool());<br />
+That done, you would want to modify it. Refer to <span style="font-weight: bold;">DestructiveDecorator</span>. You can find the  source code <a href="http://www.geocities.com/palash_ray/java-code/BCEL.zip">here</a>.<br />
+Here are some excerpts:</p>
+<pre>           JavaClass clazz;
+String classname = clazz.getClassName();
+ClassGen classGen = new ClassGen(clazz);
+ConstantPoolGen constantPoolGen = new ConstantPoolGen(clazz.getConstantPool());
+InstructionFactory fact = new InstructionFactory(classGen, constantPoolGen);
+Method[] methodArray = clazz.getMethods();
+//get each method from the array and modify it
+.....
+classGen.setConstantPool(constantPoolGen);
+   //get the modified class
+JavaClass morphed = classGen.getJavaClass();</pre>
+<p>This is how you would modify methods:</p>
+<pre>
+    //create a new, empty InstructionList
+InstructionList il = new InstructionList();
+    //go on appending instructions to it
+    //This particular instruction is equivalent to:
+    //System.out.println("XXXXXXXXX");
+il.append(fact.createFieldAccess("java.lang.System",
+"out", new ObjectType("java.io.PrintStream"),
+    Constants.GETSTATIC));
+il.append(new PUSH(fact.getConstantPool(), "XXXXXXXXX"));
+il.append(fact.createInvoke("java.io.PrintStream", "println", Type.VOID,
+new Type[] { Type.STRING }, Constants.INVOKEVIRTUAL));
+    //after you are done, insert the InstructionList
+    //at the top of the existing one
+MethodGen mg = new MethodGen(method, classname, fact.getConstantPool());
+mg.getInstructionList().insert(il);
+mg.setMaxLocals();
+mg.setMaxStack();
+//get the modified method
+Method morphedMethod = mg.getMethod();
+il.dispose();
+//set the modified method in the factory:
+fact.getClassGen().setMethodAt(morphedMethod, position);</pre>
+<p>Now you are ready to save the modified class file:</p>
+<pre>
+//modify the JavaClass instance
+//JavaClass clazz;
+//get the path of the .class file on the hard-disk
+String path = clazz .getRepository().getClassPath().
+getClassFile(morphedClass.getClassName()).getPath();
+//this writes the modified byte-code to the same .class
+//of course this wont work in case the .class is in a jar
+clazz .dump(path);</pre>
+<p>The dirtiest work is done in <span style="font-style: italic;">DestructiveDecorator.<span style="font-weight: bold;">morphMethod()</span> </span>where I am adding a sysout and then throwing a RuntimeException. Perusal of <span style="font-weight: bold;">BCELifier </span>would ease your mind and the mists will lift clear.<br />
+I am sure, if you had the guts to stick on this far, you have ceratinly gained something. Atleast you sure could introduce a few nasty sangs in a perfectly working piece of Java code.<br />
+Here goes the rest of the gang, RuntimeDecorator:<br />
+And the leader of the gang, the DynamicClassDecorator:<br />
+And finally the test-code:</p>
+<pre>
+//first morph the class file before using it
+new DynamicClassDecorator(new DestructiveDecorator()).saveModifiedClass("com.exp.becl.demo.TestClass");
+new TestClass().dummy();</pre>
+<p>I can promise you that the results would be disastrous!<br />
+Happy JVM crash.<br />
+BTW, now you should be guessing what the blokes do when the write an EJB Container, JSP container or Aspect Oriented Programming for that matter... the stuff they do at the background stands exposed.</p>

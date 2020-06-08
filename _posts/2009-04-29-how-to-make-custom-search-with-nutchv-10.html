@@ -1,0 +1,336 @@
+---
+layout: post
+status: publish
+published: true
+title: "[How to] Make custom search with Nutch(v 1.0)?"
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 85
+wordpress_url: http://puretech.paawak.com/?p=85
+date: '2009-04-29 20:41:50 +0530'
+date_gmt: '2009-04-29 15:11:50 +0530'
+categories:
+- nutch
+- search
+tags:
+- java
+- nutch
+comments:
+- id: 9
+  author: ravi jagan
+  author_email: ravi@bijlee.net
+  author_url: http://bijlee.net
+  date: '2009-05-07 02:53:47 +0530'
+  date_gmt: '2009-05-06 21:23:47 +0530'
+  content: Very useful post. One point you have missed is to say where to put the
+    java files.
+- id: 10
+  author: paawak
+  author_email: paawak@gmail.com
+  author_url: http://paawak.com
+  date: '2009-05-07 12:07:15 +0530'
+  date_gmt: '2009-05-07 06:37:15 +0530'
+  content: You need to build a jar and then create a folder inside the NUTCH_HOME/plugins
+    called, say, myquery-email, and then place the jar and the plugin.xml inside that
+    folder.
+- id: 11
+  author: Michael
+  author_email: michaeltrosen@gmail.com
+  author_url: ''
+  date: '2009-05-21 21:04:10 +0530'
+  date_gmt: '2009-05-21 15:34:10 +0530'
+  content: |-
+    Hi,
+    Your post is very useful, however, where does the EmailLookup.getCreatorEmail(url.toString());
+     method come from?
+    Michael
+- id: 12
+  author: paawak
+  author_email: paawak@gmail.com
+  author_url: http://paawak.com
+  date: '2009-05-21 22:50:02 +0530'
+  date_gmt: '2009-05-21 17:20:02 +0530'
+  content: |-
+    Hi Michael,
+    Thats just a dummy method in a dummy class to illustrate that you can index your required email.
+    Regards,
+    Palash.
+- id: 13
+  author: Amit
+  author_email: amithbk12man@rediffmail.com
+  author_url: ''
+  date: '2010-08-31 17:01:25 +0530'
+  date_gmt: '2010-08-31 11:31:25 +0530'
+  content: |-
+    hey,
+      Thanks a ton it was indeed very helpful.
+    Cheers,
+    Amit
+- id: 14
+  author: Make custom search with Nutch - Nutch Tutorial
+  author_email: ''
+  author_url: http://nutchtutorial.com/make-custom-search-with-nutch/
+  date: '2010-10-11 10:51:13 +0530'
+  date_gmt: '2010-10-11 05:21:13 +0530'
+  content: "[...] Check out the original for detail       Comments [0]Digg it!FacebookTwitterEdit
+    Post [...]"
+---
+<h2>What is Nutch?</h2>
+<p><a href="http://lucene.apache.org/nutch/" target="_blank">Nutch</a> is an open source web crawler + search engine based on <a href="http://lucene.apache.org/java/docs/index.html" target="_blank">Lucene</a>. These are a few things that make it great:</p>
+<ol>
+<li>Open source</li>
+<li>Has a web-crawler which understands and indexes html, rtf and pdf format + all links that it might encounter</li>
+<li>Its search engine is based on Lucene</li>
+<li>Has a plugin based architecture, which means we can have our own plugins for indexing and searching, without a single line of code change to the core nutch.jar</li>
+<li>Uses Hadoop for storing indexes, so its pretty scalable</li>
+</ol>
+<h2>Use case</h2>
+<p>Suppose we want to search for the author of the website by his email id.</p>
+<h2>First things first: lets index our custom data</h2>
+<p>Before we can search for our custom data, we need to index it. Nutch has a plugin architecture very similar to that of Eclipse. We can write our own plugin for indexing. Here is the source code:</p>
+<pre lang="java">
+package com.swayam.nutch.plugins.indexfilter;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.Text;
+import org.apache.nutch.crawl.CrawlDatum;
+import org.apache.nutch.crawl.Inlinks;
+import org.apache.nutch.indexer.IndexingException;
+import org.apache.nutch.indexer.IndexingFilter;
+import org.apache.nutch.indexer.NutchDocument;
+import org.apache.nutch.indexer.lucene.LuceneWriter;
+import org.apache.nutch.parse.Parse;
+/**
+ *@author paawak
+ */
+public class EmailIndexingFilter implements IndexingFilter {
+    private static final Log LOG = LogFactory.getLog(EmailIndexingFilter.class);
+    private static final String KEY_CREATOR_EMAIL = "email";
+    private Configuration conf;
+    public NutchDocument filter(NutchDocument doc, Parse parse, Text url,
+            CrawlDatum datum, Inlinks inlinks) throws IndexingException {
+        // look up email of the author based on the url of the site
+        String creatorEmail = EmailLookup.getCreatorEmail(url.toString());
+        LOG.info("######## creatorEmail = " + creatorEmail);
+        if (creatorEmail != null) {
+            doc.add(KEY_CREATOR_EMAIL, creatorEmail);
+        }
+        return doc;
+    }
+    public void addIndexBackendOptions(Configuration conf) {
+        LuceneWriter.addFieldOptions(KEY_CREATOR_EMAIL, LuceneWriter.STORE.YES,
+                LuceneWriter.INDEX.TOKENIZED, conf);
+    }
+    public Configuration getConf() {
+        return conf;
+    }
+    public void setConf(Configuration conf) {
+        this.conf = conf;
+    }
+}
+</pre>
+<p>Also, you need to create a <em>plugin.xml</em>:</p>
+<pre lang="xml">
+<plugin id="index-email" name="Email Indexing Filter" version="1.0.0"
+  provider-name="swayam">
+  <runtime>
+    <library name="EmailIndexingFilterPlugin.jar">
+      <export name="*" />
+    </library>
+  </runtime>
+  <requires>
+    <import plugin="nutch-extensionpoints" />
+  </requires>
+  <extension id="com.swayam.nutch.plugins.indexfilter.EmailIndexingFilter"
+    name="Email Indexing Filter"
+    point="org.apache.nutch.indexer.IndexingFilter">
+    <implementation id="index-email"
+      class="com.swayam.nutch.plugins.indexfilter.EmailIndexingFilter" />
+  </extension>
+</plugin>
+</pre>
+<p>This done, create a new folder in the <em>$NUTCH_HOME/plugins</em> and put the jar and the plugin.xml there.<br />
+Now we have to activate this plugin. To do this, we have to edit the <em>conf/nutch-site.xml</em>.</p>
+<pre lang="xml">
+<property>
+  <name>plugin.includes</name>
+  <value>nutch-extensionpoints|protocol-http|parse-(text|html)|index-(basic|email)|query-(basic|site|url)</value>
+  <description>Regular expression naming plugin id names to
+  include.  Any plugin not matching this expression is excluded.
+  In any case you need at least include the nutch-extensionpoints plugin. By
+  default Nutch includes crawling just HTML and plain text via HTTP,
+  and basic indexing and search plugins.
+  </description>
+</property>
+</pre>
+<h2>Now, how do I search my indexed data?</h2>
+<h3>Option 1 [cumbersome]:</h3>
+<p>Add my own query plugin:</p>
+<pre lang="java">package com.swayam.nutch.plugins.queryfilter;
+import org.apache.nutch.searcher.FieldQueryFilter;
+/**
+ *@author paawak
+ */
+public class MyEmailQueryFilter extends FieldQueryFilter {
+    public MyEmailQueryFilter() {
+        super("email");
+    }
+}</pre>
+<p>Do not forget to edit the plugin.xml.</p>
+<pre lang="xml">
+<plugin
+   id="query-email"
+   name="Email Query Filter"
+   version="1.0.0"
+   provider-name="swayam">
+   <runtime>
+      <library name="EmailQueryFilterPlugin.jar">
+         <export name="*"/>
+      </library>
+   </runtime>
+   <requires>
+      <import plugin="nutch-extensionpoints"/>
+   </requires>
+   <extension id="com.swayam.nutch.plugins.queryfilter.MyEmailQueryFilter"
+              name="Email Query Filter"
+              point="org.apache.nutch.searcher.QueryFilter">
+      <implementation id="query-email"
+                      class="com.swayam.nutch.plugins.queryfilter.MyEmailQueryFilter">
+        <parameter name="fields" value="email"/>
+      </implementation>
+   </extension>
+</plugin>
+</pre>
+<p>This line is particularly important:<br />
+<em><span style="color: #000080;">
+<parameter name="fields" value="email"/></span></em><br />
+If you skip this line, you will never be able to see this in search results.<br />
+The only catch here is you have to prepend the keyword <em>email:</em> to the search key. For example, if you want to search for <em>jsmith@mydomain.com</em>, you have to search for <em>email:jsmith@mydomain.com</em> or <em>email:jsmith</em>.<br />
+There is an easier and more elegant way :), read on...</p>
+<h3>Option 2 [smart]</h3>
+<p>Use the existing <em>query-basic</em> plugin.<br />
+This involves editing just one file: <em>conf/nutch-default.xml</em>.<br />
+In the default distribution, you can see some commented lines like this:</p>
+<pre lang="xml"><!--
+<property>
+  <name>query.basic.description.boost</name>
+  <value>1.0</value>
+  <description> Declares a custom field and its boost to be added to the default fields of the Lucene query.
+  </description>
+</property>
+--></pre>
+<p>All you have to do is un-comment them and put your custom field, <em>email</em>, in our case in place of <em>description</em>. The resulting fragment will look like:</p>
+<pre lang="xml">
+<property>
+  <name>query.basic.email.boost</name>
+  <value>1.0</value>
+  <description> Queries the author of the site by his email-id
+  </description>
+</property>
+</pre>
+<p>With this while looking for<em> jsmith@mydomain.com</em>, you can simply enter <em>jsmith@mydomain.com</em> or a part the name like<em> jsmit</em>.</p>
+<h2>Building a Nutch plugin</h2>
+<p>The preferred way is by ant, but I have used maven with the following dependencies:</p>
+<pre lang="xml">
+<project>
+...
+	<dependencies>
+		...
+		<!-- nutch -->
+		<dependency>
+			<groupId>org.apache.lucene</groupId>
+      		<artifactId>lucene-core</artifactId>
+      		<version>2.4.0</version>
+      		<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.lucene</groupId>
+      		<artifactId>lucene-misc</artifactId>
+      		<version>2.4.0</version>
+      		<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.nutch</groupId>
+      		<artifactId>nutch</artifactId>
+      		<version>1.0</version>
+      		<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.taglibs</groupId>
+      		<artifactId>taglibs-i18n</artifactId>
+      		<version>1.0.N20030822</version>
+      		<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.tika</groupId>
+			<artifactId>tika</artifactId>
+			<version>0.1-incubating</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>xerces</groupId>
+			<artifactId>xerces</artifactId>
+			<version>2.6.2</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>xerces</groupId>
+			<artifactId>xerces-apis</artifactId>
+			<version>2.6.2</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.jets3t.service</groupId>
+			<artifactId>jets3t</artifactId>
+			<version>0.6.1</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>oro</groupId>
+  			<artifactId>oro</artifactId>
+  			<version>2.0.8</version>
+  			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.ibm.icu</groupId>
+  			<artifactId>icu4j</artifactId>
+  			<version>4.0.1</version>
+  			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.hadoop</groupId>
+  			<artifactId>hadoop-core</artifactId>
+  			<version>0.19.1</version>
+  			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.solr</groupId>
+  			<artifactId>solr-common</artifactId>
+  			<version>1.3.0</version>
+  			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.solr</groupId>
+  			<artifactId>solrj</artifactId>
+  			<version>1.3.0</version>
+  			<scope>provided</scope>
+		</dependency>
+		<!-- end nutch -->
+	    ...
+	</dependencies>
+...
+</project>
+</pre>
+<h2>Useful links</h2>
+<p>Be warned that these are a bit out dated, so they may not be correct verbatim.</p>
+<ul>
+<li><a href="http://today.java.net/pub/a/today/2006/01/10/introduction-to-nutch-1.html">Introduction to Nutch, Part 1: Crawling</a></li>
+<li><a href="http://today.java.net/pub/a/today/2006/02/16/introduction-to-nutch-2.html">Introduction to Nutch, Part 2: Searching</a></li>
+<li><a href="http://wiki.apache.org/nutch/WritingPluginExample-0.9">Nutch wiki: WritingPluginExample-0.9</a></li>
+</ul>

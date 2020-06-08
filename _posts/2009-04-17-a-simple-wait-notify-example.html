@@ -1,0 +1,86 @@
+---
+layout: post
+status: publish
+published: true
+title: A simple wait notify example
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 72
+wordpress_url: http://puretech.paawak.com/?p=72
+date: '2009-04-17 16:21:44 +0530'
+date_gmt: '2009-04-17 10:51:44 +0530'
+categories:
+- thread
+tags:
+- java
+- thread
+comments:
+- id: 7
+  author: "//ikolaj"
+  author_email: knb@efef.dk
+  author_url: http://blog.efef.dk
+  date: '2009-05-27 15:54:44 +0530'
+  date_gmt: '2009-05-27 10:24:44 +0530'
+  content: |-
+    Have you read Joshua Block, Effective Java, on finalizers?
+    A good UI system should have callback mechanisms? Alternatively some lightweight JMS queue might be considered if it is not embedded development.
+    Just blabbering here, no real expression of opinion :)
+    //
+---
+<p>At times we often need to fetch an object which might take a long time. Our preferred way of doing that, especially when we are on a UI thread, is to spawn a different thread so as to keep the UI responsive (this is just one of the many use cases that I can think of now). But since we need that object to proceed further in the current execution, we have to resort to some sort of wait/notify mechanism. The following code demoes a very simplistic approach using the regular wait()/notify().</p>
+<pre lang="java">package com.swayam.thread.test;
+/**
+ *
+ * @author paawak
+ *
+ */
+public class WaitNotifyExample {
+    private Object lock = new Object();
+    public WaitNotifyExample() {
+    }
+    public void runLongTask() {
+        Thread job = new Thread(new Runnable() {
+            public void run() {
+                System.out.println("Long task started");
+                try {
+                    int maxCount = 1000;
+                    // int maxCount = Integer.MAX_VALUE;
+                    // do some long task
+                    for (int i = 0; i < maxCount; i++) {
+                        System.out.println(i);
+                    }
+                    System.out.println("Long task done.");
+                } finally {
+                    System.out.println("About to notify lock...");
+                    synchronized (lock) {
+                        lock.notifyAll();
+                    }
+                    System.out.println("Lock notified");
+                }
+            }
+        });
+        // job.setPriority(Thread.MAX_PRIORITY - 2);
+        System.out.println("Starting a long task...");
+        job.start();
+        System.out
+                .println("Pausing normal execution and waiting for long task to finish...");
+        synchronized (lock) {
+            try {
+                lock.wait();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        System.out.println("Resuming normal execution as long task is done.");
+    }
+    public static void main(String[] a) {
+        new WaitNotifyExample().runLongTask();
+    }
+}
+</pre>
+<p>Note: This is far from fool proof. One case where it will fail is if the long task is over before that lock.wait() is called.</p>

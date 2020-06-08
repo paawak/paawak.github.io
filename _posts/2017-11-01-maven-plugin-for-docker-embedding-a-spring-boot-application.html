@@ -1,0 +1,82 @@
+---
+layout: post
+status: publish
+published: true
+title: 'Maven plugin for docker: embedding a Spring Boot application'
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 897
+wordpress_url: http://palashray.com/?p=897
+date: '2017-11-01 12:44:48 +0530'
+date_gmt: '2017-11-01 16:44:48 +0530'
+categories:
+- maven
+tags:
+- docker
+- maven
+comments: []
+---
+<p>We will take an example of how to use a Maven plugin for docker to embed a Spring Boot application. The Maven plugin that I am using is:<br />
+<a href="https://github.com/spotify/dockerfile-maven">https://github.com/spotify/dockerfile-maven</a><br />
+These are the basic operations that I do with this plugin:</p>
+<ol>
+<li>Given a Dockerfile, I create a docker image by saying <em>mvn dockerfile:build</em>. This builds the docker image from the jar file in my target folder</li>
+<li>After building the docker file, I would like to push it to my docker hub repository by using the command <em>mvn dockerfile:push</em>.</li>
+</ol>
+<p>This is how I define the docker plugin in my <em>pom.xml</em>:</p>
+<pre class="lang:xhtml decode:true "><plugin>
+<groupId>com.spotify</groupId>
+<artifactId>dockerfile-maven-plugin</artifactId>
+<executions>
+<execution>
+<id>default</id>
+<goals>
+<goal>build</goal>
+<goal>push</goal>
+</goals>
+</execution>
+</executions>
+<configuration>
+<repository>docker.io/paawak/spring-boot-demo</repository>
+<tag>${project.version}</tag>
+</configuration>
+</plugin></pre>
+<p>Note that I have defined my docker repository details in the <em>repository</em> tag.<br />
+This is how the <em>Dockerfile</em> looks like:</p>
+<pre class="lang:sh decode:true">FROM java:8
+MAINTAINER Palash Ray <paawak@gmail.com>
+ADD target/spring-boot-demo-0.0.1-SNAPSHOT.jar //
+ENTRYPOINT ["java", "-jar", "/spring-boot-demo-0.0.1-SNAPSHOT.jar"]</pre>
+<h2>Providing encrypted credentials to Maven</h2>
+<p>In addition to the above, I also need to provide my credentials for docker.io. And, of course, the password should be encrypted. Maven supports encryption. I have largely followed the below link:<br />
+<a href="https://maven.apache.org/guides/mini/guide-encryption.html">https://maven.apache.org/guides/mini/guide-encryption.html</a></p>
+<h4>Step 1: Create a master password</h4>
+<p>Create a master password by typing:</p>
+<pre class="lang:sh decode:true">mvn --encrypt-master-password</pre>
+<p>Say, it gives you the below output:</p>
+<blockquote><p>{jSMOWnoPFgsHVpMvz5VrIt5kRbzGpI8u+9EF1iFQyJQ=}</p></blockquote>
+<p>Create a file: <em>~/.m2/settings-security.xml</em> with the following content:</p>
+<pre class="lang:xhtml decode:true"><settingsSecurity>
+<master>{jSMOWnoPFgsHVpMvz5VrIt5kRbzGpI8u+9EF1iFQyJQ=}</master>
+</settingsSecurity></pre>
+<h4>Step 2: Create an encrypted password</h4>
+<p>Create the encrypted password for your docker.io user. Type:</p>
+<pre class="lang:sh decode:true">mvn --encrypt-password</pre>
+<p>Say, the output is:</p>
+<blockquote><p>{COQLCE6DU6GtcS5P=}</p></blockquote>
+<p>In the <em>~/.m2/settings.xml</em> file, add the below lines under the <em>servers</em> tag.</p>
+<pre class="lang:xhtml decode:true"><server>
+<id>docker.io</id>
+<username>paawak</username>
+<password>{COQLCE6DU6GtcS5P=}</password>
+</server></pre>
+<p>Now, you should be all set. Use the below command to build the docker image and then push it:</p>
+<pre class="lang:sh decode:true">mvn clean install dockerfile:build dockerfile:push</pre>
+<h2>Sources</h2>
+<p>A working example of this can be found here:<br />
+<a href="https://github.com/paawak/blog/tree/master/code/spring-boot-demo">https://github.com/paawak/blog/tree/master/code/spring-boot-demo</a></p>

@@ -1,0 +1,279 @@
+---
+layout: post
+status: publish
+published: true
+title: Example of WebSocket/STOMP using Java
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 767
+wordpress_url: http://palashray.com/?p=767
+date: '2015-10-20 06:09:47 +0530'
+date_gmt: '2015-10-20 10:09:47 +0530'
+categories:
+- java
+- spring
+tags:
+- stomp
+- stomp client
+- websocket
+comments: []
+---
+<p>WebSockets enable 2-way, duplex communication between client and server. All major browsers and all major Java servers like Jetty 9, Tomcat 7, etc. support websockets. The present example has been done with Tomcat 8 as a server and a Tyrus based simple Java client.</p>
+<h1 class="western">Simple WebSocket Server</h1>
+<p>We will use the WebSocket API to create a simple Server.</p>
+<h3 class="western">Configuration: pom.xml</h3>
+<p>The pom would be the same as a typical JEE pom. Just put the following dependency:</p>
+<pre lang="xml">
+		<dependency>
+			<groupId>javax.websocket</groupId>
+			<artifactId>javax.websocket-api</artifactId>
+			<version>1.1</version>
+			<scope>provided</scope>
+		</dependency>
+</pre>
+<h3 class="western">Server Code</h3>
+<pre lang="java">
+@ServerEndpoint(value = "/hello-stomp")
+public class SimpleServerEndpoint {
+    private static final Logger LOGGER = LoggerFactory.getLogger(SimpleServerEndpoint.class);
+    private static final String DATE_FORMAT = "dd-MM-yyyy HH:mm:ss";
+    @OnMessage
+    public String onMessage(String message, Session session) {
+	LOGGER.info("Message from client: `{}`", message);
+	String serverMessage = new StringBuilder(100).append("Message processed by SimpleServer at [").append(new SimpleDateFormat(DATE_FORMAT).format(new Date())).append("]").append(message)
+		.toString();
+	return serverMessage;
+    }
+}
+</pre>
+<h1 class="western">Simple WebSocket Java Client</h1>
+<h3 class="western">Configuration: pom.xml</h3>
+<p>The pom would be a simple one, just add these following dependencies:</p>
+<pre lang="xml">
+		<dependency>
+			<groupId>javax.websocket</groupId>
+			<artifactId>javax.websocket-api</artifactId>
+			<version>1.1</version>
+		</dependency>
+		<dependency>
+			<groupId>org.glassfish.tyrus.bundles</groupId>
+			<artifactId>tyrus-standalone-client</artifactId>
+			<version>1.12</version>
+		</dependency>
+</pre>
+<h3 class="western">Client Code</h3>
+<p>Define an Endpoint:</p>
+<pre lang="java">
+public class SimpleClientEndpoint extends Endpoint {
+    private static final Logger LOGGER = LoggerFactory.getLogger(SimpleClientEndpoint.class);
+    @Override
+    public void onOpen(Session session, EndpointConfig config) {
+	LOGGER.info("session opened");
+	session.addMessageHandler(String.class, new Whole<string>() {
+	    @Override
+	    public void onMessage(String text) {
+		LOGGER.info("recieved message from server: `{}`", text);
+	    }
+	});
+	String message = "Hello from client";
+	LOGGER.info("trying to send message `{}` to server...", message);
+	try {
+	    session.getBasicRemote().sendText(message);
+	    LOGGER.info("message sent successfully");
+	} catch (IOException e) {
+	    LOGGER.error("error sending message to server", e);
+	}
+    }
+}
+</pre>
+<p>Then invoke this:</p>
+<pre lang="java">
+public class SimpleClient {
+    public static void main(String[] args) throws InterruptedException,
+	    URISyntaxException, DeploymentException, IOException {
+	ClientEndpointConfig cec = ClientEndpointConfig.Builder.create()
+		.build();
+	ClientManager client = ClientManager.createClient();
+	client.connectToServer(SimpleClientEndpoint.class, cec, new URI(
+		"ws://localhost:8080/stomp-server/hello-stomp"));
+	Thread.sleep(10_000);
+    }
+}
+</pre>
+<p>Note that there is a 2-way communication from server/client. This is handled in the <span style="color: #000000;"><span style="font-family: Consolas,serif;"><span style="font-size: small;">MessageHandler</span></span></span> defined in <span style="color: #000000;"><span style="font-family: Consolas,serif;"><span style="font-size: small;">SimpleClientEndpoint</span></span></span>:</p>
+<pre lang="java">
+	session.addMessageHandler(String.class, new Whole<string>() {
+	    @Override
+	    public void onMessage(String text) {
+		LOGGER.info("recieved message from server: `{}`", text);
+	    }
+	});
+</pre>
+<h1 class="western">Spring WebSocket Handler Server</h1>
+<p>Though the above example is simple and good for starters, this is not practical. For one, it does not integrate with Spring. Lets build something more closer to the real world.</p>
+<h3 class="western">Overview</h3>
+<p>The client attempts to invoke the BankDetailsService asynchronously, through websockets. For this, it first initiates the request, sending the server the sort-order. The server then triggers a dao-call. Each time when a new row is read off the ResultSet, it is immediately sent to the client. After all the records have been read, the session is closed. Note that the messages are binary. Json strings are gzipped and then sent across the wire to save bandwidth.<br />
+We will use the Spring websocket module for integrating WebSockets with Spring.</p>
+<h3 class="western">Configuration: pom.xml</h3>
+<p>We would need the spring websocket module:</p>
+<pre lang="xml">
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-websocket</artifactId>
+		</dependency>
+</pre>
+<h3 class="western">Spring Configuration</h3>
+<pre lang="java">
+@Configuration
+@EnableWebSocket
+public class WebSocketHandlerConfig implements WebSocketConfigurer {
+    @Autowired
+    private BankDetailService bankDetailService;
+    @Override
+    public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
+	registry.addHandler(new ExceptionWebSocketHandlerDecorator(new BankDetailsWebSocketHandler(bankDetailService)), "/streaming-bank-details").setAllowedOrigins("*");
+    }
+    @Bean
+    public ServletServerContainerFactoryBean createWebSocketContainer() {
+	ServletServerContainerFactoryBean container = new ServletServerContainerFactoryBean();
+	container.setMaxTextMessageBufferSize(100_000);
+	container.setMaxBinaryMessageBufferSize(100_000);
+	container.setAsyncSendTimeout(100_000_000_000_000L);
+	container.setMaxSessionIdleTimeout(100_000_000_000_000L);
+	return container;
+    }
+}
+</pre>
+<p>The <span style="color: #000000;"><span style="font-family: Consolas,serif;"><span style="font-size: small;">ExceptionWebSocketHandlerDecorator</span></span></span> is a decorator for handling any runtime exception gracefully by closing the connection.</p>
+<h3 class="western">Server Code</h3>
+<p>This is how the <span style="color: #000000;"><span style="font-family: Consolas,serif;"><span style="font-size: small;">BankDetailsWebSocketHandler</span></span></span> looks like:</p>
+<pre lang="java">
+public class BankDetailsWebSocketHandler extends TextWebSocketHandler {
+    private static final Logger LOGGER = LoggerFactory.getLogger(BankDetailsWebSocketHandler.class);
+    private final BankDetailService bankDetailService;
+    public BankDetailsWebSocketHandler(BankDetailService bankDetailService) {
+	this.bankDetailService = bankDetailService;
+    }
+    @Override
+    protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+	LOGGER.info("recieved message from client");
+	BankDetailSortOrder group = BankDetailSortOrder.valueOf(message.getPayload().toUpperCase());
+	bankDetailService.getBankDetailsAsync(group, new DataListenerForStompHandlerImpl(session));
+    }
+}
+</pre>
+<p>Note that the actual action happens in <span style="color: #000000;"><span style="font-family: Consolas,serif;"><span style="font-size: small;">DataListenerForStompHandlerImpl</span></span></span>:</p>
+<pre lang="java">
+public class DataListenerForStompHandlerImpl implements DataListener {
+    private static final Logger LOGGER = LoggerFactory.getLogger(DataListenerForStompHandlerImpl.class);
+    private final ObjectMapper mapper = new ObjectMapper();
+    private final WebSocketSession session;
+    public DataListenerForStompHandlerImpl(WebSocketSession session) {
+	this.session = session;
+    }
+    @Override
+    public void sendMessageToClient(BankDetail bankDetail) {
+	try {
+	    String jsonString = mapper.writeValueAsString(bankDetail);
+	    LOGGER.info("trying to apply gzip on message `{}` before sending to the client...", jsonString);
+	    ByteArrayOutputStream buffer = new ByteArrayOutputStream(10_000);
+	    GZIPOutputStream gzipOutput = new GZIPOutputStream(buffer);
+	    gzipOutput.write(jsonString.getBytes());
+	    gzipOutput.flush();
+	    gzipOutput.close();
+	    WebSocketMessage<?> messageToBeSent = new BinaryMessage(buffer.toByteArray());
+	    session.sendMessage(messageToBeSent);
+	} catch (IOException e) {
+	    throw new RuntimeException(e);
+	}
+    }
+    @Override
+    public void endOfMessages() {
+	try {
+	    session.close();
+	} catch (IOException e) {
+	    throw new RuntimeException(e);
+	}
+    }
+}
+</pre>
+<p>This class is passed to the Dao, and after each record is read from the ResultSet, it is sent to the client.</p>
+<h3 class="western">Client Code</h3>
+<p>Let us take a look at the client. We are still using a standard WebSocket client, not the Spring stomp client.<br />
+Like the 1<sup>st</sup> example, we have defined our Endpoint as below:</p>
+<pre lang="java">
+class StompClientEndpoint extends Endpoint {
+    private static final Logger LOGGER = LoggerFactory.getLogger(StompClientEndpoint.class);
+    private final CountDownLatch waitTillConnectionClosed;
+    private final SeekableByteChannel outputFileChannel;
+    StompClientEndpoint(CountDownLatch waitTillConnectionClosed, SeekableByteChannel outputFileChannel) {
+	this.waitTillConnectionClosed = waitTillConnectionClosed;
+	this.outputFileChannel = outputFileChannel;
+    }
+    @Override
+    public void onOpen(Session session, EndpointConfig config) {
+	session.addMessageHandler(new Whole<inputStream>() {
+	    @Override
+	    public void onMessage(InputStream inputStream) {
+		LOGGER.info("recieved binary message from server");
+		try (ReadableByteChannel reportByteChannel = Channels.newChannel(new GZIPInputStream(inputStream));) {
+		    ByteBuffer byteBuffer = ByteBuffer.allocate(1000);
+		    while (reportByteChannel.read(byteBuffer) > 0) {
+			byteBuffer.flip();
+			outputFileChannel.write(byteBuffer);
+			byteBuffer.compact();
+		    }
+		    outputFileChannel.write(StandardCharsets.US_ASCII.encode("nnn"));
+		} catch (IOException e) {
+		    LOGGER.error("error", e);
+		}
+	    }
+	});
+	try {
+	    session.getBasicRemote().sendText("MARITAL_STATUS");
+	} catch (IOException e) {
+	    LOGGER.error("error sending message to client", e);
+	}
+    }
+    @Override
+    public void onClose(Session session, CloseReason closeReason) {
+	LOGGER.warn("Connection closed with reason:{} ", closeReason);
+	waitTillConnectionClosed.countDown();
+    }
+}
+</pre>
+<p>All subsequent messages from the server would flow into the MessageHandler defined in the above class. The above is now invoked here:</p>
+<pre lang="java">
+class SingleStompConsumer implements Runnable {
+    private static final Logger LOGGER = LoggerFactory.getLogger(SingleStompConsumer.class);
+    private static final String STOMP_URI = "ws://localhost:8080/stomp-server/streaming-bank-details";
+    private final String id;
+    public SingleStompConsumer(String id) {
+	this.id = id;
+    }
+    @Override
+    public void run() {
+	CountDownLatch waitTillConnectionClosed = new CountDownLatch(1);
+	ClientManager client = ClientManager.createClient();
+	Path outputFilePath = Paths.get("d:", "temp", "output_" + id + ".json");
+	try (SeekableByteChannel outputFileChannel = Files.newByteChannel(outputFilePath, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);) {
+	    client.connectToServer(new StompClientEndpoint(waitTillConnectionClosed, outputFileChannel), ClientEndpointConfig.Builder.create().build(), new URI(STOMP_URI));
+	    waitTillConnectionClosed.await();
+	} catch (InterruptedException | IOException | DeploymentException | URISyntaxException e) {
+	    LOGGER.error("error", e);
+	}
+	LOGGER.info("All output written in the file: {}", outputFilePath);
+    }
+}
+</pre>
+<h1 class="western">Source Code</h1>
+<p><a name="_GoBack"></a><a href="https://github.com/paawak/blog/tree/master/code/stomp">https://github.com/paawak/blog/tree/master/code/stomp</a></p>
+<h1 class="western">References</h1>
+<p><a href="http://docs.spring.io/spring/docs/current/spring-framework-reference/html/websocket.html">http://docs.spring.io/spring/docs/current/spring-framework-reference/html/websocket.html</a><br />
+<a href="https://tyrus.java.net/documentation/1.12/index/getting-started.html">https://tyrus.java.net/documentation/1.12/index/getting-started.html</a><br />
+<a href="https://www.websocket.org/echo.html">https://www.websocket.org/echo.html</a></p>

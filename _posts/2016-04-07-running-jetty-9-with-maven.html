@@ -1,0 +1,44 @@
+---
+layout: post
+status: publish
+published: true
+title: Running Jetty 9 with Maven
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 830
+wordpress_url: http://palashray.com/?p=830
+date: '2016-04-07 19:59:04 +0530'
+date_gmt: '2016-04-07 23:59:04 +0530'
+categories:
+- java
+- maven
+tags:
+- jetty
+- maven
+comments: []
+---
+<p>Running Jetty through Maven is super simple. The only problem is lot of configurations were changed in Jetty 9. It is significantly different from, say, Jetty 6. I will keep it short. The below lines in pom.xml would get the job done:</p>
+<pre class="lang:xhtml decode:true ">			<plugin>
+				<groupId>org.eclipse.jetty</groupId>
+				<artifactId>jetty-maven-plugin</artifactId>
+				<version>9.3.5.v20151012</version>
+				<configuration>
+					<scanIntervalSeconds>90</scanIntervalSeconds>
+					<webApp>
+						<contextPath>/${project.name}</contextPath>
+					</webApp>
+					<httpConnector>
+						<port>8090</port>
+					</httpConnector>
+				</configuration>
+			</plugin></pre>
+<p>Note that it defines a custom port and a context path as well.<br />
+Use the below command to run Jetty:</p>
+<blockquote><p>mvn jetty:run</p></blockquote>
+<p>The sources are available here:<br />
+<a href="https://github.com/paawak/blog/tree/master/code/simple-spring-rest">https://github.com/paawak/blog/tree/master/code/simple-spring-rest</a></p>

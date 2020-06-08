@@ -1,0 +1,134 @@
+---
+layout: post
+status: publish
+published: true
+title: Using JXTreeTable to display grouped data
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 633
+wordpress_url: http://palashray.com/?p=633
+date: '2014-12-25 07:52:12 +0530'
+date_gmt: '2014-12-25 07:52:12 +0530'
+categories:
+- swing
+tags:
+- java
+- swing
+comments: []
+---
+<p class="western">Let me start by ranting about Swing. Its a lame duck. It could never really take off. But we can't live with it, can't live without it. Especially if the application is a legacy Swing application written 10 years ago.</p>
+<p class="western">So, when I had the prospect of displaying simple grouped data, the fear of writing my custom JTree absolutely seized me. That is when i thought about the SwingX project. In its present form, it buggy, unusable, messed up etc. It took me close to an hour to figure out a stable release from the quagmire of broken links that Google came up with. At last, the Maven Central came to my rescue in the form of the following 3 magical lines:</p>
+<pre lang="xml" escaped="true">		<dependency>
+			<groupId>org.swinglabs.swingx</groupId>
+			<artifactId>swingx-all</artifactId>
+			<version>1.6.4</version>
+		</dependency></pre>
+<p class="western"><span style="font-size: large;"><b>The First 90%</b></span></p>
+<p class="western">After being associated with Swing for a good part of my life, I have come to believe that 90% of your job is done if you can create a good Model, especially for unwieldy components like JTable and JTree. So, I do the same for this as well. In this case, I represent grouped data with a <span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">Map<String, List<BankDetail>></span></span></span>. All I want is to display the groups as nodes and the Lists under these nodes. This is how I model it:</p>
+<pre lang="java" line="1" escaped="true">public class BankDetailTreeTableModel extends AbstractTreeTableModel {
+    private static final String[] COLUMN_NAMES = new String[] { "id", "age",
+            "job", "marital", "education", "default", "balance" };
+    private static final String ROOT = "_ROOT_";
+    private final Map<String, List> groupedBankDetails;
+    private final List groups;
+    public BankDetailTreeTableModel(
+            Map<String, List> groupedBankDetails) {
+        super(ROOT);
+        this.groupedBankDetails = groupedBankDetails;
+        groups = getGroups(groupedBankDetails);
+    }
+    @Override
+    public int getColumnCount() {
+        return COLUMN_NAMES.length + 1;
+    }
+    @Override
+    public String getColumnName(int column) {
+        if (column == 0) {
+            return "Group";
+        }
+        return COLUMN_NAMES[column - 1];
+    }
+    @Override
+    public Object getValueAt(Object node, int column) {
+        if (node instanceof String) {
+            if (column == 0) {
+                return node;
+            }
+            return COLUMN_NAMES[column - 1];
+        } else if (node instanceof BankDetail) {
+            if (column == 0) {
+                return null;
+            }
+            return displayColumnValue((BankDetail) node, column - 1);
+        }
+        return null;
+    }
+    @Override
+    public Object getChild(Object parent, int index) {
+        if (ROOT.equals(parent)) {
+            return groups.get(index);
+        } else if (parent instanceof String) {
+            return groupedBankDetails.get(parent).get(index);
+        }
+        return null;
+    }
+    @Override
+    public int getChildCount(Object parent) {
+        if (ROOT.equals(parent)) {
+            return groups.size();
+        } else if (parent instanceof String) {
+            return groupedBankDetails.get(parent).size();
+        }
+        return 0;
+    }
+    @Override
+    public int getIndexOfChild(Object parent, Object child) {
+        return 0;
+    }
+    private List getGroups(
+            Map<String, List> groupedBankDetails) {
+        List groups = new ArrayList<>(groupedBankDetails.keySet());
+        Collections.sort(groups);
+        return groups;
+    }
+    private String displayColumnValue(BankDetail bankDetail, int columnIndex) {
+        switch (columnIndex) {
+        case 0:
+            return Integer.toString(bankDetail.getId());
+        case 1:
+            return Integer.toString(bankDetail.getAge());
+        case 2:
+            return bankDetail.getJob();
+        case 3:
+            return bankDetail.getMarital();
+        case 4:
+            return bankDetail.getEducation();
+        case 5:
+            return bankDetail.getDefaulted();
+        case 6:
+            return bankDetail.getBalance().toPlainString();
+        default:
+            throw new IllegalArgumentException("columnIndex " + columnIndex
+                    + " is not handled");
+        }
+    }
+}</pre>
+<p class="western"><span style="font-size: large;"><b>The remaining 10%</b></span></p>
+<p class="western">The tying up the model to the JXTreeTable is the simplest thing on the earth:</p>
+<pre lang="java" escaped="true">            Map<String, List> groupedBankDetails = bankDetailServiceToUse
+                    .getBankDetails(selectedGroup);
+            treeTblBankDetails.setTreeTableModel(new BankDetailTreeTableModel(
+                    groupedBankDetails));</pre>
+<p>This is how it looks like:<br />
+<a href="http://palashray.com/wp-content/uploads/2014/12/UsingJXTreeTable_1.png"><img class="aligncenter size-medium wp-image-634" src="http://palashray.com/wp-content/uploads/2014/12/UsingJXTreeTable_1-300x205.png" alt="UsingJXTreeTable_1" width="300" height="205" /></a><a href="http://palashray.com/wp-content/uploads/2014/12/UsingJXTreeTable_2.png"><img class="aligncenter size-medium wp-image-635" src="http://palashray.com/wp-content/uploads/2014/12/UsingJXTreeTable_2-300x205.png" alt="UsingJXTreeTable_2" width="300" height="205" /></a><br />
+&nbsp;</p>
+<p class="western">The source code can be found here:</p>
+<p class="western"><span style="color: #000080;"><span lang="en-US"><span style="text-decoration: underline;"><a href="https://github.com/paawak/blog/tree/master/code/lambda-demo">https://github.com/paawak/blog/tree/master/code/lambda-demo</a></span></span></span></p>
+<p class="western">The main class to run is: <span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">GroupingDemoFrame</span></span></span>.</p>
+<p class="western">I found the following post very useful in my efforts:</p>
+<p class="western"><span style="color: #000080;"><span lang="en-US"><span style="text-decoration: underline;"><a href="http://javanbswing.blogspot.com/2013/08/swing-treetable-example-using.html">http://javanbswing.blogspot.com/2013/08/swing-treetable-example-using.html</a></span></span></span></p>

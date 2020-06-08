@@ -1,0 +1,73 @@
+---
+layout: post
+status: publish
+published: true
+title: 'Apache httpclient: Reading SSL with self-signed certificates'
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 883
+wordpress_url: http://palashray.com/?p=883
+date: '2017-10-29 02:12:04 +0530'
+date_gmt: '2017-10-29 06:12:04 +0530'
+categories:
+- java
+tags:
+- docker
+- httpclient
+comments: []
+---
+<p>When we try to access SSL sites secured with self-signed certificates using apache httpclient, we get the below exception:</p>
+<blockquote><p><span style="color: #ff0000;">Exception in thread "main" javax.net.ssl.SSLHandshakeException: sun.security.validator.ValidatorException: PKIX path building failed: sun.security.provider.certpath.SunCertPathBuilderException: unable to find valid certification path to requested target</span></p></blockquote>
+<p>We will attempt to work-around this problem. First, we will run a docker image that has a Tomcat8 with a self-signed certificate (refer to <a href="http://palashray.com/tomcat-8-ssl-configuration-with-self-signed-certificate/">http://palashray.com/tomcat-8-ssl-configuration-with-self-signed-certificate/</a>).</p>
+<pre class="lang:sh decode:true ">docker pull paawak/self-signed-tomcat8
+docker run -d -p 9090:8443 paawak/self-signed-tomcat8</pre>
+<p>Check that the link is accessible: https://localhost:9090/docs/security-howto.html<br />
+The below code will ignore the self-signed certificate security issue and allow us to access this site:</p>
+<pre class="lang:java decode:true ">public Response connectUnTrusted(String selfSignedUrl) throws IOException {
+TrustStrategy trustStrategy = new TrustStrategy() {
+@Override
+public boolean isTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+return true;
+}
+};
+SSLContext sslContext;
+try {
+sslContext = new SSLContextBuilder().loadTrustMaterial(null, trustStrategy).build();
+} catch (KeyManagementException | NoSuchAlgorithmException | KeyStoreException e) {
+throw new RuntimeException(e);
+}
+CloseableHttpClient httpClient = HttpClients.custom().setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE)
+.setSSLContext(sslContext).build();
+// optional cookie store
+CookieStore cookieStore = new BasicCookieStore();
+BasicClientCookie cookie = new BasicClientCookie("foo", "value");
+cookie.setDomain("localhost");
+Executor executor = Executor.newInstance(httpClient).use(cookieStore);
+Request request = Request.Post(selfSignedUrl);
+return executor.execute(request);
+}</pre>
+<p>Here are the Maven dependencies:</p>
+<pre class="lang:xhtml decode:true "><dependency>
+<groupId>org.apache.httpcomponents</groupId>
+<artifactId>httpclient</artifactId>
+<version>${httpclient.version}</version>
+</dependency>
+<dependency>
+<groupId>org.apache.httpcomponents</groupId>
+<artifactId>httpmime</artifactId>
+<version>${httpclient.version}</version>
+</dependency>
+<dependency>
+<groupId>org.apache.httpcomponents</groupId>
+<artifactId>fluent-hc</artifactId>
+<version>${httpclient.version}</version>
+</dependency></pre>
+<p>The sources for this example can be found here:<br />
+<a href="https://github.com/paawak/blog/tree/master/code/apache-http-client/">https://github.com/paawak/blog/tree/master/code/apache-http-client/</a><br />
+&nbsp;<br />
+&nbsp;</p>

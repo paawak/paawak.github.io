@@ -1,0 +1,441 @@
+---
+layout: post
+status: publish
+published: true
+title: Using Jaxb To Serialize Java-Objects To Xml
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 639
+wordpress_url: http://palashray.com/?p=639
+date: '2015-01-12 04:37:02 +0530'
+date_gmt: '2015-01-12 04:37:02 +0530'
+categories:
+- java
+tags:
+- jaxb
+- xml
+comments: []
+---
+<p class="western">Recently, I had a requirement of serializing some Java objects to xml. Though I had assumed it to be fairly straight forward, during implementation, I found out the hard way that it is not at all intuitive. The following are the ground rules:</p>
+<ol>
+<li>
+<p class="western">You need to decorate the class which you want to serialize with the <i><b>@XmlRootElement</b></i> annotation. This rules out having the flexibility of serializing a List or a Map directly. It has to be wrapped within a class having the <i><b>@XmlRootElement</b></i> annotation.</p>
+</li>
+<li>
+<p class="western">Jaxb needs a default constructor. So if you have an immutable class with all fields set through the constructor, you need to provide a default constructor and set all the final fields to null.</p>
+</li>
+<li>
+<p class="western">Though Jaxb works well with the List, it needs a custom adapter to serialize a Map with the <i><b>@XmlJavaTypeAdapter</b></i> annotation, as we will see. This is the single most pain point in using Jaxb.</p>
+</li>
+</ol>
+<p class="western"><span style="font-size: large;"><b>The serializer code</b></span></p>
+<p class="western">I am using the O/X Mappers from Spring (<span style="color: #000080;"><span lang="en-US"><span style="text-decoration: underline;"><a href="http://docs.spring.io/spring-ws/site/reference/html/oxm.html">http://docs.spring.io/spring-ws/site/reference/html/oxm.html</a></span></span></span>) for marshalling. I found it very convenient, specially if I want to switch from Jaxb to say, Xstream. The code is pretty simple:</p>
+<pre class="lang:java decode:true">    @Override
+    public void serialize(Object object, OutputStream outputStream) {
+        Jaxb2Marshaller marshaller = new Jaxb2Marshaller();
+        marshaller.setClassesToBeBound(EmployeeGroups.class);
+        Map<String, Object> marshallerProperties = new HashMap<>();
+	  // for formatted xml
+        marshallerProperties.put(javax.xml.bind.Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
+        marshaller.setMarshallerProperties(marshallerProperties);
+        Result xmlResultCapturer = new StreamResult(outputStream);
+        try {
+            marshaller.marshal(object, xmlResultCapturer);
+        } catch (Exception e) {
+            LOG.error("could not convert rmi output to xml", e);
+        }
+    }
+</pre>
+<p class="western">This is the version using plain Jaxb:</p>
+<pre class="lang:java decode:true">@Override
+    public void serialize(Object object, OutputStream outputStream) {
+        JAXBContext jaxbContext;
+        try {
+            jaxbContext = JAXBContext.newInstance(EmployeeGroups.class);
+        } catch (JAXBException e) {
+            throw new RuntimeException(e);
+        }
+        Marshaller marshaller;
+        try {
+            marshaller = jaxbContext.createMarshaller();
+        } catch (JAXBException e) {
+            throw new RuntimeException(e);
+        }
+        // for formatted xml
+        try {
+            marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
+        } catch (PropertyException e) {
+            LOG.warn("Invalid property", e);
+        }
+        Result xmlResultCapturer = new StreamResult(outputStream);
+        try {
+            marshaller.marshal(object, xmlResultCapturer);
+        } catch (Exception e) {
+            LOG.error("could not convert rmi output to xml", e);
+        }
+    }</pre>
+<p class="western"><span style="font-size: large;"><b>The POJO to be serialized</b></span></p>
+<p class="western">The POJO looks like:</p>
+<pre class="lang:java decode:true">@XmlRootElement
+public class EmployeeGroups {
+    private final int groupSize;
+    private final Map<EmployeeRole, List<Employee>> employeeGroups;
+    public EmployeeGroups(int groupSize, Map<EmployeeRole, List<Employee>> employeeGroups) {
+        this.groupSize = groupSize;
+        this.employeeGroups = employeeGroups;
+    }
+    /**
+     * Default constructor, as Jaxb will not work without it
+     */
+    public EmployeeGroups() {
+        this(0, null);
+    }
+    public int getGroupSize() {
+        return groupSize;
+    }
+    public Map<EmployeeRole, List<Employee>> getEmployeeGroups() {
+        return employeeGroups;
+    }
+}</pre>
+<p class="western"><span style="font-size: large;"><b>Attempt 1</b></span></p>
+<p class="western" align="LEFT"><span style="font-family: Liberation Serif,serif;"><span style="font-size: medium;"><span style="color: #000000;">When I try to generate xml, I get a blank document:</span></span></span></p>
+<pre class="lang:xhtml decode:true"><?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<employeeGroups/></pre>
+<p>&nbsp;</p>
+<p class="western" align="LEFT"><span style="font-family: Liberation Serif,serif;"><span style="font-size: medium;"><span style="color: #000000;">The possible cause might be that since the object is immutable without any setters for the fields, Jaxb cannot figure out the fields to serialize. So, this time we will try to explicitly ask Jaxb to serialize the fields by adding the </span><span style="color: #000000;"><i><b>@XmlAccessorType(XmlAccessType.FIELD)</b></i></span><span style="color: #000000;"> annotation to the EmployeeGroups.</span></span></span></p>
+<p class="western"><span style="font-size: large;"><b>Attempt 2</b></span></p>
+<p class="western">The POJO looks like:</p>
+<pre class="lang:java decode:true">@XmlRootElement
+@XmlAccessorType(XmlAccessType.FIELD)
+public class EmployeeGroups {
+...
+}</pre>
+<p class="western">The 2nd attempt gives rise to the following exception:</p>
+<blockquote>
+<p class="western"><span style="color: #ff0000;">Caused by: com.sun.xml.internal.bind.v2.runtime.IllegalAnnotationsException: 1 counts of IllegalAnnotationExceptions</span><br />
+<span style="color: #ff0000;">java.util.List is an interface, and JAXB can't handle interfaces.</span><br />
+<span style="color: #ff0000;">&nbsp;&nbsp; &nbsp;this problem is related to the following location:</span><br />
+<span style="color: #ff0000;">&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;at java.util.List</span><br />
+<span style="color: #ff0000;">&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;at private final java.util.Map com.swayam.demo.xml.EmployeeGroups.employeeGroups</span><br />
+<span style="color: #ff0000;">&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; &nbsp;at com.swayam.demo.xml.EmployeeGroups</span></p>
+</blockquote>
+<p class="western">This message is actually misleading. What it means is that its high time for us to write our custom adapter for handling the Map.</p>
+<p class="western"><span style="font-size: large;"><b>Attempt 3</b></span></p>
+<p class="western">The adapter would extend the <span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">XmlAdapter</span></span></span>. It would consume a <span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">Map<EmployeeRole, List<Employee>></span></span></span> and return a concrete POJO, in our case a <span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">ListWrapper<SimpleMapEntry></span></span></span>.</p>
+<pre class="lang:java decode:true">public class JaxbMapAdapter extends XmlAdapter<ListWrapper<SimpleMapEntry>, Map<EmployeeRole, List<Employee>>> {
+    @Override
+    public ListWrapper<SimpleMapEntry> marshal(Map<EmployeeRole, List<Employee>> employeeGroups) {
+        List<SimpleMapEntry> simpleEntries = new ArrayList<>();
+        for (Entry<EmployeeRole, List<Employee>> employeeGroupEntry : employeeGroups.entrySet()) {
+            SimpleMapEntry simpleMapEntry = new SimpleMapEntry();
+            simpleMapEntry.setEmployeeRole(employeeGroupEntry.getKey());
+            simpleMapEntry.setEmployees(employeeGroupEntry.getValue());
+            simpleEntries.add(simpleMapEntry);
+        }
+        return new ListWrapper<>(simpleEntries);
+    }
+    @Override
+    public Map<EmployeeRole, List<Employee>> unmarshal(ListWrapper<SimpleMapEntry> v) {
+        throw new UnsupportedOperationException();
+    }
+}</pre>
+<p class="western">The <span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">SimpleMapEntry</span></span></span> represents an Entry in the Map, customized to our needs.</p>
+<pre class="lang:java decode:true">public class SimpleMapEntry {
+    private EmployeeRole employeeRole;
+    private List<Employee> employees;
+    public EmployeeRole getEmployeeRole() {
+        return employeeRole;
+    }
+    public void setEmployeeRole(EmployeeRole employeeRole) {
+        this.employeeRole = employeeRole;
+    }
+    public List<Employee> getEmployees() {
+        return employees;
+    }
+    public void setEmployees(List<Employee> employees) {
+        this.employees = employees;
+    }
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + ((employeeRole == null) ? 0 : employeeRole.hashCode());
+        result = prime * result + ((employees == null) ? 0 : employees.hashCode());
+        return result;
+    }
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        SimpleMapEntry other = (SimpleMapEntry) obj;
+        if (employeeRole != other.employeeRole)
+            return false;
+        if (employees == null) {
+            if (other.employees != null)
+                return false;
+        } else if (!employees.equals(other.employees))
+            return false;
+        return true;
+    }
+}</pre>
+<p class="western">The <span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">ListWrapper</span></span></span> is just a wrapper around a <span style="color: #000000;"><span style="font-family: monospace;"><span style="font-size: small;">List</span></span></span>, as Jaxb cannot handle a List, and needs a POJO to serialize.</p>
+<pre class="lang:java decode:true">public class ListWrapper<T> {
+    private final List<T> list;
+    public ListWrapper(List<T> list) {
+        this.list = list;
+    }
+    public ListWrapper() {
+        this(Collections.emptyList());
+    }
+    public List<T> getList() {
+        return list;
+    }
+}</pre>
+<p class="western">At the end of it, the test runs without error, giving the following output:</p>
+<pre class="lang:xhtml decode:true"><?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<employeeGroups>
+    <groupSize>3</groupSize>
+    <employeeGroups/>
+</employeeGroups></pre>
+<p>&nbsp;</p>
+<p class="western"><span style="font-size: large;"><b>Attempt 4</b></span></p>
+<p class="western">The adapter works fine, but since the members are immutable, we have to explicitly declare the fields to be picked up by Jaxb.</p>
+<pre class="lang:java decode:true">@XmlAccessorType(XmlAccessType.FIELD)
+public class ListWrapper<T> {
+}</pre>
+<p class="western">The test errors out:</p>
+<blockquote>
+<p class="western"><span style="color: #ff0000;">ERROR [main] PlainJaxbSerializer.serialize(46) | could not convert rmi output to xml</span><br />
+<span style="color: #ff0000;">javax.xml.bind.MarshalException</span><br />
+<span style="color: #ff0000;">&nbsp;- with linked exception:</span><br />
+<span style="color: #ff0000;">[com.sun.istack.internal.SAXException2: class com.swayam.demo.xml.jaxb.SimpleMapEntry nor any of its super class is known to this context.</span><br />
+<span style="color: #ff0000;">javax.xml.bind.JAXBException: class com.swayam.demo.xml.jaxb.SimpleMapEntry nor any of its super class is known to this context.]</span><br />
+<span style="color: #ff0000;">&nbsp;&nbsp; &nbsp;at com.sun.xml.internal.bind.v2.runtime.MarshallerImpl.write(MarshallerImpl.java:311)</span></p>
+</blockquote>
+<p class="western"><span style="font-size: large;"><b>Attempt 5</b></span></p>
+<p class="western">This simply means that when creating the Jaxb context, pass in the SimpleMapEntry as an argument:</p>
+<pre class="lang:java decode:true">JAXBContext jaxbContext;
+        try {
+            jaxbContext = JAXBContext.newInstance(EmployeeGroups.class, SimpleMapEntry.class);
+        } catch (JAXBException e) {
+            throw new RuntimeException(e);
+        }</pre>
+<p class="western">All is good, and this is the output:</p>
+<pre class="lang:xhtml decode:true"><?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<employeeGroups>
+    <groupSize>3</groupSize>
+    <employeeGroups>
+        <list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="simpleMapEntry">
+            <employeeRole>SUPERVISOR</employeeRole>
+            <employees/>
+            <employees/>
+            <employees/>
+            <employees/>
+        </list>
+        <list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="simpleMapEntry">
+            <employeeRole>TECHNICIAN</employeeRole>
+            <employees/>
+            <employees/>
+            <employees/>
+            <employees/>
+        </list>
+        <list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="simpleMapEntry">
+            <employeeRole>MANAGER</employeeRole>
+            <employees/>
+            <employees/>
+            <employees/>
+            <employees/>
+        </list>
+    </employeeGroups>
+</employeeGroups></pre>
+<p class="western"><span style="font-size: large;"><b>Attempt 6</b></span></p>
+<p class="western" align="LEFT"><span style="font-family: Liberation Serif,serif;"><span style="font-size: medium;"><span style="color: #000000;">Note that the employee node is still empty. We need to explicitly set the </span><span style="color: #646464;">@XmlAccessorType</span><span style="color: #000000;">(XmlAccessType.</span><span style="color: #0000c0;"><i><b>FIELD</b></i></span><span style="color: #000000;">) annotation:</span></span></span></p>
+<pre class="lang:java decode:true">@XmlAccessorType(XmlAccessType.FIELD)
+public class Employee {
+}</pre>
+<p class="western" align="LEFT"><span style="font-family: Liberation Serif,serif;"><span style="font-size: medium;"><span style="color: #000000;">And everything comes as expected:</span></span></span></p>
+<pre class="lang:xhtml decode:true"><?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<employeeGroups>
+    <groupSize>3</groupSize>
+    <employeeGroups>
+        <list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="simpleMapEntry">
+            <employeeRole>SUPERVISOR</employeeRole>
+            <employees>
+                <name>Ramu</name>
+                <age>42</age>
+                <role>SUPERVISOR</role>
+            </employees>
+            <employees>
+                <name>Shyam</name>
+                <age>45</age>
+                <role>SUPERVISOR</role>
+            </employees>
+            <employees>
+                <name>Radhe</name>
+                <age>38</age>
+                <role>SUPERVISOR</role>
+            </employees>
+            <employees>
+                <name>Jesse</name>
+                <age>44</age>
+                <role>SUPERVISOR</role>
+            </employees>
+        </list>
+        <list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="simpleMapEntry">
+            <employeeRole>TECHNICIAN</employeeRole>
+            <employees>
+                <name>Sadhu</name>
+                <age>22</age>
+                <role>TECHNICIAN</role>
+            </employees>
+            <employees>
+                <name>Yadav</name>
+                <age>25</age>
+                <role>TECHNICIAN</role>
+            </employees>
+            <employees>
+                <name>Chris</name>
+                <age>28</age>
+                <role>TECHNICIAN</role>
+            </employees>
+            <employees>
+                <name>Bill</name>
+                <age>34</age>
+                <role>TECHNICIAN</role>
+            </employees>
+        </list>
+        <list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="simpleMapEntry">
+            <employeeRole>MANAGER</employeeRole>
+            <employees>
+                <name>Sachin</name>
+                <age>35</age>
+                <role>MANAGER</role>
+            </employees>
+            <employees>
+                <name>Hamid</name>
+                <age>32</age>
+                <role>MANAGER</role>
+            </employees>
+            <employees>
+                <name>Naresh</name>
+                <age>34</age>
+                <role>MANAGER</role>
+            </employees>
+            <employees>
+                <name>Manna</name>
+                <age>36</age>
+                <role>MANAGER</role>
+            </employees>
+        </list>
+    </employeeGroups>
+</employeeGroups></pre>
+<p class="western"><span style="font-size: large;"><b>Attempt 7</b></span></p>
+<p class="western" align="LEFT"><span style="font-family: Liberation Serif,serif;"><span style="font-size: medium;"><span style="color: #000000;">The only problem as I see now is this:</span></span></span></p>
+<pre class="lang:xhtml decode:true">            <employees>
+                <name>Manna</name>
+                <age>36</age>
+                <role>MANAGER</role>
+            </employees></pre>
+<p class="western" align="LEFT"><span style="font-family: Liberation Serif,serif;"><span style="font-size: medium;"><span style="color: #000000;">It should be within an <employee>. The following is the modification needed:</span></span></span></p>
+<pre class="lang:java decode:true">@XmlAccessorType(XmlAccessType.FIELD)
+public class SimpleMapEntry {
+    private EmployeeRole employeeRole;
+    @XmlElementWrapper(name = "employees")
+    @XmlElement(name = "employee")
+    private List<Employee> employees;</pre>
+<p class="western" align="LEFT"><span style="font-family: Liberation Serif,serif;"><span style="font-size: medium;"><span style="color: #000000;">With this, we get the following output:</span></span></span></p>
+<pre class="lang:xhtml decode:true "><?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<employeeGroups>
+    <groupSize>3</groupSize>
+    <employeeGroups>
+        <list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="simpleMapEntry">
+            <employeeRole>SUPERVISOR</employeeRole>
+            <employees>
+                <employee>
+                    <name>Ramu</name>
+                    <age>42</age>
+                    <role>SUPERVISOR</role>
+                </employee>
+                <employee>
+                    <name>Shyam</name>
+                    <age>45</age>
+                    <role>SUPERVISOR</role>
+                </employee>
+                <employee>
+                    <name>Radhe</name>
+                    <age>38</age>
+                    <role>SUPERVISOR</role>
+                </employee>
+                <employee>
+                    <name>Jesse</name>
+                    <age>44</age>
+                    <role>SUPERVISOR</role>
+                </employee>
+            </employees>
+        </list>
+        <list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="simpleMapEntry">
+            <employeeRole>TECHNICIAN</employeeRole>
+            <employees>
+                <employee>
+                    <name>Sadhu</name>
+                    <age>22</age>
+                    <role>TECHNICIAN</role>
+                </employee>
+                <employee>
+                    <name>Yadav</name>
+                    <age>25</age>
+                    <role>TECHNICIAN</role>
+                </employee>
+                <employee>
+                    <name>Chris</name>
+                    <age>28</age>
+                    <role>TECHNICIAN</role>
+                </employee>
+                <employee>
+                    <name>Bill</name>
+                    <age>34</age>
+                    <role>TECHNICIAN</role>
+                </employee>
+            </employees>
+        </list>
+        <list xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="simpleMapEntry">
+            <employeeRole>MANAGER</employeeRole>
+            <employees>
+                <employee>
+                    <name>Sachin</name>
+                    <age>35</age>
+                    <role>MANAGER</role>
+                </employee>
+                <employee>
+                    <name>Hamid</name>
+                    <age>32</age>
+                    <role>MANAGER</role>
+                </employee>
+                <employee>
+                    <name>Naresh</name>
+                    <age>34</age>
+                    <role>MANAGER</role>
+                </employee>
+                <employee>
+                    <name>Manna</name>
+                    <age>36</age>
+                    <role>MANAGER</role>
+                </employee>
+            </employees>
+        </list>
+    </employeeGroups>
+</employeeGroups></pre>
+<p class="western"><span style="font-size: large;"><b>Sources</b></span></p>
+<p class="western">The sources can be found here: <span style="color: #000080;"><span lang="en-US"><span style="text-decoration: underline;"><a href="https://github.com/paawak/blog/tree/master/code/jaxb-demo">https://github.com/paawak/blog/tree/master/code/jaxb-demo</a></span></span></span></p>
+<p class="western"><span style="font-size: large;"><b>Reference</b></span></p>
+<p class="western"><span style="color: #000080;"><span lang="en-US"><span style="text-decoration: underline;"><a href="https://jaxb.java.net/tutorial/">https://jaxb.java.net/tutorial/</a></span></span></span></p>
+<p class="western"><span style="color: #000080;"><span lang="en-US"><span style="text-decoration: underline;"><a href="http://docs.spring.io/spring-ws/site/reference/html/oxm.html">http://docs.spring.io/spring-ws/site/reference/html/oxm.html</a></span></span></span></p>

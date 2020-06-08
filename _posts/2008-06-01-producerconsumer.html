@@ -1,0 +1,117 @@
+---
+layout: post
+status: publish
+published: true
+title: Producer/Consumer
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 14
+wordpress_url: http://technoblogs.paawak.com/?p=8
+date: '2008-06-01 11:29:21 +0530'
+date_gmt: '2008-06-01 05:59:21 +0530'
+categories:
+- thread
+tags:
+- java
+- thread
+comments: []
+---
+<p class="entryContent">
+<p>I have tried to come-up with a thread safe and a non thread safe version of a typical producer/consumer scenario.</p>
+<pre lang="java">
+package com.swayam.exp;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.List;
+/**
+ *
+ * @author paawak
+ */
+public class ProducerConsumerSimulator implements Runnable {
+    private final int sleepInterval;
+    private final List<string> list;
+    private final boolean producer;
+    private final boolean threadSafe;
+    public ProducerConsumerSimulator(boolean producer, boolean threadSafe,
+            int sleepInterval, List<string> list) {
+        this.producer = producer;
+        this.sleepInterval = sleepInterval;
+        this.list = list;
+        this.threadSafe = threadSafe;
+    }
+    public void run() {
+        while (true) {
+            try {
+                Thread.sleep(sleepInterval);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            if (producer) {
+                produce();
+                if (threadSafe) {
+                    synchronized (list) {
+                        System.out.println("Consumer, wake-up!!!");
+                        list.notify();
+                    }
+                }
+            } else {
+                if (threadSafe) {
+                    synchronized (list) {
+                        try {
+                            System.out.println("Waiting for producer...");
+                            list.wait();
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+                consume();
+            }
+        }
+    }
+    private void produce() {
+        Calendar cal = Calendar.getInstance();
+        String str = "Time Now -- " + cal.get(Calendar.MINUTE) + ":"
+                + cal.get(Calendar.SECOND) + ":"
+                + cal.get(Calendar.MILLISECOND);
+        list.add(str);
+        System.out.println("ADDED:: " + str);
+    }
+    private void consume() {
+        try {
+            String str = list.remove(0);
+            System.out.println("REMOVED:: " + str);
+        } catch (IndexOutOfBoundsException e) {
+            e.printStackTrace();
+        }
+    }
+    /**
+     * For testing
+     *
+     * @param args
+     * @throws InterruptedException
+     */
+    public static void main(String[] args) throws InterruptedException {
+        int PRODUCER_SLEEP_INTERVAL = 1000;
+        int CONSUMER_SLEEP_INTERVAL = 30;
+        boolean THREAD_SAFE_EXECUTION = true;
+        List<string> list = new ArrayList<string>();
+        Thread producer = new Thread(new ProducerConsumerSimulator(true,
+                THREAD_SAFE_EXECUTION, PRODUCER_SLEEP_INTERVAL, list));
+        producer.start();
+        Thread consumer = new Thread(new ProducerConsumerSimulator(false,
+                THREAD_SAFE_EXECUTION, CONSUMER_SLEEP_INTERVAL, list));
+        consumer.start();
+    }
+}
+</pre>
+<p>Run this with<br />
+boolean <span class="caps">THREAD</span>_SAFE_EXECUTION = true;<br />
+and<br />
+boolean <span class="caps">THREAD</span>_SAFE_EXECUTION = false;<br />
+And see the difference yourself :).</p>

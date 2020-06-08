@@ -1,0 +1,79 @@
+---
+layout: post
+status: publish
+published: true
+title: Replacing web.xml with Java config
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 837
+wordpress_url: http://palashray.com/?p=837
+date: '2016-04-07 20:15:46 +0530'
+date_gmt: '2016-04-08 00:15:46 +0530'
+categories:
+- java
+- spring
+tags:
+- web
+comments:
+- id: 74
+  author: Kazi Abid Azad
+  author_email: kaziduke@gmail.com
+  author_url: ''
+  date: '2018-12-16 09:44:23 +0530'
+  date_gmt: '2018-12-16 14:44:23 +0530'
+  content: Please provide a non-spring example
+- id: 75
+  author: Palash
+  author_email: paawak@gmail.com
+  author_url: ''
+  date: '2019-01-26 04:29:02 +0530'
+  date_gmt: '2019-01-26 09:29:02 +0530'
+  content: |-
+    Hi Kazi, I am a bit busy, so, I would not be able to help you soon. Sorry!
+    ~Palash.
+---
+<p>Post Servlet 3.0, web.xml has become redundant. It can now be replaced with pure Java configuration.<br />
+We can do that even without Spring. But since we are using Spring MVC, I am taking the Spring example. Define a class implementing the <em>WebApplicationInitializer</em>, as below:</p>
+<pre class="lang:java decode:true">import javax.servlet.ServletContext;
+import javax.servlet.ServletRegistration;
+import org.springframework.web.WebApplicationInitializer;
+import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
+import org.springframework.web.servlet.DispatcherServlet;
+public class WebappInitializer implements WebApplicationInitializer {
+    @Override
+    public void onStartup(ServletContext container) {
+	// Create the dispatcher servlet's Spring application context
+	AnnotationConfigWebApplicationContext dispatcherContext = new AnnotationConfigWebApplicationContext();
+	dispatcherContext.register(WebConfig.class);
+	// Register and map the dispatcher servlet
+	ServletRegistration.Dynamic dispatcher = container.addServlet("dispatcher", new DispatcherServlet(dispatcherContext));
+	dispatcher.setLoadOnStartup(1);
+	dispatcher.addMapping("/");
+    }
+}</pre>
+<p>Note that we can define servlets, filters, etc., whatever we do in the web.xml. Its super simple and very readable.<br />
+Please be aware that you need to include the below servlet 3.x dependency in your pom.xml:</p>
+<pre class="lang:xhtml decode:true ">		<dependency>
+			<groupId>javax.servlet</groupId>
+			<artifactId>javax.servlet-api</artifactId>
+			<version>3.1.0</version>
+			<scope>provided</scope>
+		</dependency></pre>
+<p>Moreover, you have to include the below Maven plugin and set the <em>failOnMissingWebXml</em> property to <em>false</em> in pom.xml:</p>
+<pre class="lang:xhtml decode:true ">		<plugins>
+			<plugin>
+				<artifactId>maven-war-plugin</artifactId>
+				<version>2.4</version>
+				<configuration>
+					<failOnMissingWebXml>false</failOnMissingWebXml>
+				</configuration>
+			</plugin>
+...</pre>
+<p>&nbsp;<br />
+The sources will be found here:<br />
+<a href="https://github.com/paawak/blog/tree/master/code/simple-spring-rest">https://github.com/paawak/blog/tree/master/code/simple-spring-rest</a></p>

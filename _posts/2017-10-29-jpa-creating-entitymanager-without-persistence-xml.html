@@ -1,0 +1,157 @@
+---
+layout: post
+status: publish
+published: true
+title: 'JPA: Creating EntityManager without persistence.xml'
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 886
+wordpress_url: http://palashray.com/?p=886
+date: '2017-10-29 09:24:36 +0530'
+date_gmt: '2017-10-29 13:24:36 +0530'
+categories:
+- java
+- spring
+- hibernate
+tags:
+- hibernate
+- java
+- jpa
+- spring
+comments:
+- id: 78
+  author: ItsGosho
+  author_email: itsgosho2@gmail.com
+  author_url: ''
+  date: '2019-03-23 11:01:22 +0530'
+  date_gmt: '2019-03-23 15:01:22 +0530'
+  content: THAN YOU ,after 6 hours of searching how to do this in hibernate <3333
+---
+<p>For JPA to work, we need to define a persistence.xml inside META-INF. I always found it pretty cumbersome and difficult to maintain. Especially so for my integration tests. Wouldn't it be cool if we could do everything from Java code?<br />
+Here you go:</p>
+<h2>Using only Hibernate</h2>
+<pre class="lang:java decode:true ">	private EntityManager createEntityManager(String dbUrl, String dbUser, String dbPassword) {
+		Properties props = new Properties();
+		props.put("hibernate.connection.url", dbUrl);
+		props.put("hibernate.connection.username", dbUser);
+		if (StringUtils.hasText(dbPassword)) {
+			props.put("hibernate.connection.password", dbPassword);
+		}
+		PersistenceUnitInfo persistenceUnitInfo = new PersistenceUnitInfo() {
+			@Override
+			public Properties getProperties() {
+				return props;
+			}
+			@Override
+			public List<String> getManagedClassNames() {
+				return Arrays.asList(Author.class.getName(), Book.class.getName(), Chapter.class.getName(),
+						Genre.class.getName(), Section.class.getName());
+			}
+			@Override
+			public String getPersistenceUnitName() {
+				return "TestUnit";
+			}
+			@Override
+			public String getPersistenceProviderClassName() {
+				return HibernatePersistenceProvider.class.getName();
+			}
+			@Override
+			public PersistenceUnitTransactionType getTransactionType() {
+				return null;
+			}
+			@Override
+			public DataSource getJtaDataSource() {
+				return null;
+			}
+			@Override
+			public DataSource getNonJtaDataSource() {
+				return null;
+			}
+			@Override
+			public List<String> getMappingFileNames() {
+				return null;
+			}
+			@Override
+			public List<URL> getJarFileUrls() {
+				return null;
+			}
+			@Override
+			public URL getPersistenceUnitRootUrl() {
+				return null;
+			}
+			@Override
+			public boolean excludeUnlistedClasses() {
+				return false;
+			}
+			@Override
+			public SharedCacheMode getSharedCacheMode() {
+				return null;
+			}
+			@Override
+			public ValidationMode getValidationMode() {
+				return null;
+			}
+			@Override
+			public String getPersistenceXMLSchemaVersion() {
+				return null;
+			}
+			@Override
+			public ClassLoader getClassLoader() {
+				return null;
+			}
+			@Override
+			public void addTransformer(ClassTransformer transformer) {
+			}
+			@Override
+			public ClassLoader getNewTempClassLoader() {
+				return null;
+			}
+		};
+		HibernatePersistenceProvider hibernatePersistenceProvider = new HibernatePersistenceProvider();
+		EntityManagerFactory entityManagerFactory = hibernatePersistenceProvider
+				.createContainerEntityManagerFactory(persistenceUnitInfo, Collections.EMPTY_MAP);
+		return entityManagerFactory.createEntityManager();
+	}</pre>
+<h2>Using Spring-JPA</h2>
+<pre class="lang:java decode:true ">private EntityManager createEntityManager(String dbUrl, String dbUser, String dbPassword) {
+MutablePersistenceUnitInfo mutablePersistenceUnitInfo = new MutablePersistenceUnitInfo() {
+@Override
+public ClassLoader getNewTempClassLoader() {
+return null;
+}
+};
+mutablePersistenceUnitInfo.setPersistenceUnitName("TestUnit");
+mutablePersistenceUnitInfo.setPersistenceProviderClassName(HibernatePersistenceProvider.class.getName());
+Properties props = new Properties();
+props.put("hibernate.connection.url", dbUrl);
+props.put("hibernate.connection.username", dbUser);
+if (StringUtils.hasText(dbPassword)) {
+props.put("hibernate.connection.password", dbPassword);
+}
+mutablePersistenceUnitInfo.setProperties(props);
+mutablePersistenceUnitInfo.addManagedClassName(Author.class.getName());
+mutablePersistenceUnitInfo.addManagedClassName(Book.class.getName());
+mutablePersistenceUnitInfo.addManagedClassName(Chapter.class.getName());
+mutablePersistenceUnitInfo.addManagedClassName(Genre.class.getName());
+mutablePersistenceUnitInfo.addManagedClassName(Section.class.getName());
+PersistenceUnitDescriptor persistenceUnitDescriptor = new PersistenceUnitInfoDescriptor(
+mutablePersistenceUnitInfo);
+EntityManagerFactoryBuilder entityManagerFactoryBuilder = new EntityManagerFactoryBuilderImpl(
+persistenceUnitDescriptor, Collections.EMPTY_MAP);
+EntityManagerFactory entityManagerFactory = entityManagerFactoryBuilder.build();
+return entityManagerFactory.createEntityManager();
+}</pre>
+<p>Note that you can add your entities through code. In order for this to compile, you would need to include the below dependencies in maven:</p>
+<pre class="lang:xhtml decode:true "><dependency>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-data-jpa</artifactId>
+</dependency></pre>
+<p>The complete sources can be found here:<br />
+<a href="https://github.com/paawak/blog/tree/master/code/one-to-many-example-2">https://github.com/paawak/blog/tree/master/code/one-to-many-example-2</a><br />
+This particular Java file is:<br />
+<a href="https://github.com/paawak/blog/blob/master/code/one-to-many-example-2/src/test/java/com/swayam/demo/spring/springbootdemo/JpaIntegrationTest.java">https://github.com/paawak/blog/blob/master/code/one-to-many-example-2/src/test/java/com/swayam/demo/spring/springbootdemo/JpaIntegrationTest.java</a></p>

@@ -1,0 +1,229 @@
+---
+layout: post
+status: publish
+published: true
+title: Annotation based Spring MVC, how tos
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 360
+wordpress_url: http://puretech.paawak.com/?p=360
+date: '2010-09-05 11:26:42 +0530'
+date_gmt: '2010-09-05 05:56:42 +0530'
+categories:
+- spring
+tags:
+- java
+- spring
+- spring mvc
+comments: []
+---
+<p>I will list here the common how to-s for the new Annotation based Spring MVC. Please note that I am using Spring version <strong>3.0.0.RELEASE</strong>. This is a bit, only a small bit, different from the version <strong>2.5.x</strong>. So, if you are using 2.5.x, you have to tweak things a bit before you get the same effect.<br />
+Consider the following screen:<br />
+<img class="aligncenter size-full wp-image-361" title="samplehtml" src="http://palashray.com/wp-content/uploads/2010/09/samplehtml.png" alt="samplehtml" width="561" height="404" /><br />
+The fantatstic thing about Spring MVC is it lets you take an Object Oriented approach while designing the Model (Form Bean) and lets you bind that seamlessly to the View (JSP Form).&nbsp; For the above scenario, we can break down the top section into a list of rows. I would denote the row with a class having select, itemName, price... attributes, as shown below (this is an inner class in my <em>ItemBean</em> class, which is my Form Bean):</p>
+<pre lang="java">    public static class ItemRow {
+        private boolean selected;
+        private String itemName;
+        private float price;
+        private int quantity;
+        ...
+    }</pre>
+<p>Then, in my ItemBean class, I can have a <em>List</em> of <em>ItemRow</em>, as shown:</p>
+<pre lang="java">public class ItemBean {
+    private List items;
+    private float totalPrice;
+    private Date expectedDelivery;
+...
+}</pre>
+<h2>How do I display/bind my Model to View?</h2>
+<p>This is how the View (<em>Item.jsp</em>) looks like:</p>
+<pre lang="xhtml">&nbsp;&nbsp;
+								<input id="txtUnitPrice" disabled="disabled" size="4" type="text" value="${item.price}" />
+							&nbsp;
+								<input id="txtItemPrice" readonly="readonly" size="6" type="text" value="${item.price * item.quantity}" />
+						&nbsp;
+								Total Price:
+							&nbsp;
+</pre>
+<p>Especially note the</p>
+<blockquote><p><span style="color: #0000ff;">path="items[${count.index}].selected" </span></p></blockquote>
+<p>in the <span style="color: #0000ff;">form:checkbox </span> tag. This is the key. It binds a particular index of the <em>items</em> in the <em>ItemBean</em> class to the JSP.</p>
+<h2>How to map a given url to my Controller method</h2>
+<p>After the introduction of Annotation <a href="http://static.springsource.org/spring/docs/3.0.x/javadoc-api/org/springframework/stereotype/Controller.html" target="_blank">@Controller</a>, all Spring MVC controllers have become like <a href="http://static.springsource.org/spring/docs/3.0.x/javadoc-api/index.html?org/springframework/web/servlet/mvc/multiaction/MultiActionController.html" target="_blank">MultiActionController</a>, that is, you can handle multiple requests in the same controller. Mapping a url is very simple: you should annotate any public method with the <em>@RequestMapping("/DesiredUrl.do")</em>. Of course, you should make sure:<br />
+1.> The class is annotated with <em>@Controller</em><br />
+2.> The following line is present in the Spring context file:</p>
+<pre lang="xml"></pre>
+<p>The method can have a motley combination of parameters and return type. Read the <a href="http://static.springsource.org/spring/docs/3.0.x/javadoc-api/org/springframework/web/bind/annotation/RequestMapping.html" target="_blank">javadocs</a> for details. This annotation takes an optional parameter <em>method</em>, which can be any enum <em>RequestMethod</em> type. If you do not specify anything, your method will handle all types of requests like GET, POST, DELETE, etc.</p>
+<h2>How do I pre-load or customise my Form Bean before it reaches my controller method?</h2>
+<p>In Spring MVC, the framework creates an instance of the Form Bean and binds it to the fields in JSP in case of a POST. In many cases, I would like to customise the Form Bean before it starts binding to the JSP fields. In older versions of Spring MVC, this was done by overriding the <a href="http://static.springsource.org/spring/docs/3.0.x/javadoc-api/org/springframework/web/servlet/mvc/AbstractFormController.html#formBackingObject(javax.servlet.http.HttpServletRequest)" target="_blank">formBackingObject() method in AbstractFormController</a>.<br />
+ With annotations, you do it by specifying the <em>@ModelAttribute</em> before the FormBean attribute in the request handler method and then again on a public method returning the customised Form Bean as shown below:</p>
+<pre lang="java">    @RequestMapping(value = "/checkout.htm", method = RequestMethod.POST)
+    public ModelAndView checkout(
+            @ModelAttribute("postBean") ItemBean formBean,
+            BindingResult errors) {
+        ModelAndView model = new ModelAndView();
+        model.addObject("command", formBean);
+...
+        return model;
+    }
+    @ModelAttribute("postBean")
+    public ItemBean initBeanForPost() {
+        ItemBean bean = new ItemBean();
+        populateBean(bean, true);
+        return bean;
+    }
+</pre>
+<p>Note that its always a good practice to specify the name in the <em>@ModelAttribute</em> annotation. This way you can pre-load different beans for different methods. As shown in the example above, the name specified in the <em>@ModelAttribute</em> annotation in the request handler method <em>checkout()</em> and that in the method <em>initBeanForPost()</em> should be an exact match. By the way, this works for GET as well as POST or any other request type.</p>
+<h2>How do I do the validation?</h2>
+<p>Spring version 3.x onwards, doing validations have become very easy. I will describe this in the following few steps:</p>
+<h4>1. Write a Validator</h4>
+<p>Your validator should implement the <em>Validator</em> interface. It has two methods that you need to override. The <em>supports()</em> method makes sure that the Validator can validate a given FormBean. The <em>validate()</em> method does the actual job of validating. A typical Validator will look like this:</p>
+<pre lang="java">class ItemValidator implements Validator {
+    @Override
+    public void validate(Object target, Errors errors) {
+        ItemBean bean = (ItemBean) target;
+        if (bean.getTotalPrice() == 0) {
+            errors.rejectValue("totalPrice", "noItemsSelected");
+        }
+    }
+    @Override
+    public boolean supports(Class<?> clazz) {
+        return clazz == ItemBean.class;
+    }
+}
+</pre>
+<h4>2. Set the Validator</h4>
+<p>You do this in a public method annotated with <em>@InitBinder</em> in the controller.</p>
+<pre lang="java">    @InitBinder
+    public void initBinder(WebDataBinder binder, WebRequest webRequest) {
+        if (binder.getTarget() instanceof ItemBean) {
+            binder.setValidator(new ItemValidator());
+        }
+    }
+</pre>
+<p>I am setting the validator inside the <em>if (binder.getTarget() instanceof ItemBean)</em> block as otherwise I get an <strong>ugly exception</strong> in case there are any <strong>validation errors</strong>. I am putting the stack trace below:</p>
+<blockquote><p><span style="color: #ff0000;"><br />
+java.lang.IllegalStateException: Invalid target for Validator [com.swayam.demo.web.controller.ItemController$1@11e7cc6]: org.springframework.validation.BeanPropertyBindingResult: 1 errors<br />
+Field error in object 'postBean' on field 'totalPrice': rejected value [0.0]; codes [noItemsSelected.postBean.totalPrice,noItemsSelected.totalPrice,noItemsSelected.float,noItemsSelected]; arguments []; default message [null]] with root cause<br />
+java.lang.IllegalStateException: Invalid target for Validator [com.swayam.demo.web.controller.ItemController$1@11e7cc6]: org.springframework.validation.BeanPropertyBindingResult: 1 errors<br />
+Field error in object 'postBean' on field 'totalPrice': rejected value [0.0]; codes [noItemsSelected.postBean.totalPrice,noItemsSelected.totalPrice,noItemsSelected.float,noItemsSelected]; arguments []; default message [null]<br />
+at org.springframework.validation.DataBinder.setValidator(DataBinder.java:472)<br />
+at com.swayam.demo.web.controller.ItemController.initBinder(ItemController.java:63)<br />
+at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)<br />
+at sun.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:39)<br />
+at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:25)<br />
+at java.lang.reflect.Method.invoke(Method.java:597)<br />
+at org.springframework.web.bind.annotation.support.HandlerMethodInvoker.doInvokeMethod(HandlerMethodInvoker.java:710)<br />
+at org.springframework.web.bind.annotation.support.HandlerMethodInvoker.initBinder(HandlerMethodInvoker.java:329)<br />
+at org.springframework.web.bind.annotation.support.HandlerMethodInvoker.updateModelAttributes(HandlerMethodInvoker.java:691)<br />
+at org.springframework.web.servlet.mvc.annotation.AnnotationMethodHandlerAdapter.invokeHandlerMethod(AnnotationMethodHandlerAdapter.java:417)<br />
+at org.springframework.web.servlet.mvc.annotation.AnnotationMethodHandlerAdapter.handle(AnnotationMethodHandlerAdapter.java:402)<br />
+at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:771)<br />
+</span></p></blockquote>
+<h4>3. Use @Valid before the Form Bean</h4>
+<p>This is a new feature added in release 3.x. Now the validation happens with JSR-303 Bean Validation API. You can find the jar <a href="http://repo1.maven.org/maven2/javax/validation/validation-api/1.0.0.GA/" target="_blank">here</a>. If you are using Maven, you can add the following dependency:</p>
+<pre lang="xml">
+			javax.validation
+			validation-api
+			1.0.0.GA
+</pre>
+<p>This is how you use it:</p>
+<pre lang="java">    @RequestMapping(value = "/checkout.htm", method = RequestMethod.POST)
+    public ModelAndView checkout(
+            @Valid ItemBean formBean,
+            BindingResult errors) {
+        ModelAndView model = new ModelAndView();
+...
+        return model;
+    }
+</pre>
+<p>The Form Bean is validated with the set Validator by the framework. Note that for Spring 2.5.x, you need to make the call to validator manually inside the handler method:</p>
+<pre lang="java">...
+        Validator validator = new ItemValidator();
+        validator.validate(formBean, errors);
+...
+</pre>
+<h2>In my Validator, how do I use messages from properties file for i18n?</h2>
+<p>Lets say, my properties file is <em>Messages.properties</em> located at <em>/com/swayam/demo/web/res/</em>. The contents are:</p>
+<blockquote><p>noItemsSelected=You have not selected any items</p></blockquote>
+<p>I have to create an instance of <em>MessageSource</em> in my Spring conf file as shown:</p>
+<pre lang="xml">
+				com.swayam.demo.web.res.Messages
+</pre>
+<p>Now I can use the <em>property key</em> in my <em>validate()</em> method as shown:</p>
+<pre lang="java">    @Override
+    public void validate(Object target, Errors errors) {
+        ItemBean bean = (ItemBean) target;
+        if (bean.getTotalPrice() == 0) {
+            errors.rejectValue("totalPrice", "noItemsSelected");
+        }
+    }
+</pre>
+<h2>How to display the Validation messages on my JSP?</h2>
+<p>First, from the controller, you have to pass an instance of <em>BindingResult</em> to the JSP.</p>
+<pre lang="java">    @RequestMapping(value = "/checkout.htm", method = RequestMethod.POST)
+    public ModelAndView checkout(
+            @Valid ItemBean formBean,
+            BindingResult errors) {
+        ModelAndView model = new ModelAndView();
+        model.addObject("command", formBean);
+        if (errors.hasErrors()) {
+            model.setViewName("Item");
+            model.addObject("errors", errors);
+        } else {
+            model.setViewName("Checkout");
+        }
+        return model;
+    }
+</pre>
+<p>And this is how the JSP looks like:</p>
+<div style="text-align: center; color: red;"></div>
+<h2>How do I bind a complex object to my JSP form field?</h2>
+<p>Often we have to display a complex object as text. The best example I can take is that of a Date. Its a <em>java.util.Date</em> in the model. How do I map this to a text field in my JSP? You have to extend the <em>PropertyEditorSupport</em> and override the following methods:<br />
+1. <strong>getAsText()</strong>: Converts an Object to its String representation. Used for displaying a model object in the JSP.<br />
+2. <strong>setAsText(String text)</strong>: Converts the text from the input field to the complex object that the model understands.<br />
+A typical implementation would look like this:</p>
+<pre lang="java">class DateEditorSupport extends PropertyEditorSupport {
+    private static final Logger LOG = Logger.getLogger(DateEditorSupport.class);
+    private final Format formatter;
+    DateEditorSupport(String dateFormat) {
+        formatter = new SimpleDateFormat(dateFormat);
+    }
+    public String getAsText() {
+        String date = null;
+        Object value = getValue();
+        if (value instanceof Date) {
+            date = formatter.format(value);
+        } else {
+            throw new java.lang.IllegalArgumentException("Expecting a "
+                    + Date.class.getName() + " class, got "
+                    + value.getClass().getName());
+        }
+        return date;
+    }
+    public void setAsText(String text) {
+        try {
+            Date date = (Date) formatter.parseObject(text);
+            setValue(date);
+        } catch (ParseException e) {
+            LOG.fatal("error setting date for String: " + text, e);
+        }
+    }
+}
+</pre>
+<p>Then, in the <em>@InitBinder</em> method, you need to register this against the class:</p>
+<pre lang="java">    @InitBinder
+    public void initBinder(WebDataBinder binder, WebRequest webRequest) {
+        binder.registerCustomEditor(Date.class, new DateEditorSupport(
+                "dd/MM/yyyy"));
+    }
+</pre>
+<h2>Putting it all together</h2>
+<p>You will find the sources <a href="https://github.com/paawak/blog/tree/master/code/SpringMVC">here</a>. Its an Eclipse project, using Maven. In order to get all the libraries, install <a href="http://maven.apache.org/" target="_blank">Maven</a> and run:<br />
+<em>mvn eclipse:clean eclipse:eclipse -DdownloadSources=true -DdownloadJavadocs=true -Dwtpversion=2.0</em><br />
+You can also run <a href="https://github.com/paawak/blog/blob/master/code/SpringMVC/dist/SpringMVC.war">the war file</a> directly and go to <a href="http://localhost:8080/SpringMVC/" target="_blank">http://localhost:8080/SpringMVC/</a> to see it in action.</p>

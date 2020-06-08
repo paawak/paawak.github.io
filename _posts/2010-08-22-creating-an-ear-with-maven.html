@@ -1,0 +1,279 @@
+---
+layout: post
+status: publish
+published: true
+title: Creating an EAR with Maven
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 315
+wordpress_url: http://puretech.paawak.com/?p=315
+date: '2010-08-22 00:50:20 +0530'
+date_gmt: '2010-08-21 19:20:20 +0530'
+categories:
+- java
+tags:
+- ear
+- maven
+comments:
+- id: 24
+  author: Ian Collins
+  author_email: k-sever@ukr.net
+  author_url: ''
+  date: '2013-05-28 19:32:32 +0530'
+  date_gmt: '2013-05-28 14:02:32 +0530'
+  content: "Deployment to Glassfish 3.1 fails with java.lang.RuntimeException: EJB
+    Container initialization error.\nFull stacktrace:\njava.lang.RuntimeException:
+    EJB Container initialization error\n\tat org.glassfish.ejb.startup.EjbApplication.loadContainers(EjbApplication.java:242)\n\tat
+    org.glassfish.ejb.startup.EjbDeployer.load(EjbDeployer.java:305)\n\tat org.glassfish.ejb.startup.EjbDeployer.load(EjbDeployer.java:108)\n[#|2013-05-28T16:54:09.593+0300|SEVERE|glassfish3.1.2|javax.enterprise.system.tools.admin.org.glassfish.deployment.admin|_ThreadID=17;_ThreadName=Thread-2;|Exception
+    while loading the app : EJB Container initialization error\njava.lang.RuntimeException:
+    java.lang.RuntimeException: java.lang.ClassNotFoundException: com.swayam.eardemo.shared.MySessionBeanRemote\n\tat
+    org.glassfish.ejb.security.factory.EJBSecurityManagerFactory.createManager(EJBSecurityManagerFactory.java:219)\n\tat
+    org.glassfish.ejb.startup.EjbApplication.loadContainers(EjbApplication.java:229)\n\tat
+    org.glassfish.ejb.startup.EjbDeployer.load(EjbDeployer.java:305)\n\tat org.glassfish.ejb.startup.EjbDeployer.load(EjbDeployer.java:108)"
+---
+<p>Maven is the build tool of choice for many people due to the simplicity and flexibility of use. The real strength of Maven is vetted when handling real complex projetcs consisting of tens of modules, each requiring elaborate build requirements.<br />
+I had faced an uphill task of Mavenising one of our EAR projects. As is the typical case, our project consisted of a EJB module and a WAR module, package together in a EAR module. It was a bit complex as we had to deploy the same application in JBoss and Glassfish. I will write some of that experience here.<br />
+Let us consider an enterprise application having a structure as show below:<br />
+<a href="#" rel="attachment wp-att-316"><img class="aligncenter size-full wp-image-316" title="Project Structure" src="http://palashray.com/wp-content/uploads/2010/08/project-structure.png" alt="Project Structure" width="340" height="332" /></a><br />
+I will briefly explain what the modules stand for:</p>
+<ol>
+<li><strong>swayam-ear</strong>: This is the enterprise application</li>
+<li><strong>swayam-ejb</strong>: Is the EJB module</li>
+<li><strong>swayam-war</strong>: Is the web module</li>
+<li><strong>swayam-shared</strong>: Has the ejb remote interfaces. As the name indicates, its shared by the <em>sawaym-ejb</em> and the <em>swayam-war</em> modules</li>
+<li><strong>swayam-ear-builder</strong>: Used for building all the modules</li>
+</ol>
+<p>I am using Netbeans (6.8) and Glassfish for convinience. But you can pretty much use anything.<br />
+I have kept things pretty simple. This is how the Remote interface looks like (its a Stateless Session Bean):</p>
+<pre lang="java">@Remote
+public interface MySessionBeanRemote {
+    String sayHello();
+}</pre>
+<p>And this is how I access it from the servlet:</p>
+<pre lang="java">...
+MySessionBeanRemote remoteBean = InitialContext.doLookup(MySessionBeanRemote.class.getName());
+...</pre>
+<h2>Mavenising the EJB</h2>
+<p>We will use the <em>maven-ejb-plugin</em> for this. This is how the pom looks like:</p>
+<pre lang="xml">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.swayam.eardemo</groupId>
+    <artifactId>swayam-ejb</artifactId>
+    <version>1.0.0</version>
+    <packaging>ejb</packaging>
+    <name>swayam-ejb</name>
+    <build>
+        <sourceDirectory>${basedir}/src</sourceDirectory>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <artifactId>maven-ejb-plugin</artifactId>
+                <configuration>
+                    <ejbVersion>3.0</ejbVersion>
+                    <archive>
+                        <manifest>
+                            <addClasspath>true</addClasspath>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>1.6</source>
+                    <target>1.6</target>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+    <dependencies>
+        <dependency>
+            <groupId>javax</groupId>
+            <artifactId>javaee-api</artifactId>
+            <version>6.0</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.swayam.eardemo</groupId>
+            <artifactId>swayam-shared</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+    </dependencies>
+</project>
+</pre>
+<p>Note that the packaging is <em>ejb</em> and not <em>jar</em>.</p>
+<h2>Mavenising the WAR</h2>
+<pre lang="xml">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.swayam.eardemo</groupId>
+    <artifactId>swayam-war</artifactId>
+    <version>1.0.0</version>
+    <packaging>war</packaging>
+    <name>swayam-war</name>
+    <pluginRepositories>
+        <pluginRepository>
+            <id>maven.java.net</id>
+            <name>Java.net Maven2 Repository</name>
+            <url>http://download.java.net/maven/2</url>
+        </pluginRepository>
+    </pluginRepositories>
+    <build>
+        <finalName>swayam-war</finalName>
+        <sourceDirectory>${basedir}/src/java</sourceDirectory>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>1.6</source>
+                    <target>1.6</target>
+                </configuration>
+            </plugin>
+            <plugin>
+                <artifactId>maven-war-plugin</artifactId>
+                <version>2.0</version>
+                <configuration>
+                    <webResources>
+                        <resource>
+                            <directory>${basedir}/web</directory>
+                            <excludes>
+                                <exclude>CVS/**</exclude>
+                                <exclude>WEB-INF/lib/*</exclude>
+                            </excludes>
+                        </resource>
+                    </webResources>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+    <dependencies>
+        <dependency>
+            <groupId>com.swayam.eardemo</groupId>
+            <artifactId>swayam-shared</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>servlet-api</artifactId>
+            <version>2.4</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>
+</pre>
+<h2>Mavenising the EAR</h2>
+<pre lang="xml">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.swayam.eardemo</groupId>
+    <artifactId>swayam-ear</artifactId>
+    <version>1.0.0</version>
+    <packaging>ear</packaging>
+    <name>swayam-ear</name>
+    <pluginRepositories>
+        <pluginRepository>
+            <id>maven.java.net</id>
+            <name>Java.net Maven2 Repository</name>
+            <url>http://download.java.net/maven/2</url>
+        </pluginRepository>
+    </pluginRepositories>
+    <build>
+        <finalName>swayam-ear</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>1.6</source>
+                    <target>1.6</target>
+                </configuration>
+            </plugin>
+            <plugin>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>2.3</version>
+                <configuration>
+                    <encoding>UTF-8</encoding>
+                </configuration>
+            </plugin>
+            <plugin>
+                <artifactId>maven-ear-plugin</artifactId>
+                <version>2.4.1</version>
+                <configuration>
+                    <modules>
+                        <webModule>
+                            <groupId>com.swayam.eardemo</groupId>
+                            <artifactId>swayam-war</artifactId>
+                            <bundleFileName>swayam-war.war</bundleFileName>
+                            <contextRoot>/swayam-war</contextRoot>
+                        </webModule>
+                        <ejbModule>
+                            <groupId>com.swayam.eardemo</groupId>
+                            <artifactId>swayam-ejb</artifactId>
+                            <bundleFileName>swayam-ejb.jar</bundleFileName>
+                        </ejbModule>
+                    </modules>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+    <dependencies>
+        <dependency>
+            <groupId>com.swayam.eardemo</groupId>
+            <artifactId>swayam-war</artifactId>
+            <version>${swayam-version}</version>
+            <type>war</type>
+        </dependency>
+        <dependency>
+            <groupId>com.swayam.eardemo</groupId>
+            <artifactId>swayam-ejb</artifactId>
+            <version>${swayam-version}</version>
+            <type>ejb</type>
+        </dependency>
+    </dependencies>
+    <properties>
+        <swayam-version>1.0.0</swayam-version>
+    </properties>
+</project>
+</pre>
+<p>The most important thing here is the <em>type</em> tag inside the <em>dependency</em> tag. Without this, it will not work.</p>
+<h2>Putting it all together</h2>
+<p>Its often very cumbersome to build these modules one by one manually when one of them changes. This is more so in a development environment. So, I will conclude with one pom for building all the modules at one go. This pom is present in the <em>swayam-ear-builder</em> module.</p>
+<pre lang="xml">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.swayam.eardemo</groupId>
+  <artifactId>swayam-ear-builder</artifactId>
+  <packaging>pom</packaging>
+  <version>1.0.0</version>
+  <name>swayam-ear-builder</name>
+  <modules>
+    <module>../swayam-ear</module>
+    <module>../swayam-ejb</module>
+    <module>../swayam-war</module>
+    <module>../swayam-shared</module>
+  </modules>
+</project>
+</pre>
+<p>Note that the path of the modules are relative to the pom.<br />
+You can build the EAR project and deploy it on Glassfish or JBoss. Once successfully deployed, you can open <a href="http://localhost:8080/swayam-war/EjbInvoker">http://localhost:8080/swayam-war/EjbInvoker</a> This is how it looks like:<br />
+<a href="#" rel="attachment wp-att-326"><img class="aligncenter size-full wp-image-326" title="screenshot-servlet-ejbinvoker-google-chrome" src="http://palashray.com/wp-content/uploads/2010/08/screenshot-servlet-ejbinvoker-google-chrome.png" alt="screenshot-servlet-ejbinvoker-google-chrome" width="620" height="235" /></a></p>
+<h2>Resources</h2>
+<ol>
+<li>Sources: <a href="https://github.com/paawak/blog/tree/master/code/swayam-ear-example">https://github.com/paawak/blog/tree/master/code/swayam-ear-example</a></li>
+<li>Binaries: <a href="https://github.com/paawak/blog/blob/master/code/swayam-ear-example/swayam-ear/dist">https://github.com/paawak/blog/blob/master/code/swayam-ear-example/swayam-ear/dist/</a></li>
+</ol>

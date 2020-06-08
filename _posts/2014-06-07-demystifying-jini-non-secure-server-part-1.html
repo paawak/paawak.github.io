@@ -1,0 +1,194 @@
+---
+layout: post
+status: publish
+published: true
+title: 'Demystifying JINI: Non-Secure Server: Part 1'
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 536
+wordpress_url: http://palashray.com/?p=536
+date: '2014-06-07 23:04:43 +0530'
+date_gmt: '2014-06-08 03:04:43 +0530'
+categories:
+- jini
+tags:
+- java
+- jini
+- rmi
+comments:
+- id: 59
+  author: 'Demystifying JINI: Non-Secure Server: Part 2 &laquo; Heart of a hacker'
+  author_email: ''
+  author_url: http://palashray.com/demystifying-jini-non-secure-server-part-2/
+  date: '2014-07-09 02:34:23 +0530'
+  date_gmt: '2014-07-09 02:34:23 +0530'
+  content: "[&#8230;] Part 1, we had sieved through the example available on the JINI
+    site and distilled the Rmi client server [&#8230;]"
+- id: 60
+  author: 'Demystifying JINI: Dynamic Code Download | Heart of a hacker'
+  author_email: ''
+  author_url: http://palashray.com/demystifying-jini-dynamic-code-download/
+  date: '2015-01-25 18:54:33 +0530'
+  date_gmt: '2015-01-25 18:54:33 +0530'
+  content: "[&#8230;] In the 1st part of the Demystifying JINI series, we had explored
+    how to write a bare bones non secured client/server: http://palashray.com/demystifying-jini-non-secure-server-part-1/
+    [&#8230;]"
+---
+<h2>Introduction</h2>
+<h3>What is JINI?</h3>
+<p>JINI is a framework that enables us to write Java-based distributed systems. In simple terms, it allows you to expose Java classes as services, which can be then called remotely by other Java based clients over the network. For more details, refer to <a href="http://river.apache.org/concepts.html" target="_blank">http://river.apache.org/concepts.html</a>.</p>
+<h3><strong>How is it different from RMI?</strong></h3>
+<ul>
+<li>In RMI, the client should explicitly know about the server and then make a look-up. But JINI has the concept of discovery, where it attempts to <em>discover the service</em> through some known search parameters.</li>
+<li>RMI does not support distributed transactions or events, JINI has support for that and lot more.</li>
+<li>RMI does not support dynamic code download from the server, JINI does. This means that the client is more loosely coupled and not necessarily tied to a particular protocol.</li>
+</ul>
+<h3>Where do I find it?</h3>
+<p>Its hosted at <a href="http://river.apache.org/" target="_blank">http://river.apache.org/</a>.</p>
+<h3>Reason for this blog</h3>
+<p>I came across this in my current project and wanted to explore more about the hows and whys. The problem was acute shortage of documentation on the internet, probably because very few people use this. Also, the documentation and code sample available at the apache-river site were bloated and far from simple. They just created confusion. So I decided to write my own simple implementation using minimal amount of code and configuration.</p>
+<h2>Writing a bare bones, non-secure client/server using JINI</h2>
+<h3>High Level Overview</h3>
+<p>Our implementation will consist of the following 3 components:</p>
+<ol>
+<li><strong>The RmiServer</strong>: This will expose services which can be invoked as Java method calls across the network.</li>
+<li><strong>The RmiClient</strong>: This will consume the remote services provided by the RmiServer.</li>
+<li><strong>The Registry</strong>: This will act as an intermediary between the client and the server. The server will register the services its exposing, with the registry. And the client will do a look-up for the desired service from the registry. We will be using the <em>reggie</em> component of the apache-river project for our Registry.</li>
+</ol>
+<p>Please note that to keep this simple, we are not using the dynamic code download feature that JINI provides. A downside of that is, the client also has to be bundled with the JINI-specific libraries at runtime. If you ask me thats not too bad actually.</p>
+<h3>&nbsp;Setting up the Maven dependencies</h3>
+<p>Both the Client and the Server should have the following JINI-libraries dependency:</p>
+<pre lang="xml">
+<dependency>
+ <groupId>net.jini</groupId>
+ <artifactId>jsk-platform</artifactId>
+ <version>2.2.2</version>
+ </dependency>
+ <dependency>
+ <groupId>net.jini</groupId>
+ <artifactId>jsk-lib</artifactId>
+ <version>2.2.2</version>
+ </dependency>
+ <dependency>
+ <groupId>org.apache.river</groupId>
+ <artifactId>reggie</artifactId>
+ <version>2.2.2</version>
+ </dependency>
+</pre>
+<h3>&nbsp;Creating the Remote interfaces</h3>
+<p>We will have the following two interfaces which we will expose as services:</p>
+<pre lang="java">public interface BankAccountService extends Remote {
+&nbsp;&nbsp;&nbsp; long createBankAccount(String userName) throws RemoteException;
+}
+</pre>
+<pre lang="java">public interface UserService extends Remote {
+&nbsp;&nbsp;&nbsp; List<string> getCurrentUsers() throws RemoteException;
+}
+</pre>
+<p>Note that these extend the <em>java.rmi.Remote</em> interface and also, each method throws the<em> java.rmi.RemoteException</em> exception. These two interfaces will be shared between the Server and the Client.</p>
+<h3>The Server</h3>
+<pre lang="java">public class SimpleNonSecureRmiServer {
+&nbsp;&nbsp;&nbsp; private final DiscoveryManagement discoveryManager;
+&nbsp;&nbsp;&nbsp; private final LeaseRenewalManager leaseRenewalManager;
+&nbsp;&nbsp;&nbsp; public SimpleNonSecureRmiServer() throws Exception {
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; discoveryManager = new LookupLocatorDiscovery(
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; new LookupLocator[] { new LookupLocator("jini://localhost:4160") });
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; leaseRenewalManager = new LeaseRenewalManager();
+&nbsp;&nbsp;&nbsp; }
+&nbsp;&nbsp;&nbsp; private void exportAndJoinServices() throws Exception {
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; exportAndJoinService(new UserServiceImpl(), discoveryManager, leaseRenewalManager,
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; UserService.class.getSimpleName());
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; exportAndJoinService(new BankAccountServiceImpl(), discoveryManager, leaseRenewalManager,
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; BankAccountService.class.getSimpleName());
+&nbsp;&nbsp;&nbsp; }
+&nbsp;&nbsp;&nbsp; private void exportAndJoinService(Remote service, DiscoveryManagement discoveryManager,
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; LeaseRenewalManager leaseRenewalManager, String serviceName) throws Exception {
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // the exporter can export only 1 remote service
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // this is VERY important: prevents the class from getting GC-ed
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Exporter exporter = getExporter();
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Remote exportedService = exporter.export(service);
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; JoinManager joinManager = new JoinManager(exportedService, new Entry[] { new Name(serviceName) },
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; (ServiceID) null, discoveryManager, leaseRenewalManager);
+&nbsp;&nbsp;&nbsp; }
+&nbsp;&nbsp;&nbsp; private Exporter getExporter() {
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; return new JrmpExporter();
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // return new BasicJeriExporter(TcpServerEndpoint.getInstance(0), new
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; // BasicILFactory());
+&nbsp;&nbsp;&nbsp; }
+&nbsp;&nbsp;&nbsp; public static void main(String[] args) throws Exception {
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; SimpleNonSecureRmiServer server = new SimpleNonSecureRmiServer();
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; server.exportAndJoinServices();
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; System.out.println("Hello server is ready");
+&nbsp;&nbsp;&nbsp; }
+}
+</pre>
+<h3>The Client</h3>
+<pre lang="java">public class SimpleNonSecureRmiClient {
+	/**
+	 * Needs to be run with the following JVM args:<br/>
+	 * <ul>
+	 * 	<li>-Djava.security.policy=/full-path/RmiClient/src/main/resources/policy.all</li>
+	 * 	<li>-Djava.rmi.server.RMIClassLoaderSpi=net.jini.loader.pref.PreferredClassProvider</li>
+	 * </ul>
+	 */
+&nbsp;&nbsp;&nbsp; public static void main(String[] args) throws Exception {
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; System.setSecurityManager(new RMISecurityManager());
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; LookupLocator lookup = new LookupLocator("jini://localhost:4160");
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ServiceRegistrar registrar = lookup.getRegistrar();
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; UserService userService = (UserService) registrar.lookup(new ServiceTemplate(null,
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; new Class[] { UserService.class }, new Entry[] { new Name(UserService.class.getSimpleName()) }));
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; System.out.println("Getting current users from remote: " + userService.getCurrentUsers());
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; BankAccountService bankAccountService = (BankAccountService) registrar.lookup(new ServiceTemplate(null,
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; new Class[] { BankAccountService.class }, new Entry[] { new Name(BankAccountService.class
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; .getSimpleName()) }));
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; System.out.println("Creating bank account from remote, id: " + bankAccountService.createBankAccount("aaa"));
+&nbsp;&nbsp;&nbsp; }
+}
+</pre>
+<h3>The Reggie</h3>
+<p>The reggie should be configured properly, and this must go hand-in-hand with the server. For example, they should use the same protocol, in this case, JRMP. If it uses JERI, then both the server and the reggie should use JERI.<br />
+This is the start config file for reggie [start-reggie.conf].</p>
+<pre lang="java">import com.sun.jini.config.ConfigUtil;
+import com.sun.jini.start.NonActivatableServiceDescriptor;
+import com.sun.jini.start.ServiceDescriptor;
+com.sun.jini.start {
+&nbsp;&nbsp;&nbsp; private static codebase = "";
+&nbsp;&nbsp;&nbsp; private static policy = "";
+&nbsp;&nbsp;&nbsp; private static classpath = "lib${/}reggie.jar";
+&nbsp;&nbsp;&nbsp; private static config = "config${/}jrmp-reggie.config";
+&nbsp;&nbsp;&nbsp; static serviceDescriptors = new ServiceDescriptor[] {
+&nbsp;&nbsp;&nbsp; new NonActivatableServiceDescriptor(
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; codebase, policy, classpath,
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; "com.sun.jini.reggie.TransientRegistrarImpl",
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; new String[] { config })
+&nbsp;&nbsp;&nbsp; };
+}</pre>
+<p>After that, we need the following file for specifying the protocol as well [jrmp-reggie.conf]:</p>
+<pre lang="java">import net.jini.jrmp.JrmpExporter;
+com.sun.jini.reggie {
+&nbsp;&nbsp;&nbsp; serverExporter = new JrmpExporter();
+}</pre>
+<p>Refer to the JINI documentation for the configuration details.</p>
+<h3>Putting it all together</h3>
+<p>To see this in action we need to first start the reggie service. Unpack the<a href="http://palashray.com/resources/java/demo/jini/start-reggie.zip "> start-reggie.zip</a>. From the command prompt, cd into it and:</p>
+<blockquote><p>java -Djava.ext.dirs=lib -jar start.jar config/start-reggie.config</p></blockquote>
+<p>Then, start the server using the main method.<br />
+For running the client, you need to create a policy file [called <em>policy.all</em>] containing the following:</p>
+<blockquote><p>grant {<br />
+permission java.security.AllPermission;<br />
+};</p></blockquote>
+<p>When running the client, give the following JVM arguments:</p>
+<blockquote><p>-Djava.security.policy=/resources/path-to/policy.all</p>
+<div dir="ltr">-Djava.rmi.server.<wbr />RMIClassLoaderSpi=net.jini.<wbr />loader.pref.<wbr />PreferredClassProvider</div>
+</blockquote>
+<div dir="ltr"></div>
+<div dir="ltr">You should see the out from the remote server.</div>
+<h3>&nbsp;Resources</h3>
+<p>The code can be found in GitHub, under the <em>code/jini/unsecure/plain</em>:<br />
+<a href="https://github.com/paawak/blog.git" target="_blank">https://github.com/paawak/blog.git </a><br />
+&nbsp;</p>

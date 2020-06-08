@@ -1,0 +1,222 @@
+---
+layout: post
+status: publish
+published: true
+title: CountDownLatch example
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 453
+wordpress_url: http://palashray.com/?p=453
+date: '2014-01-21 03:02:14 +0530'
+date_gmt: '2014-01-21 03:02:14 +0530'
+categories:
+- thread
+tags:
+- applet
+- java
+- thread
+comments: []
+---
+<p>[caption id="attachment_454" align="aligncenter" width="300"]<a href="http://palashray.com/resources/java/demo/countdownlatch/basic_countdownlatch.html" target="_blank"><img class="size-medium wp-image-454" src="http://palashray.com/wp-content/uploads/2014/01/CountDownDemo-300x188.png" alt="Click here to see the Applet in action." width="300" height="188" /></a> Click here to see the Applet in action.[/caption]<br />
+As shown above, the 4 progress bars start one after another after the start button is clicked.<br />
+The following code is for the JPanel with the 4 progress bars:</p>
+<pre lang="java">@SuppressWarnings("serial")
+public class ProgressPanel extends JPanel {
+    private CountDownLatch startTrigger;
+    private CountDownLatch endTrigger;
+    private JProgressBar bar1;
+    private JSpinner spinner1;
+    private JProgressBar bar2;
+    private JSpinner spinner2;
+    private JProgressBar bar3;
+    private JSpinner spinner3;
+    private JProgressBar bar4;
+    private JSpinner spinner4;
+    private JProgressBar overallBar;
+    private JButton startButton;
+    public ProgressPanel() {
+	initPanel();
+    }
+    private void initPanel() {
+	setLayout(new GridBagLayout());
+	GridBagConstraints gridBagConstraints;
+	// 1st row
+	JLabel progressBarLabel = new JLabel("Progress Bars");
+	gridBagConstraints = new GridBagConstraints();
+	gridBagConstraints.gridx = 0;
+	gridBagConstraints.gridy = 0;
+	gridBagConstraints.gridwidth = 2;
+	add(progressBarLabel, gridBagConstraints);
+	JLabel runTimeLabel = new JLabel("Run For Steps");
+	gridBagConstraints = new GridBagConstraints();
+	gridBagConstraints.gridx = 2;
+	gridBagConstraints.gridy = 0;
+	add(runTimeLabel, gridBagConstraints);
+	// 2nd row
+	bar1 = new JProgressBar(0, 100);
+	spinner1 = createJSpinner();
+	createProgressBarRow(bar1, spinner1, "One: ", 1);
+	// 3rd row
+	bar2 = new JProgressBar(0, 100);
+	spinner2 = createJSpinner();
+	createProgressBarRow(bar2, spinner2, "Two: ", 2);
+	// 4th row
+	bar3 = new JProgressBar(0, 100);
+	spinner3 = createJSpinner();
+	createProgressBarRow(bar3, spinner3, "Three: ", 3);
+	// 5th row
+	bar4 = new JProgressBar(0, 100);
+	spinner4 = createJSpinner();
+	createProgressBarRow(bar4, spinner4, "Four: ", 4);
+	// 6th row
+	JLabel overallBarLabel = new JLabel("Overall Progress: ");
+	gridBagConstraints = new GridBagConstraints();
+	gridBagConstraints.gridx = 0;
+	gridBagConstraints.gridy = 5;
+	add(overallBarLabel, gridBagConstraints);
+	overallBar = new JProgressBar(0, 100);
+	overallBar.setStringPainted(true);
+	gridBagConstraints = new GridBagConstraints();
+	gridBagConstraints.gridx = 1;
+	gridBagConstraints.gridy = 5;
+	gridBagConstraints.gridwidth = 2;
+	gridBagConstraints.anchor = GridBagConstraints.WEST;
+	gridBagConstraints.fill = GridBagConstraints.HORIZONTAL;
+	gridBagConstraints.insets = new Insets(0, 0, 0, 20);
+	add(overallBar, gridBagConstraints);
+	// 7th row
+	startButton = new JButton("Start");
+	gridBagConstraints = new GridBagConstraints();
+	gridBagConstraints.gridx = 0;
+	gridBagConstraints.gridy = 6;
+	gridBagConstraints.gridwidth = 3;
+	gridBagConstraints.insets = new Insets(0, 20, 0, 20);
+	add(startButton, gridBagConstraints);
+	startButton.addActionListener(new ActionListener() {
+	    @Override
+	    public void actionPerformed(ActionEvent e) {
+		enableWidgets(false);
+		bar1.setValue(0);
+		bar2.setValue(0);
+		bar3.setValue(0);
+		bar4.setValue(0);
+		overallBar.setValue(0);
+		startTrigger = new CountDownLatch(1);
+		endTrigger = new CountDownLatch(1);
+		CountDownLatch latch1 = new CountDownLatch(1);
+		CountDownLatch latch2 = new CountDownLatch(1);
+		CountDownLatch latch3 = new CountDownLatch(1);
+		new Thread(new ProgressUpdater(startTrigger, latch1, bar1, (int) spinner1.getValue(), overallBar, 25)).start();
+		new Thread(new ProgressUpdater(latch1, latch2, bar2, (int) spinner2.getValue(), overallBar, 50)).start();
+		new Thread(new ProgressUpdater(latch2, latch3, bar3, (int) spinner1.getValue(), overallBar, 75)).start();
+		new Thread(new ProgressUpdater(latch3, endTrigger, bar4, (int) spinner1.getValue(), overallBar, 100)).start();
+		new Thread(new Runnable() {
+		    @Override
+		    public void run() {
+			try {
+			    endTrigger.await();
+			} catch (InterruptedException e) {
+			    e.printStackTrace();
+			} finally {
+			    enableWidgets(true);
+			}
+		    }
+		}).start();
+		startTrigger.countDown();
+	    }
+	});
+    }
+    private void createProgressBarRow(JProgressBar bar, JSpinner spinner, String progressBarText, int gridy) {
+	GridBagConstraints gridBagConstraints;
+	JLabel barLabel = new JLabel(progressBarText);
+	gridBagConstraints = new GridBagConstraints();
+	gridBagConstraints.gridx = 0;
+	gridBagConstraints.gridy = gridy;
+	gridBagConstraints.anchor = GridBagConstraints.WEST;
+	add(barLabel, gridBagConstraints);
+	bar.setStringPainted(true);
+	gridBagConstraints = new GridBagConstraints();
+	gridBagConstraints.gridx = 1;
+	gridBagConstraints.gridy = gridy;
+	gridBagConstraints.anchor = GridBagConstraints.CENTER;
+	gridBagConstraints.fill = GridBagConstraints.HORIZONTAL;
+	add(bar, gridBagConstraints);
+	gridBagConstraints = new GridBagConstraints();
+	gridBagConstraints.gridx = 2;
+	gridBagConstraints.gridy = gridy;
+	add(spinner, gridBagConstraints);
+    }
+    private JSpinner createJSpinner() {
+	JSpinner spinner = new JSpinner(new SpinnerNumberModel(10, 5, 200, 5));
+	return spinner;
+    }
+    private void enableWidgets(boolean enable) {
+	spinner1.setEnabled(enable);
+	spinner2.setEnabled(enable);
+	spinner3.setEnabled(enable);
+	spinner4.setEnabled(enable);
+	startButton.setEnabled(enable);
+    }
+}</pre>
+<p>This is the Thread using the CountDownLatches to coordinate between each other:</p>
+<pre lang="java">public class ProgressUpdater implements Runnable {
+    private final CountDownLatch start;
+    private final CountDownLatch end;
+    private final JProgressBar bar;
+    private final int totalSteps;
+    private final JProgressBar overallBar;
+    private final int overallValue;
+    public ProgressUpdater(CountDownLatch start, CountDownLatch end, JProgressBar bar, int totalStepsForBar, JProgressBar overallBar, int overallValue) {
+	this.start = start;
+	this.end = end;
+	this.bar = bar;
+	this.totalSteps = totalStepsForBar;
+	this.overallBar = overallBar;
+	this.overallValue = overallValue;
+    }
+    @Override
+    public void run() {
+	try {
+	    start.await();
+	    int minValue = bar.getMinimum();
+	    int maxValue = bar.getMaximum();
+	    for (int i = 1; i < = totalSteps; i++) {
+		int currentValue = i * (maxValue - minValue) / totalSteps;
+		bar.setValue(currentValue);
+		Thread.sleep(1000);
+	    }
+	} catch (InterruptedException e) {
+	    e.printStackTrace();
+	} finally {
+	    overallBar.setValue(overallValue);
+	    end.countDown();
+	}
+    }
+}</pre>
+<p>Finally, this is the Applet code:</p>
+<pre lang="java">@SuppressWarnings("serial")
+public class CountDownLatchApplet extends JApplet {
+    @Override
+    public void init() {
+	try {
+	    SwingUtilities.invokeAndWait(new Runnable() {
+		@Override
+		public void run() {
+		    getContentPane().setLayout(new BorderLayout());
+		    getContentPane().add(new ProgressPanel(), BorderLayout.CENTER);
+		}
+	    });
+	} catch (InvocationTargetException | InterruptedException e) {
+	    // TODO Auto-generated catch block
+	    e.printStackTrace();
+	}
+    }
+}
+</pre>
+<p>The sources can be found here: <a href="https://github.com/paawak/blog/tree/master/code/Demo">https://github.com/paawak/blog/tree/master/code/Demo </a><br />
+&nbsp;</p>

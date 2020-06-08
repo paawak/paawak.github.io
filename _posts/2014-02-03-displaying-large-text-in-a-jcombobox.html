@@ -1,0 +1,204 @@
+---
+layout: post
+status: publish
+published: true
+title: Displaying large text in a JComboBox
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 499
+wordpress_url: http://palashray.com/?p=499
+date: '2014-02-03 15:20:14 +0530'
+date_gmt: '2014-02-03 15:20:14 +0530'
+categories:
+- swing
+tags:
+- applet
+- java
+- swing
+comments: []
+---
+<h1>Problem Statement</h1>
+<p><script src="https://www.java.com/js/deployJava.js" type="text/javascript"></script>I have a list of texts, some of which are large, and I need to display them in a JComboBox. The trouble is, the JComboBox displays all the items in a single line. Consider that the following items need to be displayed:</p>
+<ol>
+<li>JNLP is supposed to be the latest and greatest in the Java Applet world post 1.6 release! Personally, I was never a great fan of Applets. I have always felt that Applets are a pain in the wrong place. Inherently difficult and cumbersome to use and deploy. But some of these concerns have been addressed</li>
+<li>This is really tiny</li>
+<li>As shown above, the 4 progress bars start one after another after the start button is clicked. The following code is for the JPanel with the 4 progress bars: @SuppressWarnings("serial") public class ProgressPanel extends JPanel {&nbsp;&nbsp; private CountDownLatch startTrigger; private CountDownLatch endTrigger;&nbsp;&nbsp; private JProgressBar bar1; private JSpinner spinner1;&nbsp;&nbsp; private JProgressBar bar2; private</li>
+</ol>
+<p>&nbsp;<br />
+&nbsp;<br />
+I am having the following code that displays a JComboBox in a JFrame:</p>
+<pre class="lang:java decode:true">package com.swayam.demo.combo;
+import java.awt.BorderLayout;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.lang.reflect.InvocationTargetException;
+import java.util.Arrays;
+import java.util.List;
+import javax.swing.JComboBox;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.SwingUtilities;
+@SuppressWarnings("serial")
+public class LargeTextComboFrameWithCustomRenderer1 extends JFrame {
+    private static final List LARGE_COMBO_BOX_ITEMS = Arrays
+        .asList("JNLP is supposed to be the latest and greatest in the Java Applet world post 1.6 release! Personally, I was never a great fan of Applets. I have always felt that Applets are a pain in the wrong place. Inherently difficult and cumbersome to use and deploy. But some of these concerns have been addressed",
+            "This is really tiny",
+            "As shown above, the 4 progress bars start one after another after the start button is clicked. The following code is for the JPanel with the 4 progress bars: @SuppressWarnings("serial") public class ProgressPanel extends JPanel {   private CountDownLatch startTrigger; private CountDownLatch endTrigger;   private JProgressBar bar1; private JSpinner spinner1;   private JProgressBar bar2; private");
+    public LargeTextComboFrameWithCustomRenderer1() {
+    init();
+    }
+    private void init() {
+    getContentPane().setLayout(new BorderLayout());
+    JLabel title = new JLabel("Large Text Combo Demo: Custom ComboBox Renderer 1, With Max and Preferred Size Hints", JLabel.CENTER);
+    getContentPane().add(title, BorderLayout.NORTH);
+    JPanel mainPanel = new JPanel();
+    mainPanel.setLayout(new FlowLayout());
+    JLabel comboLabel = new JLabel("Large Combo: ", JLabel.LEFT);
+    mainPanel.add(comboLabel);
+    mainPanel.add(getLargeComboBox());
+    getContentPane().add(mainPanel, BorderLayout.CENTER);
+    setSize(new Dimension(600, 500));
+    setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+    }
+    private JComboBox getLargeComboBox() {
+    JComboBox largeComboBox = new JComboBox<>();
+    for (String item : LARGE_COMBO_BOX_ITEMS) {
+        largeComboBox.addItem(item);
+    }
+    largeComboBox.setRenderer(new LargeComboBoxRenderer1(200));
+    largeComboBox.setPreferredSize(new Dimension(200, 30));
+    largeComboBox.setMaximumSize(new Dimension(200, 30));
+    return largeComboBox;
+    }
+    public static void main(String[] args) {
+    try {
+        SwingUtilities.invokeAndWait(new Runnable() {
+        @Override
+        public void run() {
+            LargeTextComboFrameWithCustomRenderer1 frame = new LargeTextComboFrameWithCustomRenderer1();
+            frame.setVisible(true);
+        }
+        });
+    } catch (InvocationTargetException | InterruptedException e) {
+        e.printStackTrace();
+    }
+    }
+}</pre>
+<p>It looks like this:<br />
+[caption id="attachment_506" align="aligncenter" width="300"]<a href="http://palashray.com/wp-content/uploads/2014/02/LargeTextComboFrameWithDefaultRenderer1.png"><img class="size-medium wp-image-506" src="http://palashray.com/wp-content/uploads/2014/02/LargeTextComboFrameWithDefaultRenderer1-300x95.png" alt="Large Text Combo Demo: Default ComboBox Renderer" width="300" height="95" /></a> Large Text Combo Demo: Default ComboBox Renderer[/caption]<br />
+You can see it in action here:&nbsp;&nbsp;<script type="text/javascript">// <![CDATA[<br />
+var url = "http://palashray.com/resources/java/demo/large_combo_box/large_combo_box_demo_1.jnlp";deployJava.createWebStartLaunchButton(url, '1.7.0');<br />
+// ]]></script><br />
+Note that the JComboBox stretches depending on the width of the largest text as rendered on a single line.</p>
+<h1>Limiting the width of the JComboBox</h1>
+<p>We can do that by setting the PrefrerredSize and the MaximumSize of the JComboBox:</p>
+<pre class="lang:java decode:true">    private JComboBox getLargeComboBox() {
+	JComboBox largeComboBox = new JComboBox<>();
+	for (String item : LARGE_COMBO_BOX_ITEMS) {
+	    largeComboBox.addItem(item);
+	}
+	largeComboBox.setPreferredSize(new Dimension(200, 30));
+	largeComboBox.setMaximumSize(new Dimension(200, 30));
+	return largeComboBox;
+    }
+</pre>
+<p>It looks like this:<br />
+[caption id="attachment_511" align="aligncenter" width="300"]<a href="http://palashray.com/wp-content/uploads/2014/02/LargeTextComboFrameWithDefaultRenderer2.png"><img class="size-medium wp-image-511" src="http://palashray.com/wp-content/uploads/2014/02/LargeTextComboFrameWithDefaultRenderer2-300x250.png" alt="Large Text Combo Demo: Default ComboBox Renderer, With Max and Preferred Size Hints" width="300" height="250" /></a> Large Text Combo Demo: Default ComboBox Renderer, With Max and Preferred Size Hints[/caption]<br />
+You can see it in action here:&nbsp;&nbsp;<script type="text/javascript">// <![CDATA[<br />
+var url = "http://palashray.com/resources/java/demo/large_combo_box/large_combo_box_demo_2.jnlp";deployJava.createWebStartLaunchButton(url, '1.7.0');<br />
+// ]]></script><br />
+The problem with this approach is that the text is truncated.</p>
+<h1>Custom Renderer which wraps large test inside HTML</h1>
+<p>We will have a custom renderer for JComboBox which wraps this text into nice HTML so that it is displayed in multi-lines.</p>
+<pre class="lang:java decode:true">    private JComboBox getLargeComboBox() {
+	JComboBox largeComboBox = new JComboBox<>();
+	for (String item : LARGE_COMBO_BOX_ITEMS) {
+	    largeComboBox.addItem(item);
+	}
+	largeComboBox.setRenderer(new LargeComboBoxRenderer1(200));
+	largeComboBox.setPreferredSize(new Dimension(200, 30));
+	largeComboBox.setMaximumSize(new Dimension(200, 30));
+	return largeComboBox;
+    }
+</pre>
+<p>This is how the renderer looks like:</p>
+<pre class="lang:java decode:true">@SuppressWarnings("serial")
+public class LargeComboBoxRenderer1 extends JLabel implements ListCellRenderer<String> {
+    private final int wordWrapWidth;
+    public LargeComboBoxRenderer1(int wordWrapWidth) {
+	this.wordWrapWidth = wordWrapWidth;
+    }
+    @Override
+    public Component getListCellRendererComponent(JList<? extends String> list, String value, int index, boolean isSelected, boolean cellHasFocus) {
+	if (isSelected) {
+	    setBackground(list.getSelectionBackground());
+	    setForeground(list.getSelectionForeground());
+	} else {
+	    setBackground(list.getBackground());
+	    setForeground(list.getForeground());
+	}
+	setFont(list.getFont());
+	setOpaque(true);
+	setText(getHtmlWrappedText(value));
+	return this;
+    }
+    private String getHtmlWrappedText(String text) {
+	StringBuilder sb = new StringBuilder(300);
+	sb.append("<html>");
+	sb.append("<p style="");
+	sb.append(getParagraphStyle());
+	sb.append("">");
+	sb.append(text);
+	sb.append("</p>");
+	sb.append("</html>");
+	return sb.toString();
+    }
+    private String getParagraphStyle() {
+	StringBuilder sb = new StringBuilder(100);
+	sb.append("word-wrap: break-word;");
+	sb.append("width: ");
+	sb.append(wordWrapWidth);
+	sb.append("px;");
+	return sb.toString();
+    }
+}</pre>
+<p>And this is how it looks like now:<br />
+[caption id="attachment_514" align="aligncenter" width="300"]<a href="http://palashray.com/wp-content/uploads/2014/02/LargeTextComboFrameWithCustomRenderer1.png"><img class="size-medium wp-image-514" src="http://palashray.com/wp-content/uploads/2014/02/LargeTextComboFrameWithCustomRenderer1-300x250.png" alt="Large Text Combo Demo: Custom ComboBox Renderer 1, With Max and Preferred Size Hints" width="300" height="250" /></a> Large Text Combo Demo: Custom ComboBox Renderer 1, With Max and Preferred Size Hints[/caption]<br />
+You can see it in action here:&nbsp;&nbsp;<script type="text/javascript">// <![CDATA[<br />
+var url = "http://palashray.com/resources/java/demo/large_combo_box/large_combo_box_demo_3.jnlp";deployJava.createWebStartLaunchButton(url, '1.7.0');<br />
+// ]]></script><br />
+As shown above, this does not look good when the pop-up is not there in the JComboBox.</p>
+<h1>Finishing touches</h1>
+<p>We need to make a distinction between when there is a pop-out and when there is not. This is done by the <em>int index</em> parameter in the <em>ListCellRenderer::getListCellRendererComponent(JList<? extends String> list, String value, int index, boolean isSelected, boolean cellHasFocus)</em> method. When <em>index == -1</em>, it indicates that the item is not popped out. This is the code:</p>
+<pre class="lang:java decode:true ">    @Override
+    public Component getListCellRendererComponent(JList<? extends String> list, String value, int index, boolean isSelected, boolean cellHasFocus) {
+	if (isSelected) {
+	    setBackground(list.getSelectionBackground());
+	    setForeground(list.getSelectionForeground());
+	} else {
+	    setBackground(list.getBackground());
+	    setForeground(list.getForeground());
+	}
+	setFont(list.getFont());
+	setOpaque(true);
+	// index is -1 when there is no pop-up
+	if (index == -1) {
+	    setText(value);
+	} else {
+	    setText(getHtmlWrappedText(value));
+	}
+	return this;
+    }
+</pre>
+<p>This is how it looks now:<br />
+[caption id="attachment_515" align="aligncenter" width="300"]<a href="http://palashray.com/wp-content/uploads/2014/02/LargeTextComboFrameWithCustomRenderer2.png"><img class="size-medium wp-image-515" src="http://palashray.com/wp-content/uploads/2014/02/LargeTextComboFrameWithCustomRenderer2-300x250.png" alt="Large Text Combo Demo: Custom ComboBox Renderer 2, With Max and Preferred Size Hints" width="300" height="250" /></a> Large Text Combo Demo: Custom ComboBox Renderer 2, With Max and Preferred Size Hints[/caption]<br />
+You can see it in action here:&nbsp;&nbsp;<script type="text/javascript">// <![CDATA[<br />
+var url = "http://palashray.com/resources/java/demo/large_combo_box/large_combo_box_demo_4.jnlp";deployJava.createWebStartLaunchButton(url, '1.7.0');<br />
+// ]]></script><br />
+The sources can be found <a href="https://github.com/paawak/blog/tree/master/code/Demo">https://github.com/paawak/blog/tree/master/code/Demo</a>.</p>

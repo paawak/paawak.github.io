@@ -1,0 +1,393 @@
+---
+layout: post
+status: publish
+published: true
+title: Making iText work with Indic scripts
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 417
+wordpress_url: http://puretech.paawak.com/?p=417
+date: '2012-12-22 23:52:57 +0530'
+date_gmt: '2012-12-22 18:22:57 +0530'
+categories:
+- java
+tags:
+- Indic Script
+- iText
+- java
+- pdf
+comments:
+- id: 31
+  author: Khaja
+  author_email: khajam@gmail.com
+  author_url: ''
+  date: '2012-12-24 01:11:06 +0530'
+  date_gmt: '2012-12-23 19:41:06 +0530'
+  content: Nicely done Palash!
+- id: 32
+  author: Dipak C.
+  author_email: itsdipak@gmail.com
+  author_url: ''
+  date: '2014-07-16 05:35:42 +0530'
+  date_gmt: '2014-07-16 05:35:42 +0530'
+  content: No link is working.. please help
+- id: 33
+  author: Dipak C.
+  author_email: itsdipak@gmail.com
+  author_url: ''
+  date: '2014-07-16 05:42:33 +0530'
+  date_gmt: '2014-07-16 05:42:33 +0530'
+  content: I need solution for hindi.. If anything please help
+- id: 34
+  author: Palash
+  author_email: paawak@gmail.com
+  author_url: http://palashray.com
+  date: '2014-07-16 23:49:55 +0530'
+  date_gmt: '2014-07-16 23:49:55 +0530'
+  content: Thanks for pointing this out :). I have fixed it now.
+- id: 35
+  author: Palash
+  author_email: paawak@gmail.com
+  author_url: http://palashray.com
+  date: '2014-07-16 23:52:24 +0530'
+  date_gmt: '2014-07-16 23:52:24 +0530'
+  content: My fix should work with Hindi as well. But as far as I remember, the iText
+    team has commented the code out. So you need to dig into their code by comparing
+    it with my patch, and see if that works. Again, as far as I remember, my fix should
+    work on Hindi as well.
+- id: 36
+  author: Dima
+  author_email: templates2008@gmail.com
+  author_url: ''
+  date: '2014-08-07 18:21:05 +0530'
+  date_gmt: '2014-08-07 18:21:05 +0530'
+  content: "Looks like a great solution but did not work for me . PDF not generated
+    getting\nThe lookup type 6 is not yet handled\nThe lookup type 6 is not yet handled\nThe
+    lookup type 6 is not yet handled\nThe lookup type 6 is not yet handled\nThe lookup
+    type 6 is not yet handled\nException in thread \"main\" java.lang.IllegalArgumentException:
+    No corresponding character or simple glyphs found for GlyphID=0\n\tat com.itextpdf.text.pdf.GlyphSubstitutionTableReader.getTextFromGlyph(GlyphSubstitutionTableReader.java:77)\n\tat
+    com.itextpdf.text.pdf.GlyphSubstitutionTableReader.getGlyphSubstitutionMap(GlyphSubstitutionTableReader.java:54)\n\tat
+    com.itextpdf.text.pdf.TrueTypeFont.process(TrueTypeFont.java:687)\n\tat com.itextpdf.text.pdf.TrueTypeFontUnicode.(TrueTypeFontUnicode.java:87)\n\tat
+    com.itextpdf.text.pdf.BaseFont.createFont(BaseFont.java:697)\n\tat com.itextpdf.text.pdf.BaseFont.createFont(BaseFont.java:615)\n\tat
+    com.itextpdf.text.pdf.BaseFont.createFont(BaseFont.java:450)"
+- id: 37
+  author: palash
+  author_email: paawak@gmail.com
+  author_url: ''
+  date: '2014-08-08 00:34:59 +0530'
+  date_gmt: '2014-08-08 00:34:59 +0530'
+  content: |-
+    Dima, I would suggest that you take the latest code from iText's svn repository. Actually, as I mentioned in my post, this is still a half baked solution. I only made it work for a subset of fonts out there. If you try this with Lohit or SolaimanLipi fonts for Bengali, this should work.
+    Thanks,
+    Palash.
+- id: 38
+  author: Gourav
+  author_email: gourav.chowdhury@cmcltd.com
+  author_url: ''
+  date: '2015-03-02 15:29:25 +0530'
+  date_gmt: '2015-03-02 15:29:25 +0530'
+  content: |-
+    its working for me too but how to fix e kar i kar problem in iText?
+    will it work in ubuntu environment also?
+- id: 39
+  author: Ruchi
+  author_email: ruchi.khokhani@gmail.com
+  author_url: ''
+  date: '2015-04-28 09:32:08 +0530'
+  date_gmt: '2015-04-28 09:32:08 +0530'
+  content: Palash, what changes shall be required, if i want to use for Tamil??
+- id: 40
+  author: palash
+  author_email: paawak@gmail.com
+  author_url: ''
+  date: '2015-04-29 00:35:12 +0530'
+  date_gmt: '2015-04-29 00:35:12 +0530'
+  content: You would need to parse the Tamil fonts and populate the necessary tables
+    like GSUB.
+- id: 41
+  author: Ruchi
+  author_email: ruchi.khokhani@gmail.com
+  author_url: ''
+  date: '2015-05-02 09:09:28 +0530'
+  date_gmt: '2015-05-02 09:09:28 +0530'
+  content: |-
+    hey thanks Palash. But it seems e-kar, i-kar is not working.
+    You have also coded for the same.
+    can it be used readily to resolve them?
+- id: 42
+  author: Ruchika
+  author_email: ruchikapokharna11@gmail.com
+  author_url: ''
+  date: '2016-01-11 01:30:38 +0530'
+  date_gmt: '2016-01-11 06:30:38 +0530'
+  content: Palash I am working on malayalam font this solution is working for me.
+    but it is not working for Consonent Diacritics.How to fix that? Do you have any
+    idea regarding this?
+- id: 43
+  author: Ruchika
+  author_email: ruchikapokharna11@gmail.com
+  author_url: ''
+  date: '2016-01-11 01:32:57 +0530'
+  date_gmt: '2016-01-11 06:32:57 +0530'
+  content: |-
+    Palash I am working on malayalam font and this solution is working for me. But it is not working for Consonent Diacritics.
+    Have you worked on Consonent Diacritics?
+- id: 44
+  author: Palash
+  author_email: paawak@gmail.com
+  author_url: http://palashray.com
+  date: '2016-01-11 08:20:30 +0530'
+  date_gmt: '2016-01-11 13:20:30 +0530'
+  content: |-
+    Ruchika,
+    I am not familiar with Malayalam, but for Hindi and Bangali, I had made it to work with Diacritics. But it is a bit tricky. I dont remember exactly how I did it, but look at *IndicGlyphRepositioner* and *BanglaGlyphRepositioner*. I believe these were written to handle the same issue. I think these are in the *com.itextpdf.text.pdf.languages* package.
+    Thanks,
+    Palash.
+- id: 45
+  author: Ruchika
+  author_email: ruchikapokharna11@gmail.com
+  author_url: ''
+  date: '2016-04-19 02:04:21 +0530'
+  date_gmt: '2016-04-19 06:04:21 +0530'
+  content: "I m working on Hindi Mangal fonts. when I am generating PDF I am getting
+    an error-\ncom.itextpdf.text.pdf.fonts.otf.FontReadingException: No corresponding
+    character or simple glyphs found for GlyphID=549\n\tat com.itextpdf.text.pdf.fonts.otf.GlyphSubstitutionTableReader.getTextFromGlyph(GlyphSubstitutionTableReader.java:117)\n\tat
+    com.itextpdf.text.pdf.fonts.otf.GlyphSubstitutionTableReader.getGlyphSubstitutionMap(GlyphSubstitutionTableReader.java:95)\n\tat
+    com.itextpdf.text.pdf.TrueTypeFontUnicode.readGsubTable(TrueTypeFontUnicode.java:537)\n\tat
+    com.itextpdf.text.pdf.TrueTypeFontUnicode.process(TrueTypeFontUnicode.java:99)\n\tat
+    com.itextpdf.text.pdf.TrueTypeFontUnicode.(TrueTypeFontUnicode.java:73)\n\tat
+    com.itextpdf.text.pdf.BaseFont.createFont(BaseFont.java:704)\n\tat com.itextpdf.text.pdf.BaseFont.createFont(BaseFont.java:622)\n\tat
+    com.itextpdf.text.pdf.BaseFont.createFont(BaseFont.java:565)\nDo I need to change
+    the fonts?"
+- id: 46
+  author: Palash
+  author_email: paawak@gmail.com
+  author_url: http://palashray.com
+  date: '2016-04-19 12:56:42 +0530'
+  date_gmt: '2016-04-19 16:56:42 +0530'
+  content: |-
+    This exception usually means that the given font, Mangal, has some bugs and is not standard compliant. I would suggest that you use
+    Lohit Devanagari Font:
+    http://www.fontsc.com/font/lohit-devanagari
+    Thanks,
+    Palash.
+- id: 47
+  author: Md. Forhad Hossain
+  author_email: forhadcse08@gmail.com
+  author_url: ''
+  date: '2016-11-28 01:49:39 +0530'
+  date_gmt: '2016-11-28 06:49:39 +0530'
+  content: It's like your code is  working but in few cases like 'প্র', 'ন্ত্র' etc
+    it's not working.. Can you please tell me which source file i have to modify for
+    solving this issue.
+- id: 48
+  author: Palash
+  author_email: paawak@gmail.com
+  author_url: ''
+  date: '2016-11-28 13:41:49 +0530'
+  date_gmt: '2016-11-28 18:41:49 +0530'
+  content: Not sure if you are using the latest code. That should work.
+- id: 49
+  author: Md. Forhad Hossain
+  author_email: forhadcse08@gmail.com
+  author_url: ''
+  date: '2016-11-29 01:01:01 +0530'
+  date_gmt: '2016-11-29 06:01:01 +0530'
+  content: i am using the jar of the given link :(
+- id: 50
+  author: Palash
+  author_email: paawak@gmail.com
+  author_url: ''
+  date: '2016-11-29 01:46:14 +0530'
+  date_gmt: '2016-11-29 06:46:14 +0530'
+  content: That will not work. See the section called "How do I make it work?". You
+    need the latest code, then uncomment a line, build it with Maven, and then, it
+    should work. I will update my blog to say so much.
+- id: 51
+  author: Md. Forhad Hossain
+  author_email: forhadcse08@gmail.com
+  author_url: ''
+  date: '2016-11-29 10:57:48 +0530'
+  date_gmt: '2016-11-29 15:57:48 +0530'
+  content: "i downloaded code from following link\nhttp://sourceforge.net/p/itext/code/HEAD/tree/trunk/itext/\nThen
+    uncomment readGsubTable() in process function.\nvoid process(byte ttfAfm[], boolean
+    preload) throws DocumentException, IOException {\n    \tsuper.process(ttfAfm,
+    preload);\n    \treadGsubTable();\n    }\nBut it's not working. I am getting following
+    output :\nপর আমি কোন পথে ক্ষীরের লক্ষ্মী ষন্ড পুতুল রুপো গঙ্গা ঋষি\nfrom below
+    input :\nপ্র আমি কোন পথে ক্ষীরের লক্ষ্মী ষন্ড পুতুল রুপো গঙ্গা ঋষি\nI am able
+    to fix  positioning of i-kar, e-kar and o-kar ."
+- id: 52
+  author: Hrishikesh banik
+  author_email: banikhrishi@gmail.com
+  author_url: ''
+  date: '2016-12-03 03:02:08 +0530'
+  date_gmt: '2016-12-03 08:02:08 +0530'
+  content: |-
+    Hi Palash Can you provide sample code for Bangle in itext7.
+    you have already done great job.
+- id: 53
+  author: Litany
+  author_email: forhadcse08@gmail.com
+  author_url: ''
+  date: '2017-01-09 02:22:37 +0530'
+  date_gmt: '2017-01-09 07:22:37 +0530'
+  content: |-
+    hi palash,
+    i am facing problem with showing character with ref...
+    Input : র্ম
+    output : র্ ম  (without space)
+    Can you please tell me why this is happening ?
+- id: 54
+  author: Palash
+  author_email: paawak@gmail.com
+  author_url: ''
+  date: '2017-01-16 10:09:22 +0530'
+  date_gmt: '2017-01-16 15:09:22 +0530'
+  content: I am sorry as I am really out of touch. I am not following up with iText
+    anymore.
+- id: 55
+  author: Palash
+  author_email: paawak@gmail.com
+  author_url: ''
+  date: '2017-01-16 10:10:37 +0530'
+  date_gmt: '2017-01-16 15:10:37 +0530'
+  content: Not sure. Please feel free to debug. It might be the issue with your font.
+    Try to use Solaiman Lipi or Lohit.
+- id: 56
+  author: Maruf
+  author_email: maruf571@gmail.com
+  author_url: ''
+  date: '2017-07-18 13:48:50 +0530'
+  date_gmt: '2017-07-18 17:48:50 +0530'
+  content: It 2017 and the problem is not fixed yet. There is no perfect lib in java
+    to generate PDF without any problem.
+- id: 57
+  author: Jayaram
+  author_email: jayaram.astraquark@gmail.com
+  author_url: ''
+  date: '2020-04-22 08:07:52 +0530'
+  date_gmt: '2020-04-22 12:07:52 +0530'
+  content: |-
+    hi palash,
+       I am facing this type of error in Tamil language.
+    Input : காவல் துறை மேலாளர்
+    Output : காவல் தறை   மலாளர
+    I use the right  Noto Sans Tamil Regular.ttf. I'm looking for the right font and I can't find it yet.
+- id: 58
+  author: Palash
+  author_email: paawak@gmail.com
+  author_url: ''
+  date: '2020-04-23 05:09:19 +0530'
+  date_gmt: '2020-04-23 09:09:19 +0530'
+  content: Not sure about that. Please debug and see what the issue is.
+---
+<h2>Why iText does not work properly for Indic Scripts?</h2>
+<p>There are a number of threads floating around as to why iText does not render Indian languages properly. The reason is because iText does not handle Ligature Substitution.</p>
+<h2>What is Ligature Substitution?</h2>
+<p>In Indian languages like Bangla and Hindi, two or more characters sometimes merge to form a single Glyph.</p>
+<h4>Bangla Example:</h4>
+<p><span style="font-family: Lohit Devanagari;">ক </span>+ <span style="font-family: Lohit Devanagari;">্ </span>+ <span style="font-family: Lohit Devanagari;">ষ </span>= <span style="font-family: Lohit Devanagari;">ক্ষ</span><br />
+<span style="font-family: Lohit Devanagari;">ক </span>+ <span style="font-family: Lohit Devanagari;">্ </span>+ <span style="font-family: Lohit Devanagari;">ষ </span>+ <span style="font-family: Lohit Devanagari;">্ </span>+ <span style="font-family: Lohit Devanagari;">ম </span>= <span style="font-family: Lohit Devanagari;">ক্ষ্ম</span><br />
+<span style="font-family: Lohit Devanagari;">ল </span>+ <span style="font-family: Lohit Devanagari;">্ </span>+ <span style="font-family: Lohit Devanagari;">ল </span>= <span style="font-family: Lohit Devanagari;">ল্ল</span></p>
+<h4>Hindi example</h4>
+<p><span style="font-family: Lohit Devanagari;">क </span>+ <span style="font-family: Lohit Devanagari;">् </span>+ <span style="font-family: Lohit Devanagari;">ष </span>= <span style="font-family: Lohit Devanagari;">क्ष</span><br />
+<span style="font-family: Lohit Devanagari;">क </span>+ <span style="font-family: Lohit Devanagari;">् </span>+ <span style="font-family: Lohit Devanagari;">ष </span>+ <span style="font-family: Lohit Devanagari;">् </span>= <span style="font-family: Lohit Devanagari;">क्ष्म</span><br />
+<span style="font-family: Lohit Devanagari;">ल </span>+ <span style="font-family: Lohit Devanagari;">् </span>+ <span style="font-family: Lohit Devanagari;">ल </span>= <span style="font-family: Lohit Devanagari;">ल्ल</span><br />
+This essentially means that whenever we get these composite characters, we need to replace them with a single glyph.<br />
+In case you see only boxes above, click <a href="http://palashray.com/wp-content/uploads/2012/12/GlyphSubstitution.jpeg" target="_blank" rel="noopener">here</a>. Upgrade your browser to one that can handle Unicode.</p>
+<h2>Where do we get the information about which Glyphs are to be substituted?</h2>
+<p>This information is available in the OpenTypeFont file(note that OpenTypeFonts can have the extension .ttf, which is also used for TrueTypeFonts). The <a href="http://www.microsoft.com/typography/otspec/otff.htm">OpenTypeFont</a> has a table called the GlyphSubstitutionTable (GSUB). Its pretty cryptic and obfuscated, and you have to basically go on a wild goose chase. But after that, you can get a list of the Glyphs that should be replaced by a single Glyph. These specifications can be found here: <a href="http://www.microsoft.com/typography/otspec/gsub.htm">http://www.microsoft.com/typography/otspec/gsub.htm</a></p>
+<h2>Inner workings of iText</h2>
+<p>The best part about iText is its Open Source.<br />
+This is the Github location: <a href="https://github.com/itext/itextpdf">https://github.com/itext/itextpdf</a><br />
+At the heart of converting text to PDF is the <a href="https://github.com/itext/itextpdf/blob/develop/itext/src/main/java/com/itextpdf/text/pdf/TrueTypeFont.java"><span style="color: #333399;"><span style="font-family: Monospace;"><span style="font-size: small;">TrueTypeFont</span></span></span></a> class. This parses the actual FontFile and reads various information like the Character to Glyph mappings (cmap), the Glyph metrics, etc. Then, we have the <span style="color: #333399;"><span style="font-family: Monospace;"><span style="font-size: small;">convertToBytes()</span></span></span> method in the <a href="https://github.com/itext/itextpdf/blob/develop/itext/src/main/java/com/itextpdf/text/pdf/FontDetails.java"><span style="color: #333399;"><span style="font-family: Monospace;"><span style="font-size: small;">FontDetails</span></span></span></a> class, which actually converts each character into the Glyph code and writes it to PDF.</p>
+<h2>Integration of the GlyphSubstitutionTable data with iText</h2>
+<ol>
+<li>The <a href="https://github.com/itext/itextpdf/blob/develop/itext/src/main/java/com/itextpdf/text/pdf/fonts/otf/GlyphSubstitutionTableReader.java"><span style="color: #333399;"><span style="font-family: Monospace;"><span style="font-size: small;">GlyphSubstitutionTableReader</span></span></span></a> class parses the FontFile and gleans the Glyph substitution information, and returns a <span style="color: #333399;"><span style="font-family: Monospace;"><span style="font-size: small;">Map<String, Glyph></span></span></span>, where the key is the String of composite characters and value is the Glyph object.</li>
+<li>Then, in the <span style="color: #333399;"><span style="font-family: Monospace;"><span style="font-size: small;">FontDetails::convertToBytes()</span></span></span> method, tokenise the input String based on the composite characters.</li>
+<li>Replace the composite characters by their respective Glyphs.</li>
+<li>For characters that do not need substitution, proceed normally and replace them with their corresponding Glyph.</li>
+</ol>
+<h2>Test Harness</h2>
+<p>The following is the test harness for testing out my fix.</p>
+<pre class="lang:java decode:true">import java.io.FileOutputStream;
+import java.io.IOException;
+import org.junit.Test;
+import com.itextpdf.text.Document;
+import com.itextpdf.text.DocumentException;
+import com.itextpdf.text.Font;
+import com.itextpdf.text.Paragraph;
+import com.itextpdf.text.Phrase;
+import com.itextpdf.text.pdf.BaseFont;
+import com.itextpdf.text.pdf.PdfWriter;
+/**
+ * Inspired from http://itextpdf.com/examples/iia.php?id=158
+ *
+ * @author paawak
+ */
+public class BanglaPdfGenerationTest {
+    /**
+     * The unicode of this is given below:
+     *
+     * u0986u09aeu09bf u0995u09cbu09a8 u09aau09a5u09c7
+     * u0995u09cdu09b7u09c0u09b0u09c7u09b0 u09b7u09a8u09cdu09a1
+     * u09aau09c1u09a4u09c1u09b2 u09b0u09c1u09aau09cb
+     * u0997u0999u09cdu0997u09be u098bu09b7u09bf
+     *
+     */
+    private static final String BANGLA_TEXT = "আমি কোন পথে ক্ষীরের লক্ষ্মী ষন্ড পুতুল রুপো গঙ্গা ঋষি";
+    public void createPdf(String filename) throws DocumentException, IOException {
+        // step 1
+        Document document = new Document();
+        // step 2
+        PdfWriter.getInstance(document, new FileOutputStream(filename));
+        // step 3
+        document.open();
+        // step 4
+        Paragraph paragraph = new Paragraph();
+        paragraph.add(new Phrase(BANGLA_TEXT, new Font(BaseFont.createFont("/usr/share/fonts/lohit-bengali/Lohit-Bengali.ttf", BaseFont.IDENTITY_H, true))));
+        document.add(paragraph);
+        // step 5
+        document.close();
+    }
+    @Test
+    public void testGenerate() throws IOException, DocumentException {
+        String fileName = System.getProperty("user.home") + "/a.pdf";
+        new BanglaPdfGenerationTest().createPdf(fileName);
+    }
+}</pre>
+<h2>Before Fix</h2>
+<p><a href="http://palashray.com/resources/java/iTextIndic/BeforeFix.pdf" target="_blank" rel="attachment noopener wp-att-419"><img class="aligncenter size-full wp-image-419" src="http://palashray.com/wp-content/uploads/2012/12/BeforeFix.png" alt="BeforeFix" width="665" height="94" /></a><br />
+&nbsp;</p>
+<h2>After Fix</h2>
+<p><a href="http://palashray.com/resources/java/iTextIndic/AfterFix.pdf" target="_blank" rel="attachment noopener wp-att-418"><img class="aligncenter size-full wp-image-418" src="http://palashray.com/wp-content/uploads/2012/12/AfterFix.png" alt="AfterFix" width="561" height="52" /></a><br />
+&nbsp;</p>
+<h2>Source</h2>
+<p>The changes are done on <strong>itextpdf-5.4.0-SNAPSHOT</strong>, revision <strong>5638</strong>. Please note that the below jar <span style="color: #ff0000;">will not work</span> in most cases,&nbsp; as it is only half-baked.</p>
+<ul>
+<li>The sources are <a href="http://palashray.com/resources/java/iTextIndic/itext-source.zip" target="_blank" rel="noopener">here </a></li>
+<li>The patch is <a href="http://palashray.com/resources/java/iTextIndic/itextpdf_palash_22-12-2012.txt" target="_blank" rel="noopener">here</a></li>
+<li>The jar file is <a href="http://palashray.com/resources/java/iTextIndic/itextpdf-5.4.0-SNAPSHOT.jar" target="_blank" rel="noopener">here</a></li>
+</ul>
+<h2>Next Steps</h2>
+<p>If you notice the i-kar, e-kar and o-kar are still not displaying in their proper position. I am convinced that this is because we need to read the Positioning data from the <a href="http://www.microsoft.com/typography/otspec/GPOS.htm" target="_blank" rel="noopener">GPOS - The Glyph Positioning Table</a>. That is my next task. Stay tuned!</p>
+<h2>Update: Why is the latest iText still not working?</h2>
+<p>My code is commented out in the latest iText, as it seems to be interfering with some of their core functionalities.</p>
+<h2>How do I make it work?</h2>
+<p>Download the iText source from Github:<br />
+<a href="https://github.com/itext/itextpdf">https://github.com/itext/itextpdf</a><br />
+After getting the source, just uncomment the below line in the <span class="ico-l"><a href="https://github.com/itext/itextpdf/blob/develop/itext/src/main/java/com/itextpdf/text/pdf/TrueTypeFontUnicode.java"><strong>TrueTypeFontUnicode.java</strong></a>:</span></p>
+<pre class="lang:java decode:true ">@Override
+void process(byte ttfAfm[], boolean preload) throws DocumentException, IOException {
+super.process(ttfAfm, preload);
+//the below line must be uncommented for Indic scripts to work
+readGsubTable();
+}</pre>
+<p>&nbsp;<br />
+Building it with maven should be pretty straight forward. Cheers!<br />
+&nbsp;</p>

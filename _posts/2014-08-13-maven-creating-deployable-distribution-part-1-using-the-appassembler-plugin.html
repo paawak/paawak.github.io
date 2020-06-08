@@ -1,0 +1,143 @@
+---
+layout: post
+status: publish
+published: true
+title: 'Maven: Creating deployable distribution: Part 1: Using the Appassembler plugin'
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 625
+wordpress_url: http://palashray.com/?p=625
+date: '2014-08-13 04:02:39 +0530'
+date_gmt: '2014-08-13 04:02:39 +0530'
+categories:
+- maven
+tags:
+- build
+- maven
+comments:
+- id: 70
+  author: Benny
+  author_email: b.bottema@projectnibble.org
+  author_url: http://www.bennybottema.com
+  date: '2018-12-22 13:05:27 +0530'
+  date_gmt: '2018-12-22 18:05:27 +0530'
+  content: This was a huge help. Still relevant. The versions here used are a little
+    outdated, but still work fine it seems. Not sure what will break if I switch to
+    the newest versions.
+---
+<h2>Context</h2>
+<p>Often, we have a standalone Java application, from which we want to create a deployable distribution having all the dependencies in one place and with a shell script or bat file which can be then invoked from the command prompt. The <a href="http://mojo.codehaus.org/appassembler/" target="_blank">Mojo Appassembler</a> plugin helps do just that. We will be using the&nbsp;<a href="https://github.com/paawak/blog/tree/master/code/maven-distribution-example">maven-distribution-example</a> as reference. This project would need the project&nbsp;<a href="https://github.com/paawak/blog/tree/master/code/jini/unsecure/plain/rmi-service-api">rmi-service-api</a> to compile.</p>
+<h2>Using the Appassembler plugin</h2>
+<p>We have created a profile called&nbsp;<em>all-in-one</em> which can be called to create our distribution:</p>
+<pre class="lang:xhtml decode:true">		<profile>
+			<id>all-in-one</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.codehaus.mojo</groupId>
+						<artifactId>appassembler-maven-plugin</artifactId>
+						<version>1.8.1</version>
+						<configuration>
+							<repositoryLayout>flat</repositoryLayout>
+							<repositoryName>lib</repositoryName>
+							<showConsoleWindow>true</showConsoleWindow>
+							<platforms>
+								<platform>unix</platform>
+								<platform>windows</platform>
+							</platforms>
+							<programs>
+								<program>
+									<mainClass>com.swayam.demo.rmi.server.core.SpringNonSecureRmiServer</mainClass>
+									<id>run_rmi_server</id>
+								</program>
+							</programs>
+						</configuration>
+						<executions>
+							<execution>
+								<phase>package</phase>
+								<goals>
+									<goal>assemble</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+					<!-- tars all the jars and bat files to create a single file -->
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-assembly-plugin</artifactId>
+						<version>2.4</version>
+						<configuration>
+							<descriptor>src/assembly/all-in-one-assembly-descriptor.xml</descriptor>
+						</configuration>
+						<executions>
+							<execution>
+								<id>assemble-all</id>
+								<phase>package</phase>
+								<goals>
+									<goal>single</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+				</plugins>
+			</build>
+		</profile></pre>
+<p>This profile contains 2 parts:</p>
+<ol>
+<li>The appassembler plugin
+<ol>
+<li>Collects all the maven dependencies in the target/appassembler/lib</li>
+<li>Generates the&nbsp; .sh and .bat scripts to invoke the main class which is provided</li>
+</ol>
+</li>
+<li>The maven assembly plugin which creates a tar archive from
+<ol>
+<li>The appassembler directory</li>
+<li>readme.txt file</li>
+</ol>
+</li>
+</ol>
+<p>The maven assembly plugin works using the below assembly descriptor (all-in-one-assembly-descriptor.xml):</p>
+<pre class="lang:xhtml decode:true"><assembly
+	xmlns="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.2"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/plugins/maven-assembly-plugin/assembly/1.1.2 http://maven.apache.org/xsd/assembly-1.1.2.xsd">
+	<id>all-in-one</id>
+	<formats>
+		<format>tar</format>
+	</formats>
+	<includeBaseDirectory>false</includeBaseDirectory>
+	<fileSets>
+		<fileSet>
+			<directory>${project.basedir}/src/static</directory>
+			<outputDirectory>/</outputDirectory>
+			<includes>
+				<include>readme.txt</include>
+			</includes>
+		</fileSet>
+		<fileSet>
+			<directory>${project.build.directory}/appassembler</directory>
+			<outputDirectory>/</outputDirectory>
+			<includes>
+				<include>**/**</include>
+			</includes>
+		</fileSet>
+	</fileSets>
+</assembly></pre>
+<p>Next, we invoke Maven by:</p>
+<blockquote><p>mvn clean package -P all-in-one</p></blockquote>
+<p>Go to the tar file is generated in the <em>target</em> directory. You will find two directories inside the tar:</p>
+<ol>
+<li><strong>bin</strong>: This contains the shell script and the bat file</li>
+<li><strong>lib</strong>: This has all the dependant jars</li>
+</ol>
+<p>You can now run the Rmi Server by invoking the shell or bat scripts from the prompt.<br />
+The sources can be found here: <a href="https://github.com/paawak/blog/tree/master/code/maven-ant-assembly-example">https://github.com/paawak/blog/tree/master/code/maven-ant-assembly-example</a><br />
+&nbsp;<br />
+&nbsp;<br />
+&nbsp;</p>

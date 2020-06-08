@@ -1,0 +1,128 @@
+---
+layout: post
+status: publish
+published: true
+title: Why Teneo won&#039;t work with Ehcache?
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 45
+wordpress_url: http://puretech.paawak.com/?p=45
+date: '2009-04-04 02:18:05 +0530'
+date_gmt: '2009-04-03 20:48:05 +0530'
+categories:
+- teneo
+tags:
+- java
+- teneo
+comments:
+- id: 6
+  author: Martin Taal
+  author_email: mtaal@elver.org
+  author_url: ''
+  date: '2009-04-05 14:33:15 +0530'
+  date_gmt: '2009-04-05 20:33:15 +0530'
+  content: |-
+    Hi Palash,
+    Another way to generate objects which are Serializable is to declare an interface EObjectSerializable which extends EObject and Serializable and then set this interface in the genmodel in the root extends interface (is available in the genmodel properties).
+    gr. Martin
+---
+<p>The first problem is that by default EMF classes are not Serializable. The very first stack trace that you will get in two parts will look something like:</p>
+<h3>Stack Trace I<span style="color: #ff0000;"><br />
+</span></h3>
+<p><span style="color: #ff0000;">java.lang.ClassCastException: xxx.impl.SomeEmfClassImpl<br />
+at org.hibernate.type.AbstractType.disassemble(AbstractType.java:78)<br />
+at org.hibernate.type.TypeFactory.disassemble(TypeFactory.java:474)<br />
+at org.hibernate.cache.entry.CacheEntry.<init>(CacheEntry.java:69)<br />
+at org.hibernate.engine.TwoPhaseLoad.initializeEntity(TwoPhaseLoad.java:164)<br />
+at org.hibernate.loader.Loader.initializeEntitiesAndCollections(Loader.java:877)<br />
+at org.hibernate.loader.Loader.doQuery(Loader.java:752)<br />
+at org.hibernate.loader.Loader.doQueryAndInitializeNonLazyCollections(Loader.java:259)<br />
+</span></p>
+<h3>Stack Trace II</h3>
+<p><span style="color: #ff0000;">**Serious** 04/04/09 12:08:15 PM&nbsp;&nbsp;&nbsp; org.hibernate.HibernateException: A collection with cascade="all-delete-orphan" was no longer referenced by the owning entity instance: Properties.trail<br />
+at org.hibernate.engine.Collections.processDereferencedCollection(Collections.java:119)<br />
+at org.hibernate.engine.Collections.processUnreachableCollection(Collections.java:62)<br />
+at org.hibernate.event.def.AbstractFlushingEventListener.flushCollections(AbstractFlushingEventListener.java:241)<br />
+at org.hibernate.event.def.AbstractFlushingEventListener.flushEverythingToExecutions(AbstractFlushingEventListener.java:100)<br />
+at org.hibernate.event.def.DefaultFlushEventListener.onFlush(DefaultFlushEventListener.java:49)<br />
+at org.hibernate.impl.SessionImpl.flush(SessionImpl.java:1027)<br />
+at org.hibernate.impl.SessionImpl.managedFlush(SessionImpl.java:365)<br />
+at org.hibernate.transaction.JDBCTransaction.commit(JDBCTransaction.java:137)</span><br />
+Stack Trace II is most confusing. If you trust Stack Trace II, it will lead you off on a false scent. You will think that there is a problem with the way EMF handles collections. You will constatntly rant and spit fire at them, thinking there is nothing to be done except selectively disabling caching for those queries.<br />
+But friends, here is the killer: Stack Trace II is caused by Stack Trace I. So let us explore that first. If you look at the very first line: ClassCastException. What has caused this? Let us see.<br />
+<span style="color: #ff0000;"> at org.hibernate.type.AbstractType.disassemble(AbstractType.java:78)</span><br />
+If you look at the source code <a href="http://kickjava.com/src/org/hibernate/type/AbstractType.java.htm" target="_blank">AbstractType</a>.disassemble() looks like:</p>
+<pre lang="java">	public Serializable disassemble(Object value, SessionImplementor session, Object owner)
+	throws HibernateException {
+		if (value==null) {
+			return null;
+		}
+		else {
+			return (Serializable) deepCopy( value, session.getEntityMode(), session.getFactory() );
+		}
+	}</pre>
+<p>So in line 78, the EMF model is casted into Serializable, and hence the cause of exception.</p>
+<h2>Solution</h2>
+<p>There is no other go, but to make the EMF models Serializable. How do we do that? We have to edit the default JET Templates so that all generated interfaces by EMF are Serializable. <a href="http://blog.eclipse-tips.com/2008/08/using-dynamic-templates-in-emf.html" target="_blank">Here</a> is an excellent article which will guide you. The template to edit is <em>templates/model/Class.javajet</em>.<br />
+
+{% raw %}
+<pre lang="java">
+  <%if (isImplementation) {%>
+  public<%if (genClass.isAbstract()) {%> abstract<%}%> class <%=genClass.getClassName()%><%=genClass.getTypeParameters().trim()%><%=genClass.getClassExtends()%><%=genClass.getClassImplements()%>
+  <%} else {%>
+  public interface <%=genClass.getInterfaceName()%><%=genClass.getTypeParameters().trim()%><%=genClass.getInterfaceExtends()%>
+  <%}%>, java.io.Serializable
+  {
+</pre>
+{% endraw %}
+
+<br />
+Now re-generate the model code from genmodel and try again.<br />
+With this, some operations, of course will work. But if you are using Teneo lesser than 1.0.4 (1.0.3 is the latest release as of now ), for most of the operations you will get a trace which looks something like:</p>
+<h3>Stack Trace III</h3>
+<p><span style="color: #ff0000;">04/04/09 01:05:47.164 PM&nbsp; 131221 WARN&nbsp; org.apache.struts.chain.commands.AbstractExceptionHandler - Unhandled exception<br />
+java.lang.NullPointerException<br />
+at xxx.MyInterceptor.getEntityName(MyInterceptor.java:41)<br />
+at org.hibernate.impl.SessionImpl.guessEntityName(SessionImpl.java:1792)<br />
+at org.hibernate.impl.SessionImpl.bestGuessEntityName(SessionImpl.java:1759)<br />
+at org.eclipse.emf.teneo.hibernate.mapping.econtainer.EContainerUserType.assemble(EContainerUserType.java:300)<br />
+at org.hibernate.type.TypeFactory.assemble(TypeFactory.java:443)<br />
+at org.hibernate.cache.entry.CacheEntry.assemble(CacheEntry.java:119)<br />
+</span><br />
+Before you get lost in the trace, lets take a quick look at what actually happens. Hibernate encounters a cache-entry and tries to make sense of it and construct the actual object queried. In the process, it is delegated to the TypeFactory.assemble(), which determines the type of the entry and delegates it to an implementation of <a href="http://kickjava.com/src/org/hibernate/type/Type.java.htm" target="_blank">org.hibernate.type.Type</a>. So far so good. So what goes wrong?<br />
+<span style="color: #ff0000;"> at org.eclipse.emf.teneo.hibernate.mapping.econtainer.EContainerUserType.assemble(EContainerUserType.java:300)</span><br />
+If you have a look at the source code and then its super class, <a href="http://kickjava.com/src/org/hibernate/type/AbstractType.java.htm" target="_blank">org.hibernate.type.AbstractType</a>, at the <em>assemble()</em> method, you will notice that one significant difference is, in AbstractType.assemble(), if the cached parameter is null, it returns a null, assuming that Hibernate will fetch it from the Database instead.</p>
+<pre lang="java">	public Object assemble(Serializable cached, SessionImplementor session, Object owner)
+	throws HibernateException {
+		if ( cached==null ) {
+			return null;
+		}
+		else {
+			return deepCopy( cached, session.getEntityMode(), session.getFactory() );
+		}
+	}</pre>
+<p>While in EContainerUserType.assemble(), there is no null check that is what causes the big trace. Grab the Teneo sources, apply the fix, re-compile and bingo!</p>
+<pre lang="java">	public Object assemble(Serializable cached, SessionImplementor session, Object owner) throws HibernateException {
+	    // palash: fix for ALL our teneo/ehcache woes!!
+        // if cache is null, just return null, without guessing; hibernate is smart enough to fetch it from the db
+        if (cached == null) {
+            return null;
+        }
+		// already correct
+		if (!(cached instanceof ContainerPointer)) {
+			final String entityName = session.bestGuessEntityName(cached);
+			final Serializable idObject = getID(entityName, cached, session);
+			return session.internalLoad(entityName, idObject, false, false);
+		} else {
+			final ContainerPointer cp = (ContainerPointer) cached;
+			return cp.getObject(session);
+		}
+	}</pre>
+<p>This fix will be available in Teneo 1.0.4 release. I have raised a <a href="https://bugs.eclipse.org/bugs/show_bug.cgi?id=270740" target="_blank">bug</a> on this and Martin has been kind enough to check it in.<br />
+For this article, I am using EMF 2.3.0_v_200706262000, Teneo 0.8_v_200708101732,&nbsp; Hibernate 3.3.1.GA and Ehcache 1.5.0. You will find the Teneo sources in the public CVS repository here<br />
+:pserver:anonymous@dev.eclipse.org:/cvsroot/modeling.</p>

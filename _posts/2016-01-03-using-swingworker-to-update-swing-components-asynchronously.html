@@ -1,0 +1,103 @@
+---
+layout: post
+status: publish
+published: true
+title: Using SwingWorker to update Swing Components asynchronously
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 811
+wordpress_url: http://palashray.com/?p=811
+date: '2016-01-03 21:01:33 +0530'
+date_gmt: '2016-01-04 02:01:33 +0530'
+categories:
+- java
+- jini
+- swing
+- thread
+tags:
+- jini
+- rmi
+- swing
+- SwingWorker
+comments: []
+---
+<p>I have a JList, the contents of which are updated asynchronously by a different thread. The way I update the JList is by updating the model:</p>
+<pre class="lang:java decode:true ">	private final DefaultListModel<BankDetail> streamedDataModel;
+...
+        streamedDataModel.addElement(element);
+</pre>
+<p>The only problem is, if this is not done in the EventDispatchThread, the UI becomes unresponsive, and starts behaving weird.<br />
+The way to solve this to use the <a href="https://docs.oracle.com/javase/8/docs/api/javax/swing/SwingWorker.html" target="_blank">SwingWorker</a>.<br />
+I have a Jini server, which streams data to a Jini client, in this case, a Swing JFrame. I have a JList to which I publish the data as and when it becomes available.</p>
+<h2>Jini Service API</h2>
+<p>Its a simple streaming service:</p>
+<pre class="lang:java decode:true ">public interface BankDetailStreamingService extends Remote {
+    void streamAllBankDetails(RemoteDataListener<BankDetail> bankDetailRemoteListener) throws RemoteException;
+}</pre>
+<p>At its heart is the interface RemoteDataListener, on to which the server publishes data as it becomes available.</p>
+<pre class="lang:java decode:true ">public interface RemoteDataListener<T> extends Remote {
+    void newData(T data) throws RemoteException;
+    void endOfData() throws RemoteException;
+}</pre>
+<h2>Client Implementation</h2>
+<p>The key is to implement the interface RemoteDataListener along with the SwingWorker as shown below as an inner class in the JFrame:</p>
+<pre class="lang:java decode:true ">    class StreamingTask extends SwingWorker<Void, BankDetail> implements RemoteDataListener<BankDetail> {
+	private final DefaultListModel<BankDetail> streamedDataModel;
+	public StreamingTask(DefaultListModel<BankDetail> streamedDataModel) {
+	    this.streamedDataModel = streamedDataModel;
+	}
+	@Override
+	protected Void doInBackground() {
+	    try {
+		Exporter exporter = new BasicJeriExporter(TcpServerEndpoint.getInstance(0), new BasicILFactory());
+		@SuppressWarnings("unchecked")
+		RemoteDataListener<BankDetail> exportedRemoteDataListener = (RemoteDataListener<BankDetail>) exporter.export(this);
+		bankDetailStreamingService.streamAllBankDetails(exportedRemoteDataListener);
+	    } catch (RemoteException e) {
+		throw new RuntimeException(e);
+	    }
+	    return null;
+	}
+	@Override
+	protected void process(List<BankDetail> chunks) {
+	    for (BankDetail element : chunks) {
+		streamedDataModel.addElement(element);
+	    }
+	    // scroll to end
+	    listStreamedData.ensureIndexIsVisible(streamedDataModel.size() - 1);
+	}
+	@Override
+	public void newData(BankDetail data) throws RemoteException {
+	    publish(data);
+	}
+	@Override
+	public void endOfData() throws RemoteException {
+	}
+	@Override
+	protected void done() {
+	    prgStreamingData.setIndeterminate(false);
+	    JOptionPane.showMessageDialog(RmiStreamingDemoFrame.this, "All data streamed successfully", "End of data", JOptionPane.INFORMATION_MESSAGE);
+	    btnStartStreaming.setEnabled(true);
+	    setCursor(null);
+	}
+    }
+</pre>
+<p>We invoke the long running service in the <em>doInBackground()</em> method and add itself as a listener. When new data is received in the <em>newData()</em> method, we immediately call the <em>publish()</em> method, which delegates it to the <em>process()</em> method. The <em>process()</em> method is invoked within the eventDispatcherThread. This ensures that any updates made to the model of the JList is reflected on the UI. So, the code to update Swing components reside here. Also note that the <em>done()</em> method is called by the SwingWorker after the processing thread is finished.</p>
+<h2>Running the example</h2>
+<p>Run the <em>SpringNonSecureRmiServer</em> to start the Reggie and the Jini Server. After the Jini Server starts up, run the<span class="Apple-converted-space"><em> RmiStreamingDemoFrame</em>.<br />
+</span><br />
+<img class="aligncenter size-medium wp-image-812" src="http://palashray.com/wp-content/uploads/2016/01/rmi-data-streaming-1-296x300.png" alt="rmi-data-streaming-1" width="296" height="300" /><br />
+<img class="aligncenter size-medium wp-image-813" src="http://palashray.com/wp-content/uploads/2016/01/rmi-data-streaming-2-297x300.png" alt="rmi-data-streaming-2" width="297" height="300" /></p>
+<h2>Sources</h2>
+<p>The sources can be found here: <a href="https://github.com/paawak/blog/tree/master/code/jini/unsecure/streaming-with-jini">https://github.com/paawak/blog/tree/master/code/jini/unsecure/streaming-with-jini</a><br />
+There are 3 Maven projects under that:</p>
+<ol>
+<li>rm-api</li>
+<li>rmi-client</li>
+<li>rmi-server</li>
+</ol>

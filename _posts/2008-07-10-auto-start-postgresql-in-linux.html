@@ -1,0 +1,40 @@
+---
+layout: post
+status: publish
+published: true
+title: Auto-start PostgreSQL in Linux
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 17
+wordpress_url: http://technoblogs.paawak.com/?p=14
+date: '2008-07-10 11:37:10 +0530'
+date_gmt: '2008-07-10 06:07:10 +0530'
+categories:
+- database
+- linux
+tags:
+- linux
+comments: []
+---
+<p><span style="color: #ff0000;"><strong>This post is outdated. Please see this instead:</strong></span><br />
+<a href="http://palashray.com/fedora-getting-up-and-running-with-postgres-in-2-mins/">http://palashray.com/fedora-getting-up-and-running-with-postgres-in-2-mins/</a><br />
+I had faced lot of problems starting Postgres when my system boots-up. The challenge is that the postmaster daemon should be started by the under-privileged user "postgres" and NOT "root". This is what you must do:</p>
+<p class="entryContent">In the source distribution of postgres, there is a file called <span style="color: #000099;"><em>linux</em></span> in <span style="color: #000099;"><em>contrib/start-scripts/</em></span>. Open this file and follow the instructions.<br />
+I will enumerate them as commands. Please note that you have to run these as root.<br />
+<span style="color: #3333ff;">cp POSTGRES_SRC_DIST/contrib/start-scripts/linux /etc/rc.d/init.d/postgresql<br />
+ln -s /etc/rc.d/init.d/postgresql /etc/rc.d/rc0.d/K02postgresql<br />
+ln -s /etc/rc.d/init.d/postgresql /etc/rc.d/rc1.d/K02postgresql<br />
+ln -s /etc/rc.d/init.d/postgresql /etc/rc.d/rc2.d/K02postgresql<br />
+ln -s /etc/rc.d/init.d/postgresql /etc/rc.d/rc3.d/S98postgresql<br />
+ln -s /etc/rc.d/init.d/postgresql /etc/rc.d/rc4.d/S98postgresql<br />
+ln -s /etc/rc.d/init.d/postgresql /etc/rc.d/rc5.d/S98postgresql</span><br />
+You might also want to read these:</p>
+<ul>
+<li>http://www.postgresql.org/docs/7.4/static/postmaster-start.html</li>
+<li>http://www.postgresql.org/docs/8.3/static/server-start.html</li>
+</ul>

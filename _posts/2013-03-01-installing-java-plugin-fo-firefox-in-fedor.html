@@ -1,0 +1,33 @@
+---
+layout: post
+status: publish
+published: true
+title: Installing java plugin for Firefox in Fedora
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 444
+wordpress_url: http://puretech.paawak.com/?p=444
+date: '2013-03-01 22:39:50 +0530'
+date_gmt: '2013-03-01 17:09:50 +0530'
+categories:
+- linux
+tags:
+- firefox
+- java
+- linux
+comments: []
+---
+<p>Java plugin should be enabled by default in Firefox when Fedora is installed. This is the way to check: open Firefox and type <strong>about:plugins</strong> in the address bar. Java plugin should be listed here. If not, its very easy to install it.</p>
+<blockquote><p>cd /usr/lib/mozilla/plugins<br />
+ls -l</p></blockquote>
+<p>Make sure that you do not have any&nbsp;libjavaplugin.so symlinks. If you do, you have to first unlink it:</p>
+<blockquote><p>unlink libjavaplugin.so</p></blockquote>
+<p>I am assuming you have a jre (either 1.6 or 1.7) already installed. You need to find the <strong>libnpjp2.so</strong>, and assuming its in /usr/lib/jdk1.6.0_14/jre/lib/i386/libnpjp2.so,</p>
+<blockquote><p>ln -s /usr/lib/jdk1.6.0_14/jre/lib/i386/libnpjp2.so</p></blockquote>
+<p>Restart Firefox and you should be all set.<br />
+&nbsp;</p>

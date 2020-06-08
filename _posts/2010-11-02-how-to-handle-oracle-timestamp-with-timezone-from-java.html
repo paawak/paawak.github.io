@@ -1,0 +1,490 @@
+---
+layout: post
+status: publish
+published: true
+title: "[How To] Handle Oracle TimeStamp with TimeZone from Java"
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 395
+wordpress_url: http://puretech.paawak.com/?p=395
+date: '2010-11-02 02:39:46 +0530'
+date_gmt: '2010-11-01 21:09:46 +0530'
+categories:
+- database
+- hibernate
+tags:
+- hibernate
+- java
+- oracle
+comments:
+- id: 27
+  author: Java SQL Timestamp time zone problems | PHP Developer Resource
+  author_email: ''
+  author_url: http://www.dkphp.com/questions-2/timestamp/java-sql-timestamp-time-zone-problems.html
+  date: '2012-05-23 23:04:36 +0530'
+  date_gmt: '2012-05-23 17:34:36 +0530'
+  content: "[...] this : http://puretech.paawak.com/2010/11/02/how-to-handle-oracle-timestamp-with-timezone-from-java/
+    \          Tagged: JavaquestionsSQLtimestamptimezone       /* * * CONFIGURATION
+    VARIABLES: EDIT [...]"
+- id: 28
+  author: Girija
+  author_email: paminigirija@yahoo.co.in
+  author_url: ''
+  date: '2016-02-17 04:11:41 +0530'
+  date_gmt: '2016-02-17 09:11:41 +0530'
+  content: "Hi there,\nMany thanks to give a detailed analysis on the oracle Timestamp
+    with Timezone in a very easy way.\nI have very similar type of implementation
+    is there but, I am getting a null pointer when fetching a column with value \"09-NOV-05
+    12.00.00.000000 PM AMERICA/TORONTO\", I analyzed and found it behaves the same
+    for some EST Timezones. Please let me know if you have any input on this.. and
+    how  can i resolve it.\njava.lang.NullPointerException\n\tat oracle.jdbc.driver.TimestamptzAccessor.getString(TimestamptzAccessor.java:167)\n\tat
+    oracle.jdbc.driver.T4CTimestamptzAccessor.getString(T4CTimestamptzAccessor.java:278)\n\tat
+    oracle.jdbc.driver.OracleResultSetImpl.getString(OracleResultSetImpl.java:1297)\n\tat
+    oracle.jdbc.driver.OracleResultSet.getString(OracleResultSet.java:494)\n\tat com.ibm.ws.rsadapter.jdbc.WSJdbcResultSet.getString(WSJdbcResultSet.java:2461)\n\tat
+    com.ibm.phsdsm.common.code.persistence.hibernate.PanoramaCalendar.nullSafeGet(PanoramaCalendar.java:162)\nThanks."
+- id: 29
+  author: Palash
+  author_email: paawak@gmail.com
+  author_url: http://palashray.com
+  date: '2016-02-17 08:08:01 +0530'
+  date_gmt: '2016-02-17 13:08:01 +0530'
+  content: Well, not sure. Try the latest jdbc driver. Not sure if you have tried
+    to have a custom datatype etc.?
+- id: 30
+  author: Ken
+  author_email: kurai_dai@hotmail.com
+  author_url: ''
+  date: '2016-12-01 23:28:28 +0530'
+  date_gmt: '2016-12-02 04:28:28 +0530'
+  content: |-
+    Seems using the latest oracle jdbc driver (ojdbc7-12.1.0.2), the issue still exists. Using the stmt.setTimestamp(column_index, timestamp, timeWithZone), jdbc connection still takes the timezone from client machine to update database.
+    And during the daylight saving period, the hour may be wrongly converted by one hour.
+---
+<h2>Oracle TimeStamp with TimeZone: A Critical Analysis</h2>
+<p>For storing the TimeZone information in TimeStamp, Oracle (10g) has two options:</p>
+<ol>
+<li><span style="color: #800000;">TIMESTAMP WITH TIME ZONE</span> data type:&nbsp; As the name indicates, this stores the TimeZone data along with the TimeStamp. The TimeZone can be either stored in the UTC format (eaxmple: <em>+05:30</em>) or the TimeZoneRegion format (example: <em>Asia/Calcutta</em> or <em>Indian Standard Time</em>).</li>
+<li><span style="color: #800000;">TIMESTAMP WITH LOCAL TIME ZONE</span> data type: This does not store the TimeZone information <em>per se</em>. While inserting data, it adjusts for the offset of the client's TimeZone and stores it according to the db server's local TimeZone, without the actual TimeZone information. Similarly, while querying, the TimeStamp will be offseted against the client's TimeZone, without returning any explicit TimeZone information. This data type is very confusing and is to be avoided at all costs.</li>
+</ol>
+<p>As far as JDBC is concerned, things are plain and simple when we talk about Statement. The trouble starts the moment we think about PreparedStatement. Both these data types map to the <em>java.sql.Timestamp</em> in JDBC. But <em>java.sql.Timestamp</em> does not have any TimeZone information. In this scenario, we should be using the <a href="http://download.oracle.com/javase/6/docs/api/java/sql/PreparedStatement.html#setTimestamp(int,%20java.sql.Timestamp,%20java.util.Calendar)" target="_blank">PreparedStatement.</a><a href="http://download.oracle.com/javase/6/docs/api/java/sql/PreparedStatement.html#setTimestamp(int,%20java.sql.Timestamp,%20java.util.Calendar)" target="_blank">setTimestamp(int parameterIndex, Timestamp x, Calendar cal)</a> to pass the TimeZone information to the db driver. There is another twist to this tale. The <span style="color: #800000;">TIMESTAMP WITH LOCAL TIME ZONE</span> data type needs to adjust the time against the client's TimeZone. When we open a Oracle client session, the TimeZone is already set. But that is not the case with JDBC Connection. The TimeZone info is not set by the driver, for reasons best known to themselves. So a simple <a href="http://download.oracle.com/javase/6/docs/api/java/sql/ResultSet.html#getTimestamp(int)" target="_blank">ResultSet.getTimestamp(int columnIndex)</a> will not work. Instead, we have to use the <a href="http://download.oracle.com/javase/6/docs/api/java/sql/ResultSet.html#getTimestamp(int,%20java.util.Calendar)" target="_blank">ResultSet.getTimestamp(int columnIndex, Calendar cal)</a> to pass the TimeZone to the db driver.</p>
+<h2>Simple JDBC example</h2>
+<p>Consider the following table having both types of TimeStamp with TimeZone:</p>
+<pre lang="sql">CREATE TABLE TIMESTAMP_DEMO (
+	ID                                                    NUMBER(6) PRIMARY KEY NOT NULL,
+	NAME                                             VARCHAR2(20) NOT NULL,
+	TIME_WITH_ZONE                     TIMESTAMP(9) WITH TIME ZONE NOT NULL,
+	TIME_WITH_ZONE_LOCAL      TIMESTAMP(9) WITH LOCAL TIME ZONE
+    ) ;</pre>
+<p>This is the SQL statement for inserting data:</p>
+<blockquote><p>INSERT INTO TIMESTAMP_DEMO (ID, NAME, TIME_WITH_ZONE, TIME_WITH_ZONE_LOCAL) VALUES (0, 'manualInsert', TO_TIMESTAMP_TZ('2010-09-26 11:30:00 Australia/Adelaide','YYYY-MM-DD HH24:MI:SS TZR'), TO_TIMESTAMP_TZ('2010-09-26 11:30:00 Australia/Adelaide','YYYY-MM-DD HH24:MI:SS TZR'));</p></blockquote>
+<p>We will try to insert data from plain JDBC and then read it back to ensure that the information persisted is correct.</p>
+<h3>INSERT Approach 1</h3>
+<p>Consider the following code snippet:</p>
+<pre lang="java">        PreparedStatement pStat = con
+                .prepareStatement("INSERT INTO TIMESTAMP_DEMO "
+                        + " (ID, NAME, TIME_WITH_ZONE, TIME_WITH_ZONE_LOCAL) "
+                        + " VALUES " + " (?, ?, ?, ?)");
+        pStat.setInt(1, 1);
+        pStat.setString(2, "insert_1");
+        String timeZoneId = "Australia/Adelaide";
+        TimeZone timeZone = TimeZone.getTimeZone(timeZoneId);
+        Calendar timeWithZone = Calendar.getInstance(timeZone);
+        timeWithZone.set(Calendar.HOUR_OF_DAY, 11);
+        timeWithZone.set(Calendar.MINUTE, 30);
+        timeWithZone.set(Calendar.SECOND, 0);
+        timeWithZone.set(Calendar.MILLISECOND, 0);
+        Timestamp ts = new Timestamp(timeWithZone.getTimeInMillis());
+        pStat.setTimestamp(3, ts, timeWithZone);
+        pStat.setTimestamp(4, ts, timeWithZone);
+        pStat.execute();
+        pStat.close();</pre>
+<p>Now run the following query from any Oracle SQL Client:</p>
+<blockquote><p>SELECT TO_CHAR(TIME_WITH_ZONE, 'YYYY-MM-DD HH24:MI:SS:FF TZR') AS TIME_WITH_ZONE FROM TIMESTAMP_DEMO;</p></blockquote>
+<p>You will find that the returned value is:</p>
+<blockquote><p>2010-11-02 11:30:00:000000000 +05:30</p></blockquote>
+<p>Note that the TimeZone info is wrongly stored. The only conclusion that we can have is that the JDBC driver is buggy. How do we get around this problem?</p>
+<h3>INSERT Approach 2</h3>
+<pre lang="java">        String timeZoneId = "Australia/Adelaide";
+        TimeZone timeZone = TimeZone.getTimeZone(timeZoneId);
+        Calendar timeWithZone = Calendar.getInstance(timeZone);
+        timeWithZone.set(Calendar.HOUR_OF_DAY, 11);
+        timeWithZone.set(Calendar.MINUTE, 30);
+        timeWithZone.set(Calendar.SECOND, 0);
+        timeWithZone.set(Calendar.MILLISECOND, 0);
+        String dateFormat = "yyyy-MM-dd HH:mm:ss:SSS";
+        DateFormat df = new SimpleDateFormat(dateFormat);
+        // this is very important
+        if (timeZone != null) {
+            df.setTimeZone(timeZone);
+        }
+        String dateTime = df.format(timeWithZone.getTime());
+        String tzId = timeWithZone.getTimeZone().getID();
+        dateTime += " " + tzId;
+        PreparedStatement pStat = con
+                .prepareStatement("INSERT INTO TIMESTAMP_DEMO "
+                        + " (ID, NAME, TIME_WITH_ZONE, TIME_WITH_ZONE_LOCAL) "
+                        + " VALUES "
+                        + " (?, ?, TO_TIMESTAMP_TZ(?, 'YYYY-MM-DD HH24:MI:SS:FF TZR'), ?)");
+        pStat.setInt(1, 2);
+        pStat.setString(2, "insert_2");
+        Timestamp ts = new Timestamp(timeWithZone.getTimeInMillis());
+        pStat.setString(3, dateTime);
+        pStat.setTimestamp(4, ts, timeWithZone);
+        pStat.execute();
+        pStat.close();</pre>
+<p>On running the select statement, the data got back is:</p>
+<blockquote><p>2010-11-02 11:30:00:000000000 AUSTRALIA/ADELAIDE</p></blockquote>
+<p>This is precisely the data which was inserted. The trcik here is to bypass the JDBC data and use Oracle function <em>TO_TIMESTAMP_TZ(timeString, format)</em>.</p>
+<h3>SELECT Approach 1</h3>
+<pre lang="java">        Statement stat = con.createStatement();
+        ResultSet res = stat
+                .executeQuery("SELECT * FROM TIMESTAMP_DEMO  ORDER BY ID");
+        while (res.next()) {
+            Timestamp timestamp = res.getTimestamp("TIME_WITH_ZONE");
+            Timestamp timestampLocal = null;
+            try {
+                timestampLocal = res.getTimestamp("TIME_WITH_ZONE_LOCAL");
+            } catch (SQLException e) {
+                e.printStackTrace();
+                break;
+            }
+            System.out.println("TIME=" + timestamp + ", TIME_LOCAL="
+                    + timestampLocal);
+        }
+        stat.close();
+        res.close();</pre>
+<p>On running the above, we get the following exception:</p>
+<blockquote><p><span style="color: #ff0000;">java.sql.SQLException: The database session time zone is not set<br />
+at oracle.jdbc.driver.SQLStateMapping.newSQLException(SQLStateMapping.java:70)<br />
+at oracle.jdbc.driver.DatabaseError.newSQLException(DatabaseError.java:110)<br />
+</span></p></blockquote>
+<p>This is got on the line</p>
+<blockquote><p>res.getTimestamp("TIME_WITH_ZONE_LOCAL");</p></blockquote>
+<p>as the TimeZone is not set in the JDBC Connection object.</p>
+<h3>SELECT Approach 2</h3>
+<pre lang="java">        Statement stat = con.createStatement();
+        ResultSet res = stat
+                .executeQuery("SELECT * FROM TIMESTAMP_DEMO  ORDER BY ID");
+        while (res.next()) {
+            Timestamp timestamp = res.getTimestamp("TIME_WITH_ZONE");
+            Timestamp timestampLocal = res.getTimestamp("TIME_WITH_ZONE_LOCAL",
+                    new GregorianCalendar(TimeZone.getDefault()));
+            System.out.println(res.getString("NAME") + ": "
+                    + res.getString("ID") + ", TIME="
+                    + getTimeWithZone(timestamp) + ", TIME_LOCAL="
+                    + getTimeWithZone(timestampLocal));
+        }
+        stat.close();
+        res.close();</pre>
+<p>And this is how <em>getTimeWithZone()</em> looks like:</p>
+<pre lang="java">    public static String getTimeWithZone(Timestamp timestamp) {
+        Calendar cal = new GregorianCalendar();
+        cal.setTime(timestamp);
+        return getTimeWithZone(cal);
+    }
+    public static String getTimeWithZone(Calendar cal) {
+        String dateFormat = "HH:mm:ss:SSS zzzz";
+        DateFormat df = new SimpleDateFormat(dateFormat);
+        // this is very important
+        TimeZone timeZone = cal.getTimeZone();
+        if (timeZone != null) {
+            df.setTimeZone(timeZone);
+        }
+        String dateTime = df.format(cal.getTime());
+        return dateTime;
+    }</pre>
+<p>We get the following sysouts:</p>
+<blockquote><p>insert_1: 1, TIME=11:30:00:000 India Standard Time, TIME_LOCAL=06:00:00:000 India Standard Time<br />
+insert_2: 2, TIME=06:30:00:000 India Standard Time, TIME_LOCAL=06:00:00:000 India Standard Time</p></blockquote>
+<p>Note that in both cases, the returned TimeZone is wrongly fetched. Again, the JDBC driver is buggy.</p>
+<h3>SELECT Approach 3</h3>
+<p>As with INSERT, we will try to bypass the JDBC driver as follows:</p>
+<pre lang="java">        Statement stat = con.createStatement();
+        ResultSet res = stat.executeQuery("SELECT ID, NAME, "
+                + " TO_CHAR(TIME_WITH_ZONE, 'HH24:MI:SS:FF TZR'), "
+                + " TO_CHAR(TIME_WITH_ZONE_LOCAL, 'HH24:MI:SS:FF TZR') "
+                + " FROM TIMESTAMP_DEMO  ORDER BY ID");
+        while (res.next()) {
+            String timestamp = res.getString(3);
+            String timestampLocal = res.getString(4);
+            System.out.println(res.getString("NAME") + ": "
+                    + res.getString("ID") + ", TIME=" + timestamp
+                    + ", TIME_LOCAL=" + timestampLocal);
+        }
+        stat.close();
+        res.close();</pre>
+<p>The following sysouts are got:</p>
+<blockquote><p>insert_1: 1, TIME=11:30:00:000000000 +05:30, TIME_LOCAL=11:30:00:000000000 +05:30<br />
+insert_2: 2, TIME=11:30:00:000000000 AUSTRALIA/ADELAIDE, TIME_LOCAL=11:30:00:000000000 +05:30</p></blockquote>
+<p>Note that the values returned are exactly as intended.</p>
+<h2>Hibernate Example</h2>
+<p>Let us try and translate the above code into Hibernate. The first inference that we can draw from the above discussion is that <em>get()</em> on <span style="color: #800000;">TIMESTAMP WITH LOCAL TIME ZONE</span> will not work with the usual approach, and we have to define our custom data type to customise get() on PreparedStatement.</p>
+<h3>Hibernate Approach 1</h3>
+<p>This is how my custom data type (to map to <em>TIMESTAMP WITH LOCAL TIME ZONE</em>) looks like:</p>
+<pre lang="java">public class TimestampType implements UserType {
+    // private static final Logger LOG = Logger.getLogger(TimestampType.class);
+    @Override
+    public int[] sqlTypes() {
+        return new int[] { Types.TIMESTAMP };
+    }
+    @Override
+    public Class returnedClass() {
+        return Calendar.class;
+    }
+    @Override
+    public boolean equals(Object x, Object y) throws HibernateException {
+        if (x == null || y == null) {
+            return false;
+        }
+        return x.equals(y);
+    }
+    @Override
+    public int hashCode(Object x) throws HibernateException {
+        if (x != null) {
+            return x.hashCode();
+        }
+        return 0;
+    }
+    @Override
+    public Object nullSafeGet(ResultSet rs, String[] names, Object owner)
+            throws HibernateException, SQLException {
+        Calendar cal = new GregorianCalendar();
+        Timestamp timestamp = rs.getTimestamp(names[0], cal);
+        if (timestamp != null) {
+            cal.setTime(timestamp);
+        } else {
+            cal = null;
+        }
+        return cal;
+    }
+    @Override
+    public void nullSafeSet(PreparedStatement st, Object value, int index)
+            throws HibernateException, SQLException {
+        if (value == null) {
+            st.setNull(index, Types.DATE);
+        } else {
+            doInstanceCheck(value);
+            Calendar cal = (Calendar) value;
+            Timestamp timestamp = new Timestamp(cal.getTimeInMillis());
+            st.setTimestamp(index, timestamp, cal);
+        }
+    }
+    @Override
+    public Object deepCopy(Object value) throws HibernateException {
+        Calendar clone = null;
+        if (value != null) {
+            doInstanceCheck(value);
+            Calendar cal = (Calendar) value;
+            // just copying the timezone and time
+            clone = new GregorianCalendar();
+            clone.setTimeInMillis(cal.getTimeInMillis());
+            TimeZone tz = cal.getTimeZone();
+            clone.setTimeZone(TimeZone.getTimeZone(tz.getID()));
+        }
+        return clone;
+    }
+    @Override
+    public boolean isMutable() {
+        return true;
+    }
+    @Override
+    public Serializable disassemble(Object value) throws HibernateException {
+        Calendar cal = null;
+        if (value != null) {
+            doInstanceCheck(value);
+            cal = (Calendar) deepCopy(value);
+        }
+        return cal;
+    }
+    @Override
+    public Object assemble(Serializable cached, Object owner)
+            throws HibernateException {
+        return disassemble(cached);
+    }
+    @Override
+    public Object replace(Object original, Object target, Object owner)
+            throws HibernateException {
+        return disassemble(original);
+    }
+    protected void doInstanceCheck(Object value) {
+        if ((value != null) &amp;&amp; !(value instanceof Calendar)) {
+            throw new UnsupportedOperationException(value.getClass()
+                    + " not supported, expecting type "
+                    + Calendar.class.getName());
+        }
+    }
+}</pre>
+<p>And this is how my entity looks like:</p>
+<pre lang="java">@Entity
+@Table(name = "TIMESTAMP_DEMO")
+public class TimestampDemo implements Serializable {
+    private static final long serialVersionUID = -5902132666472097299L;
+    private long id;
+    private String name;
+    private Calendar timeWithZone;
+    private Calendar timeWithZoneLocal;
+    @Id
+    @SequenceGenerator(name = "seq", sequenceName = "TIMESTAMP_DEMO_SEQ")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "seq")
+    public long getId() {
+        return id;
+    }
+    @Column
+    public String getName() {
+        return name;
+    }
+    @Column(name = "TIME_WITH_ZONE")
+    @Temporal(TemporalType.TIMESTAMP)
+    public Calendar getTimeWithZone() {
+        return timeWithZone;
+    }
+    @Column(name = "TIME_WITH_ZONE_LOCAL")
+    @Type(type = "com.swayam.demo.oracle.hibernate.custom.TimestampType")
+    public Calendar getTimeWithZoneLocal() {
+        return timeWithZoneLocal;
+    }
+    public void setId(long id) {
+        this.id = id;
+    }
+    public void setName(String name) {
+        this.name = name;
+    }
+    public void setTimeWithZone(Calendar timeWithZone) {
+        this.timeWithZone = timeWithZone;
+    }
+    public void setTimeWithZoneLocal(Calendar timeWithZoneLocal) {
+        this.timeWithZoneLocal = timeWithZoneLocal;
+    }
+}</pre>
+<p>As expected, this will not save/get correct TimeZone data as it depends on the buggy JDBC driver.</p>
+<h3>Hibernate Approach 2</h3>
+<p>Here, as before, we use the <em>TO_TIMESTAMP_TZ()</em> function to circumvent the buggy JDBC driver. We keep the <em>TimestampType</em> for mapping to <em>TIMESTAMP WITH LOCAL TIME ZONE</em> and add <em>TimestampType2</em> to map to <em>TIMESTAMP WITH TIME ZONE</em>.</p>
+<pre lang="java">public class TimestampType2 extends TimestampType {
+    private static final Logger LOG = Logger.getLogger(TimestampType2.class);
+    @Override
+    public Object nullSafeGet(ResultSet rs, String[] names, Object owner)
+            throws HibernateException, SQLException {
+        Calendar cal = null;
+        String timestamp = rs.getString(names[0]);
+        LOG.info("raw timestamp=" + timestamp);
+        if (timestamp != null) {
+            cal = parseOracleTimestampWithZone(timestamp);
+        }
+        return cal;
+    }
+    @Override
+    public void nullSafeSet(PreparedStatement st, Object value, int index)
+            throws HibernateException, SQLException {
+        if (value == null) {
+            st.setNull(index, Types.DATE);
+        } else {
+            doInstanceCheck(value);
+            Calendar cal = (Calendar) value;
+            String dateTime = getOracleFormattedTimeWithZone(cal);
+            LOG.info("dateTime=" + dateTime);
+            LOG.info("index=" + index);
+            st.setString(index, dateTime);
+        }
+    }
+    /**
+     * Converts raw time-stamp with time-zone string from Oracle to Calendar
+     * containing the time-zone
+     *
+     * @param rawTimestamp
+     *            in the format <em>2010-9-26 11.30.0.0 Australia/Adelaide</em>
+     * @return
+     */
+    private static Calendar parseOracleTimestampWithZone(String rawTimestamp) {
+        Calendar cal = null;
+        String dateFormat = "yyyy-MM-dd HH.mm.ss.SSS";
+        SimpleDateFormat df = new SimpleDateFormat(dateFormat);
+        try {
+            Date date = df.parse(rawTimestamp);
+            Calendar tempCal = Calendar.getInstance();
+            tempCal.setTime(date);
+            String timeZoneId = rawTimestamp.split("s")[2];
+            TimeZone timeZone = TimeZone.getTimeZone(timeZoneId);
+            cal = new GregorianCalendar(timeZone);
+            // setting the date and time-zone does not work, as Calendar adjusts
+            // for time zone, so the below circus
+            cal.set(Calendar.YEAR, tempCal.get(Calendar.YEAR));
+            cal.set(Calendar.MONTH, tempCal.get(Calendar.MONTH));
+            cal.set(Calendar.DATE, tempCal.get(Calendar.DATE));
+            cal.set(Calendar.HOUR_OF_DAY, tempCal.get(Calendar.HOUR_OF_DAY));
+            cal.set(Calendar.MINUTE, tempCal.get(Calendar.MINUTE));
+            cal.set(Calendar.SECOND, tempCal.get(Calendar.SECOND));
+            cal.set(Calendar.MILLISECOND, tempCal.get(Calendar.MILLISECOND));
+        } catch (ParseException e) {
+            LOG.error("Could not convert string `" + rawTimestamp
+                    + "` to Calendar", e);
+        }
+        return cal;
+    }
+    private static String getOracleFormattedTimeWithZone(Calendar timeWithZone) {
+        String dateFormat = "yyyy-MM-dd HH:mm:ss:SSS";
+        DateFormat df = new SimpleDateFormat(dateFormat);
+        // this is very important
+        TimeZone timeZone = timeWithZone.getTimeZone();
+        if (timeZone != null) {
+            df.setTimeZone(timeZone);
+        }
+        String dateTime = df.format(timeWithZone.getTime());
+        String tzId = timeWithZone.getTimeZone().getID();
+        dateTime += " " + tzId;
+        return dateTime;
+    }
+}</pre>
+<p>And this is how my modified entity looks like:</p>
+<pre lang="java">@SQLInsert(sql = "INSERT INTO TIMESTAMP_DEMO (NAME, TIME_WITH_ZONE, TIME_WITH_ZONE_LOCAL, ID) values (?, TO_TIMESTAMP_TZ(?, 'YYYY-MM-DD HH24:MI:SS:FF TZR'), ?, ?)")
+@Table(name = "TIMESTAMP_DEMO")
+@Entity
+public class TimestampDemo2 implements Serializable {
+    private static final long serialVersionUID = 4940963602672391841L;
+    private long id;
+    private String name;
+    private Calendar timeWithZone;
+    private Calendar timeWithZoneLocal;
+    @Id
+    @SequenceGenerator(name = "seq", sequenceName = "TIMESTAMP_DEMO_SEQ")
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "seq")
+    public long getId() {
+        return id;
+    }
+    @Column
+    public String getName() {
+        return name;
+    }
+    @Column(name = "TIME_WITH_ZONE")
+    @Type(type = "com.swayam.demo.oracle.hibernate.custom.TimestampType2")
+    public Calendar getTimeWithZone() {
+        return timeWithZone;
+    }
+    @Column(name = "TIME_WITH_ZONE_LOCAL")
+    @Type(type = "com.swayam.demo.oracle.hibernate.custom.TimestampType")
+    public Calendar getTimeWithZoneLocal() {
+        return timeWithZoneLocal;
+    }
+    public void setId(long id) {
+        this.id = id;
+    }
+    public void setName(String name) {
+        this.name = name;
+    }
+    public void setTimeWithZone(Calendar timeWithZone) {
+        this.timeWithZone = timeWithZone;
+    }
+    public void setTimeWithZoneLocal(Calendar timeWithZoneLocal) {
+        this.timeWithZoneLocal = timeWithZoneLocal;
+    }
+}</pre>
+<p>This set up gives us the desirable save/get results with the correct TimeZone value.</p>
+<h3>Conclusion</h3>
+<p>I take this opportunity to illustrate the advantage of Open Source Software as opposed to proprietary ones. If the ojdbc sources were in public domain, we could have patched the bug instead of having to circumvent them as in the present instance.</p>
+<h3>Resources</h3>
+<p>The sources can be found <a href="https://github.com/paawak/blog/tree/master/code/OracleTimeZoneTest">https://github.com/paawak/blog/tree/master/code/OracleTimeZoneTest</a>.<br />
+There are three test cases which illustrates the above discussion. I have used the ojdbc driver 5 for this example. Since I am using Maven for building this, the libraries are not a part of this distribution. You can grab any Oracle JDBC driver from <a href="http://www.oracle.com/technetwork/database/features/jdbc/index-091264.html" target="_blank">here</a>.</p>

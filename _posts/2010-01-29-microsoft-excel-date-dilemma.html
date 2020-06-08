@@ -1,0 +1,83 @@
+---
+layout: post
+status: publish
+published: true
+title: Microsoft Excel date dilemma
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 260
+wordpress_url: http://puretech.paawak.com/?p=260
+date: '2010-01-29 17:00:45 +0530'
+date_gmt: '2010-01-29 11:30:45 +0530'
+categories:
+- java
+tags:
+- excel
+- java
+comments: []
+---
+<p>I was recently exporting a Microsoft Excel SpreadSheet to a data base. I was using <a title="Apache POI" href="http://poi.apache.org/">Apache POI</a> to read the excel sheet. To my utter surprise, I was getting the date as some numeric value. I initially thought it was the Unix epoch, but it turned out wrong. I then applied my "dirty-fix" talent, rather than googling. <em>17-Jan-09</em> was <em>39830</em>. <em>39830/365</em> = <em>109</em>. So I gathered that this Microsoft Epoch started from <em>1st Jan 1900</em>. I was not entirely wrong. But it actually starts from <em>31st December 1899</em> :). So, <em>31st December 1899</em> is the <em>Day 1</em> in Microsoft Terminlogy. The Microsoft guys goofed up in the leap year thing, so they lost one day. I know this as I googled a bit today, and came across <a title="ExcelDateandTimes" href="http://www.ozgrid.com/Excel/ExcelDateandTimes.htm">this</a>. So, the Microsoft Epoch really should have been <em>1st Jan 1900</em>. Better luck next time :).<br />
+I would love to share the code with you:</p>
+<pre lang="java">import java.io.IOException;
+import java.io.InputStream;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.GregorianCalendar;
+import org.apache.poi.hssf.usermodel.HSSFCell;
+import org.apache.poi.hssf.usermodel.HSSFRow;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+/**
+ *
+ * @author paawak
+ */
+abstract class SheetReader {
+    final HSSFWorkbook excelBook;
+    final int startFromRow;
+    SheetReader(InputStream excelSheetContents, int startFromRow)
+            throws IOException {
+        excelBook = new HSSFWorkbook(excelSheetContents);
+        this.startFromRow = startFromRow;
+    }
+    String getCellContent(HSSFRow row, int columnIndex) {
+        HSSFCell cell = row.getCell(columnIndex);
+        String content = null;
+        if (cell != null) {
+            int cellType = cell.getCellType();
+            switch (cellType) {
+           // also handles dates
+            case HSSFCell.CELL_TYPE_NUMERIC:
+                content = String.valueOf(cell.getNumericCellValue());
+                break;
+            case HSSFCell.CELL_TYPE_STRING:
+                content = cell.getStringCellValue();
+                break;
+            case HSSFCell.CELL_TYPE_BOOLEAN:
+                content = String.valueOf(cell.getBooleanCellValue());
+                break;
+            case HSSFCell.CELL_TYPE_BLANK:
+                break;
+            default:
+                throw new UnsupportedOperationException("HssfCellType "
+                        + cellType + " not yet supported");
+            }
+        }
+        return content;
+    }
+    Date getDate(String date) throws NumberFormatException {
+        Date givenDate = null;
+        if (date != null && !"".equals(date.trim())) {
+            // hack to have date in readble format
+            int dateInt = (int) Float.parseFloat(date);
+            Calendar cal = new GregorianCalendar(1899, 11, 30);
+            cal.add(Calendar.DATE, dateInt);
+            givenDate = cal.getTime();
+        }
+        return givenDate;
+    }
+}</pre>
+<p>Note that I am getting a float for the date, which I am converting to String, for purely ease of handling.</p>

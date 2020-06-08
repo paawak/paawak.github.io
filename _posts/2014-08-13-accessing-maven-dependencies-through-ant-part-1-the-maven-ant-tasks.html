@@ -1,0 +1,153 @@
+---
+layout: post
+status: publish
+published: true
+title: 'Accessing Maven dependencies through Ant: Part 1: The Maven Ant Tasks'
+author:
+  display_name: paawak
+  login: paawak
+  email: paawak@gmail.com
+  url: ''
+author_login: paawak
+author_email: paawak@gmail.com
+wordpress_id: 618
+wordpress_url: http://palashray.com/?p=618
+date: '2014-08-13 02:02:43 +0530'
+date_gmt: '2014-08-13 02:02:43 +0530'
+categories:
+- ant
+- maven
+tags:
+- ant
+- build
+- maven
+comments:
+- id: 68
+  author: 'Accessing Maven dependencies through Ant: Part 2: The Aether Ant Tasks
+    | Heart of a hacker'
+  author_email: ''
+  author_url: http://palashray.com/accessing-maven-dependencies-through-ant-part-2-the-aether-ant-tasks/
+  date: '2014-08-13 02:33:55 +0530'
+  date_gmt: '2014-08-13 02:33:55 +0530'
+  content: "[&#8230;] http://palashray.com/accessing-maven-dependencies-through-ant-part-1-the-maven-ant-tasks/
+    [&#8230;]"
+---
+<h2>Context</h2>
+<p>I have a project which is managed by <em>Maven</em>. Suppose for some reason, best know to me :), I want to do the following using <em>Ant</em>:</p>
+<ol>
+<li>Inspect the project's dependencies</li>
+<li>Zip all the dependencies together</li>
+</ol>
+<p>This can be achieved by using the <a href="http://maven.apache.org/ant-tasks/" target="_blank">Maven Ant Tasks</a>.</p>
+<h2>Project Structure</h2>
+<p>We will take the <a href="https://github.com/paawak/blog/tree/master/code/maven-ant-assembly-example" target="_blank">Rmi Server</a> as an example to demonstrate how we can access Maven dependencies in Ant through the Maven Ant Tasks.<br />
+The pom.xml looks like this:</p>
+<pre class="lang:java decode:true ">	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework</groupId>
+				<artifactId>spring-framework-bom</artifactId>
+				<version>4.0.2.RELEASE</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
+	<dependencies>
+		<dependency>
+			<groupId>com.swayam.demo.rmi.api</groupId>
+			<artifactId>rmi-service-api</artifactId>
+			<version>1.0</version>
+		</dependency>
+		<dependency>
+			<groupId>log4j</groupId>
+			<artifactId>log4j</artifactId>
+			<version>1.2.14</version>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+			<version>1.5.8</version>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>jcl-over-slf4j</artifactId>
+			<version>1.5.8</version>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-log4j12</artifactId>
+			<version>1.5.8</version>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-core</artifactId>
+			<exclusions>
+				<exclusion>
+					<groupId>commons-logging</groupId>
+					<artifactId>commons-logging</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework</groupId>
+			<artifactId>spring-context</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>net.jini</groupId>
+			<artifactId>jsk-platform</artifactId>
+			<version>2.2.2</version>
+		</dependency>
+		<dependency>
+			<groupId>net.jini</groupId>
+			<artifactId>jsk-lib</artifactId>
+			<version>2.2.2</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.river</groupId>
+			<artifactId>reggie</artifactId>
+			<version>2.2.2</version>
+		</dependency>
+	</dependencies></pre>
+<h2>Building the project with Ant</h2>
+<p>The following is how my ant file, <em>build-with-maven-ant-task.xml</em>, looks:</p>
+<pre class="lang:java decode:true "><project name="Rmi Server builder which works with maven-ant-task" default="create-zip" basedir="." xmlns:artifact="antlib:org.apache.maven.artifact.ant">
+	<path id="maven-ant-tasks.classpath" path="lib/maven-ant-tasks-2.1.3.jar" />
+	<typedef resource="org/apache/maven/artifact/ant/antlib.xml"
+	           uri="antlib:org.apache.maven.artifact.ant"
+	           classpathref="maven-ant-tasks.classpath" />
+	<!-- The below properties should either come from Maven or from command line while invoking ant -->
+	<condition property="maven.local.repo" else="${user.home}/.m2/repository">
+		<isset property="maven.local.repo"/>
+	</condition>
+	<condition property="project.name" else="no-name">
+		<isset property="project.name"/>
+	</condition>
+	<condition property="project.version" else="no-version">
+		<isset property="project.version"/>
+	</condition>
+	<property name="ant.build.directory" value="${basedir}/target/ant-build"/>
+	<target name="clean">
+		<delete dir="${ant.build.directory}"/>
+		<mkdir dir="${ant.build.directory}"/>
+	</target>
+	<target name="gather-dependencies-from-maven" depends="clean">
+		<artifact:dependencies filesetId="deps.fileset" useScope="runtime">
+			<pom file="pom.xml"/>
+			<localRepository path="${maven.local.repo}"/>
+		</artifact:dependencies>
+		<copy todir="${ant.build.directory}/lib">
+			<fileset refid="deps.fileset"/>
+			<mapper type="flatten"/>
+		</copy>
+	</target>
+	<target name="create-zip" depends="gather-dependencies-from-maven">
+		<zip destfile="${basedir}/target/${project.name}-${project.version}.zip" basedir="${ant.build.directory}"/>
+	</target>
+</project></pre>
+<h2>Invoking Ant</h2>
+<p>From the command prompt, issue the following command:</p>
+<blockquote><p>ant -f build-with-maven-ant-task.xml -Dproject.name=rmi-server -Dproject.version=1.0</p></blockquote>
+<p>In the <em>target</em> folder, you should see the <em>rmi-server-1.0.zip</em>, containing all the dependencies of the project.<br />
+&nbsp;<br />
+&nbsp;</p>
