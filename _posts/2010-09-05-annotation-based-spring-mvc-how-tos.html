@@ -24,7 +24,7 @@ comments: []
 ---
 <p>I will list here the common how to-s for the new Annotation based Spring MVC. Please note that I am using Spring version <strong>3.0.0.RELEASE</strong>. This is a bit, only a small bit, different from the version <strong>2.5.x</strong>. So, if you are using 2.5.x, you have to tweak things a bit before you get the same effect.<br />
 Consider the following screen:<br />
-<img class="aligncenter size-full wp-image-361" title="samplehtml" src="http://palashray.com/wp-content/uploads/2010/09/samplehtml.png" alt="samplehtml" width="561" height="404" /><br />
+<img class="aligncenter size-full wp-image-361" title="samplehtml" src="/assets/2010/09/samplehtml.png" alt="samplehtml" width="561" height="404" /><br />
 The fantatstic thing about Spring MVC is it lets you take an Object Oriented approach while designing the Model (Form Bean) and lets you bind that seamlessly to the View (JSP Form).&nbsp; For the above scenario, we can break down the top section into a list of rows. I would denote the row with a class having select, itemName, price... attributes, as shown below (this is an inner class in my <em>ItemBean</em> class, which is my Form Bean):</p>
 <pre lang="java">    public static class ItemRow {
         private boolean selected;

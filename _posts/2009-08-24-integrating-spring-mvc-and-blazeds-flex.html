@@ -60,7 +60,7 @@ comments:
 <p>I was playing around with Flex for the past couple of days. Being a Java developer, I was naturally inclined towards trying out BlazeDS so that I can use Flex as a front-end to my Java backend. The thing that I suffered from most was a huge information deluge. I was flooded by loads of blogs, articles and tutorials which made my life miserable. Finally, I saw a saviour in: <a href="http://www.javaworld.com/community/node/2181 " target="_blank" rel="noopener">Bare Bones BlazeDS Object Remoting</a>, which explains how to create a BlazeDS and Java integration. Of course this does not include spring integration. Then I downloaded <a href="http://www.springsource.org/spring-flex" target="_blank" rel="noopener">Spring BlazeDS</a>, and went through the samples. Then I kind of combined these two and figured out how to make it work. The challenge here is that I have existing screens which are pure Spring MVC stuff. I am trying to embed flex in some of them, and have BlazeDS integration with my existing spring beans. Read on...</p>
 <h2>First things first: directory structure</h2>
 <p>My project directory looks like:<br />
-<a href="#" rel="attachment wp-att-145"><img class="alignnone size-full wp-image-145" title="directory-structure1" src="http://palashray.com/wp-content/uploads/2009/08/directory-structure1.png" alt="directory-structure1" width="220" height="471" /></a><br />
+<a href="#" rel="attachment wp-att-145"><img class="alignnone size-full wp-image-145" title="directory-structure1" src="/assets/2009/08/directory-structure1.png" alt="directory-structure1" width="220" height="471" /></a><br />
 Details:</p>
 <ol>
 <li><strong>src/main/java</strong> contains all my java files</li>
@@ -290,7 +290,7 @@ Finally, just a word for Maven users, these are the arifacts you have to use:</p
 <p>For others, you can always expand the blazeds.war and put all the jars inside the WEB-INF/lib.<br />
 The only pain point for this approach is that every time you change your context root, you have to recompile all your flex against the services-config.xml along with a new context.root argument.<br />
 This is how the end screen looks like (in the browser):<br />
-<a href="#" rel="attachment wp-att-171"><img class="alignnone size-medium wp-image-171" title="newaccountgroup" src="http://palashray.com/wp-content/uploads/2009/08/newaccountgroup-300x160.png" alt="newaccountgroup" width="300" height="160" /></a><br />
+<a href="#" rel="attachment wp-att-171"><img class="alignnone size-medium wp-image-171" title="newaccountgroup" src="/assets/2009/08/newaccountgroup-300x160.png" alt="newaccountgroup" width="300" height="160" /></a><br />
 &nbsp;</p>
 <h2>Sources</h2>
 <p><a href="https://github.com/paawak/legacy-apps-from-desktop/tree/master/products/ims/ims-web/trunk">https://github.com/paawak/legacy-apps-from-desktop/tree/master/products/ims/ims-web/trunk</a></p>

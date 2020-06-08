@@ -116,8 +116,8 @@ mvn install:install-file -DgroupId=com.jaspersoft.jasperserver.api.metadata -Dar
 mvn install:install-file -DgroupId=com.jaspersoft.jasperserver.api.common -DartifactId=jasperserver-api-common -Dversion=5.6.0 -Dpackaging=jar -Dfile=/path-to-webapps/jasperserver-pro/WEB-INF/lib/jasperserver-api-common-5.6.0.jar</pre>
 <h1>Spring bean configuration</h1>
 <p>Jaspersoft works with Spring, thanks God for that!<br />
-<img class="aligncenter wp-image-589 size-full" src="http://palashray.com/wp-content/uploads/2014/07/jasper-bean-creation-sequence-1.png" alt="jasper-bean-creation-sequence-1" width="816" height="1056" /><br />
-<img class="aligncenter wp-image-590 size-full" src="http://palashray.com/wp-content/uploads/2014/07/jasper-bean-creation-sequence-2.png" alt="jasper-bean-creation-sequence-2" width="816" height="1056" /><br />
+<img class="aligncenter wp-image-589 size-full" src="/assets/2014/07/jasper-bean-creation-sequence-1.png" alt="jasper-bean-creation-sequence-1" width="816" height="1056" /><br />
+<img class="aligncenter wp-image-590 size-full" src="/assets/2014/07/jasper-bean-creation-sequence-2.png" alt="jasper-bean-creation-sequence-2" width="816" height="1056" /><br />
 Finally, this is what the Spring file looks like:</p>
 <pre class="lang:java decode:true"><?xml version="1.0" encoding="UTF-8"?>
 <beans xmlns="http://www.springframework.org/schema/beans"
@@ -162,7 +162,7 @@ Finally, this is what the Spring file looks like:</p>
 	</bean>
 </beans></pre>
 <h1>Information flow</h1>
-<p><img class="aligncenter wp-image-591 size-full" src="http://palashray.com/wp-content/uploads/2014/07/jasper-flow-highlevel-1.png" alt="jasper-flow-highlevel-1" width="816" height="1056" /></p>
+<p><img class="aligncenter wp-image-591 size-full" src="/assets/2014/07/jasper-flow-highlevel-1.png" alt="jasper-flow-highlevel-1" width="816" height="1056" /></p>
 <pre class="lang:java decode:true">public class SpringBeanDataSourceServiceFactory implements CustomDelegatedDataSourceServiceFactory, ApplicationContextAware {
     private ApplicationContext applicationContext;
     @Override
@@ -206,7 +206,7 @@ Finally, this is what the Spring file looks like:</p>
     paramMap.put(SpringBeanQueryExecutorFactory.METHOD_NAME, methodName);
     }
 }</pre>
-<p><img class="aligncenter wp-image-592 size-full" src="http://palashray.com/wp-content/uploads/2014/07/jasper-flow-highlevel-2.png" alt="jasper-flow-highlevel-2" width="816" height="1056" /></p>
+<p><img class="aligncenter wp-image-592 size-full" src="/assets/2014/07/jasper-flow-highlevel-2.png" alt="jasper-flow-highlevel-2" width="816" height="1056" /></p>
 <pre class="lang:java decode:true">public class SpringBeanQueryExecutorFactory extends AbstractQueryExecuterFactory {
     public static final String APPLICATION_CONTEXT = "APPLICATION_CONTEXT";
     public static final String BEAN_NAME = "BEAN_NAME";
@@ -304,6 +304,6 @@ Finally, this is what the Spring file looks like:</p>
 </jasperReport>
 </pre>
 <p>Link the DataSource and the JRXML. You need to define an Input as well. Then run the report. You should see the below report:</p>
-<h1><a href="#"><img class="aligncenter wp-image-593 size-large" src="http://palashray.com/wp-content/uploads/2014/07/generated-report-1024x575.png" alt="generated-report" width="474" height="266" /></a>Resources</h1>
+<h1><a href="#"><img class="aligncenter wp-image-593 size-large" src="/assets/2014/07/generated-report-1024x575.png" alt="generated-report" width="474" height="266" /></a>Resources</h1>
 <p>The sources for this can be found here: <a href="https://github.com/paawak/blog/tree/master/code/jasper/custom-datasource">https://github.com/paawak/blog/tree/master/code/jasper/custom-datasource</a><br />
 &nbsp;</p>

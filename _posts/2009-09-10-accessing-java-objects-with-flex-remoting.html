@@ -130,7 +130,7 @@ The following code snippet illustrates this:</p>
 	</mx:DataGrid>
 </mx:Application></pre>
 <p>This is how it looks like:<br />
-<a href="#" rel="attachment wp-att-185"><img class="alignnone size-full wp-image-185" title="flex_remote_object-1" src="http://palashray.com/wp-content/uploads/2009/09/flex_remote_object-1.png" alt="flex_remote_object-1" width="802" height="255" /></a><br />
+<a href="#" rel="attachment wp-att-185"><img class="alignnone size-full wp-image-185" title="flex_remote_object-1" src="/assets/2009/09/flex_remote_object-1.png" alt="flex_remote_object-1" width="802" height="255" /></a><br />
 The most important thing to note here is that the result that is got back in the call back function, should be cast with the proper data type in Flex. This is the <a href="http://livedocs.adobe.com/flex/3/html/help.html?content=data_access_4.html">link</a> which has the details under the head <strong>Converting data from Java to ActionScript</strong>. From here we get to know the correct casting. In this case, we are casting the result into <em>mx.collections.ArrayCollection</em> since it is of <em>java.util.List</em> type.<br />
 Also note that though each element in the array is of the type Item, it can be accessed by its bean attribute name. That is how we can access the id, name and code in the DataGrid. Note that you cannot invoke the getter method like <em>getId()</em> on the object, it will not work.<br />
 So far, we have used a DataGrid which can extract data based on the attribute names. What if we use a ComboBox which needs a two dimensional array with <em>data</em> and <em>label</em> attributes? This is the code snippet of the modified <em>getItemListResultHandler()</em>:</p>
@@ -155,6 +155,6 @@ So far, we have used a DataGrid which can extract data based on the attribute na
 ...
 </pre>
 <p>The screen looks like this now:<br />
-<a href="#"><img class="alignnone size-full wp-image-190" title="flex_remote_object-2" src="http://palashray.com/wp-content/uploads/2009/09/flex_remote_object-2.png" alt="flex_remote_object-2" width="801" height="296" /></a></p>
+<a href="#"><img class="alignnone size-full wp-image-190" title="flex_remote_object-2" src="/assets/2009/09/flex_remote_object-2.png" alt="flex_remote_object-2" width="801" height="296" /></a></p>
 <h3>Sources</h3>
 <p><a href="https://github.com/paawak/legacy-apps-from-desktop/tree/master/products/ims/ims-web/trunk">https://github.com/paawak/legacy-apps-from-desktop/tree/master/products/ims/ims-web/trunk</a></p>

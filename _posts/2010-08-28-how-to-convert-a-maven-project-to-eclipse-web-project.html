@@ -44,7 +44,7 @@ comments:
     and then everything was smooth.
 ---
 <p>Eclipse WTP has this nice feature where it allows you to deploy, run and debug Web Applications from the IDE. You start by going to the Server View, adding the target server (like Apache Tomcat in our case) and then adding the Web Project to the server. This is how the view looks like:<br />
-<img class="aligncenter size-full wp-image-346" title="addremovewebprojects_1" src="http://palashray.com/wp-content/uploads/2010/08/addremovewebprojects_1.png" alt="addremovewebprojects_1" width="882" height="669" /><br />
+<img class="aligncenter size-full wp-image-346" title="addremovewebprojects_1" src="/assets/2010/08/addremovewebprojects_1.png" alt="addremovewebprojects_1" width="882" height="669" /><br />
 But I have often faced this problem: when I run <em>mvn eclipse:eclipse</em> on a Maven Web Project to convert it to an Eclipse project, it is not recognised as a Web Project by Eclipse. When I right-click on the server and select <em>Add Remove Projects</em>, it does not appear in the option box. But to me&nbsp; <em>mvn eclipse:eclipse -DdownloadSources=true -DdownloadJavadocs=true</em> is indispensable as it downloads and links all the sources and JavaDocs, which comes very handy. On the other hand if I cannot add my project as a Web Project in Eclipse, running and debugging becomes a big issue. So how do I reconcile these two?</p>
 <h2>Solution 1: Specify the WTP Version</h2>
 <p>While running <em>mvn eclipse:eclipse</em>, specify the WTP Version by passing the <em>-Dwtpversion=2.0</em> argument. The command looks like:<br />
@@ -52,9 +52,9 @@ But I have often faced this problem: when I run <em>mvn eclipse:eclipse</em> on 
 Note that as of this writing, the supported versions of WTP are&nbsp; 1.0, 1.5, 2.0 and R7.</p>
 <h2>Solution 2: Convert it to a Facted Project</h2>
 <p>Right click on the project, go to <em>Properties</em>, then select <em>Project Facets</em>.<br />
-<img class="aligncenter size-full wp-image-349" title="converttofacetedproject" src="http://palashray.com/wp-content/uploads/2010/08/converttofacetedproject.png" alt="converttofacetedproject" width="442" height="380" /><br />
+<img class="aligncenter size-full wp-image-349" title="converttofacetedproject" src="/assets/2010/08/converttofacetedproject.png" alt="converttofacetedproject" width="442" height="380" /><br />
 Another dialog appears having the available facets.<br />
-<img class="aligncenter size-full wp-image-350" title="selectdynamicwebproject" src="http://palashray.com/wp-content/uploads/2010/08/selectdynamicwebproject.png" alt="selectdynamicwebproject" width="638" height="560" /><br />
+<img class="aligncenter size-full wp-image-350" title="selectdynamicwebproject" src="/assets/2010/08/selectdynamicwebproject.png" alt="selectdynamicwebproject" width="638" height="560" /><br />
 Select <em>Dynamic Web Module</em>.</p>
 <h2>Solution 3: Manual editing</h2>
 <p>I like this best as it gives lot of flexibility around configuration. First you need to modify the <em>.project</em> file as shown:</p>
