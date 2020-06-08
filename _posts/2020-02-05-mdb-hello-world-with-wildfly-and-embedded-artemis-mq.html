@@ -34,7 +34,7 @@ comments: []
 <p>In this example, we are going to write a simple MDB that prints the JMS message that it receives, on the console. We would be packaging the MDB within a <em>war</em> file. We would then deploy the war in <a href="https://wildfly.org/">WildFly</a>. For the Message Broker, we would be using <a href="https://activemq.apache.org/components/artemis/">ActiveMQ Artemis</a> that comes embedded within WildFly.<br />
 <strong>Note:</strong> ActiveMQ Artemis is actually an avatar of <a href="https://hornetq.jboss.org/">HornetQ</a>, the MQ that used to be embedded in JBoss. JBoss donated the source code to Apache, and thus Artemis was born.</p>
 <h1><a id="post-1108-_il6oh0jthq79"></a>High Level Design</h1>
-<p><img class="wp-image-1109" src="http://localhost/tech-blog/wp-content/uploads/2020/02/word-image-5.png" /></p>
+<p><img class="wp-image-1109" src="/assets/2020/02/word-image-5.png" /></p>
 <ol>
 <li>User submits Form Data to a Servlet</li>
 <li>The Servlet then publishes this as a JSON Message to the Message Broker, Artemis MQ, in this case, through JMS API</li>

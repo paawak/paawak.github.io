@@ -39,7 +39,7 @@ comments:
 <p>Maven is the build tool of choice for many people due to the simplicity and flexibility of use. The real strength of Maven is vetted when handling real complex projetcs consisting of tens of modules, each requiring elaborate build requirements.<br />
 I had faced an uphill task of Mavenising one of our EAR projects. As is the typical case, our project consisted of a EJB module and a WAR module, package together in a EAR module. It was a bit complex as we had to deploy the same application in JBoss and Glassfish. I will write some of that experience here.<br />
 Let us consider an enterprise application having a structure as show below:<br />
-<a href="#" rel="attachment wp-att-316"><img class="aligncenter size-full wp-image-316" title="Project Structure" src="http://palashray.com/wp-content/uploads/2010/08/project-structure.png" alt="Project Structure" width="340" height="332" /></a><br />
+<a href="#" rel="attachment wp-att-316"><img class="aligncenter size-full wp-image-316" title="Project Structure" src="/assets/2010/08/project-structure.png" alt="Project Structure" width="340" height="332" /></a><br />
 I will briefly explain what the modules stand for:</p>
 <ol>
 <li><strong>swayam-ear</strong>: This is the enterprise application</li>
@@ -271,7 +271,7 @@ MySessionBeanRemote remoteBean = InitialContext.doLookup(MySessionBeanRemote.cla
 </pre>
 <p>Note that the path of the modules are relative to the pom.<br />
 You can build the EAR project and deploy it on Glassfish or JBoss. Once successfully deployed, you can open <a href="http://localhost:8080/swayam-war/EjbInvoker">http://localhost:8080/swayam-war/EjbInvoker</a> This is how it looks like:<br />
-<a href="#" rel="attachment wp-att-326"><img class="aligncenter size-full wp-image-326" title="screenshot-servlet-ejbinvoker-google-chrome" src="http://palashray.com/wp-content/uploads/2010/08/screenshot-servlet-ejbinvoker-google-chrome.png" alt="screenshot-servlet-ejbinvoker-google-chrome" width="620" height="235" /></a></p>
+<a href="#" rel="attachment wp-att-326"><img class="aligncenter size-full wp-image-326" title="screenshot-servlet-ejbinvoker-google-chrome" src="/assets/2010/08/screenshot-servlet-ejbinvoker-google-chrome.png" alt="screenshot-servlet-ejbinvoker-google-chrome" width="620" height="235" /></a></p>
 <h2>Resources</h2>
 <ol>
 <li>Sources: <a href="https://github.com/paawak/blog/tree/master/code/swayam-ear-example">https://github.com/paawak/blog/tree/master/code/swayam-ear-example</a></li>

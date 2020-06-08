@@ -130,7 +130,7 @@ Caused by: java.lang.NoSuchMethodError: org.apache.maven.settings.RuntimeInfo.<i
 <p>I some how managed to modify my ant script to use the AetherAntTask instead of the MavenAntTask. Everything was hunky dory, the build went fine, generated the zip with all dependencies and life was good. Till I decided to actually deployed the build. And thank my lucky stars that I did it. Though the build went fine, the application wont start. Apparently Aether messed up with some Spring dependencies which we working fine with the earlier MavenAntTask. It turns out Aether is still bleeding edge.</p>
 <h2>Solution</h2>
 <p>I had actually given up. Then after a couple of weeks, I was thinking about this problem again, and I spotted something very odd. The overall interaction looked something like this:<br />
-[caption id="attachment_608" align="aligncenter" width="649"]<img class="wp-image-608 size-full" src="http://palashray.com/wp-content/uploads/2014/07/maven-ant-flow.png" alt="Existing build flow" width="649" height="623" /> Existing build flow[/caption]<br />
+[caption id="attachment_608" align="aligncenter" width="649"]<img class="wp-image-608 size-full" src="/assets/2014/07/maven-ant-flow.png" alt="Existing build flow" width="649" height="623" /> Existing build flow[/caption]<br />
 I am outlining the steps below:</p>
 <ol>
 <li>The build is kicked off by Maven</li>
