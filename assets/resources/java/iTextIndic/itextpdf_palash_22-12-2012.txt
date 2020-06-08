@@ -1,0 +1,887 @@
+Index: src/main/java/com/itextpdf/text/pdf/ArrayBasedStringTokenizer.java
+===================================================================
+--- src/main/java/com/itextpdf/text/pdf/ArrayBasedStringTokenizer.java	(revision 0)
++++ src/main/java/com/itextpdf/text/pdf/ArrayBasedStringTokenizer.java	(working copy)
+@@ -0,0 +1,75 @@
++package com.itextpdf.text.pdf;
++
++import java.util.ArrayList;
++import java.util.List;
++import java.util.regex.Matcher;
++import java.util.regex.Pattern;
++
++/**
++ * Tokenizes the given <i>text</i> based on a given array of Strings. On assembling the output array, 
++ * you should be able to get back the original text.
++ * 
++ * @author <a href="mailto:paawak@gmail.com">Palash Ray</a>
++ * 
++ */
++public class ArrayBasedStringTokenizer {
++    
++    private final Pattern regex;
++    
++    public ArrayBasedStringTokenizer(String[] tokens) {
++        this.regex = Pattern.compile(getRegexFromTokens(tokens));
++    }
++    
++    public String[] tokenize(String text) {
++        
++        List<String> tokens = new ArrayList<String>();
++        
++        Matcher matcher = regex.matcher(text);
++        
++        int endIndexOfpreviousMatch = 0;
++        
++        while (matcher.find()) {
++            
++            int startIndexOfMatch = matcher.start();
++            
++            String previousToken = text.substring(endIndexOfpreviousMatch, startIndexOfMatch);
++            
++            if (previousToken.length() > 0) {
++                tokens.add(previousToken);
++            }
++            
++            String currentMatch = matcher.group();
++            
++//            System.out.println("currentMatch=" + currentMatch); 
++            
++            tokens.add(currentMatch);
++            
++            endIndexOfpreviousMatch = matcher.end();
++            
++        }
++        
++        String tail = text.substring(endIndexOfpreviousMatch, text.length());
++        
++        if (tail.length() > 0) {
++            tokens.add(tail);
++        }
++        
++        return tokens.toArray(new String[0]);
++        
++    }
++    
++    private String getRegexFromTokens(String[] tokens) {
++        StringBuilder regexBuilder = new StringBuilder(100);
++        
++        for (String token : tokens) {
++            regexBuilder.append("(").append(token).append(")|");
++        }
++        
++        regexBuilder.setLength(regexBuilder.length() - 1); 
++        
++        String regex = regexBuilder.toString();
++        
++        return regex;
++    }
++
++}
+Index: src/main/java/com/itextpdf/text/pdf/FontDetails.java
+===================================================================
+--- src/main/java/com/itextpdf/text/pdf/FontDetails.java	(revision 5617)
++++ src/main/java/com/itextpdf/text/pdf/FontDetails.java	(working copy)
+@@ -44,10 +44,16 @@
+ package com.itextpdf.text.pdf;
+ 
+ import java.io.UnsupportedEncodingException;
++import java.util.ArrayList;
+ import java.util.HashMap;
++import java.util.List;
++import java.util.Map;
++import java.util.Set;
++import java.util.TreeSet;
+ 
+ import com.itextpdf.text.ExceptionConverter;
+ import com.itextpdf.text.Utilities;
++import com.itextpdf.text.pdf.languages.IndicCompositeCharacterComparator;
+ 
+ /**
+  * Each font in the document will have an instance of this class
+@@ -207,43 +213,98 @@
+             }
+             case BaseFont.FONT_TYPE_TTUNI: {
+                 try {
+-                    int len = text.length();
+-                    int metrics[] = null;
+-                    char glyph[] = new char[len];
+-                    int i = 0;
+-                    if (symbolic) {
+-                        b = PdfEncodings.convertToBytes(text, "symboltt");
+-                        len = b.length;
+-                        for (int k = 0; k < len; ++k) {
+-                            metrics = ttu.getMetricsTT(b[k] & 0xff);
+-                            if (metrics == null)
+-                                continue;
+-                            longTag.put(Integer.valueOf(metrics[0]), new int[]{metrics[0], metrics[1], ttu.getUnicodeDifferences(b[k] & 0xff)});
+-                            glyph[i++] = (char)metrics[0];
++                    
++                    Map<String, Glyph> glyphSubstitutionMap = ttu.getGlyphSubstitutionMap();
++                    
++                    if (glyphSubstitutionMap == null) {
++                    
++                        int len = text.length();
++                        int metrics[] = null;
++                        char glyph[] = new char[len];
++                        int i = 0;
++                        if (symbolic) {
++                            b = PdfEncodings.convertToBytes(text, "symboltt");
++                            len = b.length;
++                            for (int k = 0; k < len; ++k) {
++                                metrics = ttu.getMetricsTT(b[k] & 0xff);
++                                if (metrics == null)
++                                    continue;
++                                longTag.put(Integer.valueOf(metrics[0]), new int[]{metrics[0], metrics[1], ttu.getUnicodeDifferences(b[k] & 0xff)});
++                                glyph[i++] = (char)metrics[0];
++                            }
+                         }
+-                    }
+-                    else {
+-                    	for (int k = 0; k < len; ++k) {
+-                    		int val;
+-                    		if (Utilities.isSurrogatePair(text, k)) {
+-                    			val = Utilities.convertToUtf32(text, k);
+-                    			k++;
+-                    		}
+-                    		else {
+-                    			val = text.charAt(k);
+-                    		}
+-                    		metrics = ttu.getMetricsTT(val);
+-                    		if (metrics == null)
+-                    			continue;
+-                    		int m0 = metrics[0];
+-                    		Integer gl = Integer.valueOf(m0);
+-                    		if (!longTag.containsKey(gl))
+-                    			longTag.put(gl, new int[]{m0, metrics[1], val});
+-                    		glyph[i++] = (char)m0;
+-                    	}
++                        else {
++                        	for (int k = 0; k < len; ++k) {
++                        		int val;
++                        		if (Utilities.isSurrogatePair(text, k)) {
++                        			val = Utilities.convertToUtf32(text, k);
++                        			k++;
++                        		}
++                        		else {
++                        			val = text.charAt(k);
++                        		}
++                        		metrics = ttu.getMetricsTT(val);
++                        		if (metrics == null)
++                        			continue;
++                        		int m0 = metrics[0];
++                        		Integer gl = Integer.valueOf(m0);
++                        		if (!longTag.containsKey(gl))
++                        			longTag.put(gl, new int[]{m0, metrics[1], val});
++                        		glyph[i++] = (char)m0;
++                        	}
++                        }
++                        String s = new String(glyph, 0, i);
++                        b = s.getBytes(CJKFont.CJK_ENCODING);
++                    
++                    } else {
++                        // generate a regex from the characters to be substituted
++                        
++                        // for Indic languages: push back the CompositeCharacters with smaller length
++                        Set<String> compositeCharacters = new TreeSet<String>(new IndicCompositeCharacterComparator());
++                        compositeCharacters.addAll(glyphSubstitutionMap.keySet());
++                        
++                        // convert the text to a list of Glyph, also take care of the substitution
++                        ArrayBasedStringTokenizer tokenizer = new ArrayBasedStringTokenizer(compositeCharacters.toArray(new String[0]));
++                        String[] tokens = tokenizer.tokenize(text);
++                        
++                        List<Glyph> glyphList = new ArrayList<Glyph>(50);
++                        
++                        for (String token : tokens) {
++                            
++                            // first check whether this is in the substitution map
++                            Glyph subsGlyph = glyphSubstitutionMap.get(token);
++                            
++                            if (subsGlyph != null) {
++                                glyphList.add(subsGlyph);
++                            } else {
++                                // break up the string into individual characters
++                                for (char c : token.toCharArray()) {
++                                    int[] metrics = ttu.getMetricsTT(c);
++                                    int glyphCode = metrics[0];
++                                    int glyphWidth = metrics[1];
++                                    glyphList.add(new Glyph(glyphCode, glyphWidth, String.valueOf(c))); 
++                                }
++                            }
++                            
++                        }
++                        
++                        char[] charEncodedGlyphCodes = new char[glyphList.size()];
++                        
++                        // process each Glyph thus obtained
++                        for (int i = 0; i < glyphList.size(); i++) {
++                            Glyph glyph = glyphList.get(i); 
++                            charEncodedGlyphCodes[i] = (char) glyph.code;
++                            Integer glyphCode = Integer.valueOf(glyph.code);
++                            
++                            if (!longTag.containsKey(glyphCode)) {
++                                // FIXME: this is buggy as the 3rd arg. should be a String as a Glyph can represent more than 1 char
++                                longTag.put(glyphCode, new int[]{glyph.code, glyph.width, glyph.chars.charAt(0)}); 
++                            }
++                        }
++                        
++                        b = new String(charEncodedGlyphCodes).getBytes(CJKFont.CJK_ENCODING);
++                        
+                     }
+-                    String s = new String(glyph, 0, i);
+-                    b = s.getBytes(CJKFont.CJK_ENCODING);
+                 }
+                 catch (UnsupportedEncodingException e) {
+                     throw new ExceptionConverter(e);
+Index: src/main/java/com/itextpdf/text/pdf/Glyph.java
+===================================================================
+--- src/main/java/com/itextpdf/text/pdf/Glyph.java	(revision 0)
++++ src/main/java/com/itextpdf/text/pdf/Glyph.java	(working copy)
+@@ -0,0 +1,68 @@
++package com.itextpdf.text.pdf;
++
++/**
++ *  
++ * @author <a href="mailto:paawak@gmail.com">Palash Ray</a>
++ */
++public class Glyph {
++    
++    /**
++     * The <i>code</i> or <i>id</i> by which this is represented in the Font File
++     */
++    public final int code;
++    
++    /**
++     * The normalized width of this Glyph.
++     */
++    public final int width;
++    
++    /**
++     * The Unicode text represented by this Glyph
++     */
++    public final String chars;
++    
++    public Glyph(int code, int width, String chars) {
++        this.code = code;
++        this.width = width;
++        this.chars = chars;
++    }
++
++    @Override
++    public int hashCode() {
++        final int prime = 31;
++        int result = 1;
++        result = prime * result + ((chars == null) ? 0 : chars.hashCode());
++        result = prime * result + code;
++        result = prime * result + width;
++        return result;
++    }
++
++    @Override
++    public boolean equals(Object obj) {
++        if (this == obj)
++            return true;
++        if (obj == null)
++            return false;
++        if (getClass() != obj.getClass())
++            return false;
++        Glyph other = (Glyph) obj;
++        if (chars == null) {
++            if (other.chars != null)
++                return false;
++        } else if (!chars.equals(other.chars))
++            return false;
++        if (code != other.code)
++            return false;
++        if (width != other.width)
++            return false;
++        return true;
++    }
++
++
++
++    @Override
++    public String toString() {
++        return Glyph.class.getSimpleName() + " [id=" + code + ", width=" + width + ", chars=" + chars + "]";
++    }
++    
++}
+Index: src/main/java/com/itextpdf/text/pdf/GlyphSubstitutionTableReader.java
+===================================================================
+--- src/main/java/com/itextpdf/text/pdf/GlyphSubstitutionTableReader.java	(revision 0)
++++ src/main/java/com/itextpdf/text/pdf/GlyphSubstitutionTableReader.java	(working copy)
+@@ -0,0 +1,372 @@
++package com.itextpdf.text.pdf;
++
++import java.io.IOException;
++import java.util.ArrayList;
++import java.util.Arrays;
++import java.util.Collections;
++import java.util.HashMap;
++import java.util.List;
++import java.util.Map;
++
++import com.itextpdf.text.io.RandomAccessSourceFactory;
++import com.itextpdf.text.log.Logger;
++import com.itextpdf.text.log.LoggerFactory;
++
++/**
++ * <p>
++ * Parses an OpenTypeFont file and reads the Glyph Substitution Table. This table governs how two or more Glyphs should be merged
++ * to a single Glyph. This is especially useful for Asian languages like Bangla, Hindi, etc.
++ * </p>
++ * <p>
++ * This has been written according to the OPenTypeFont specifications. This may be found <a href="http://www.microsoft.com/typography/otspec/gsub.htm">here</a>.
++ * </p>
++ * 
++ * @author <a href="mailto:paawak@gmail.com">Palash Ray</a>
++ */
++public class GlyphSubstitutionTableReader {
++
++    private static final Logger LOG = LoggerFactory.getLogger(GlyphSubstitutionTableReader.class);
++
++    private final RandomAccessFileOrArray rf;
++    private final int gsubTableLocation;
++    private final int[] glyphWidthByIndex;
++    private final Map<Integer, Character> glyphToCharacterMap;
++    private Map<Integer, List<Integer>> rawLigatureSubstitutionMap;
++
++    public GlyphSubstitutionTableReader(String fontFilePath, int gsubTableLocation, Map<Integer, Character> glyphToCharacterMap, int[] glyphWidthByIndex) throws IOException {
++        rf = new RandomAccessFileOrArray(new RandomAccessSourceFactory().createBestSource(fontFilePath));
++        this.gsubTableLocation = gsubTableLocation;
++        this.glyphWidthByIndex = glyphWidthByIndex;
++        this.glyphToCharacterMap = glyphToCharacterMap;
++    }
++
++    public Map<String, Glyph> getGlyphSubstitutionMap() throws IOException {
++        
++        readGsubTable(gsubTableLocation);
++        
++        Map<String, Glyph> glyphSubstitutionMap = new HashMap<String, Glyph>();
++        
++        for (Integer glyphIdToReplace : rawLigatureSubstitutionMap.keySet()) {
++            List<Integer> constituentGlyphs = rawLigatureSubstitutionMap.get(glyphIdToReplace);
++            StringBuilder chars = new StringBuilder(constituentGlyphs.size());
++            
++            for (Integer constituentGlyphId : constituentGlyphs) {
++                chars.append(getTextFromGlyph(constituentGlyphId, glyphToCharacterMap));
++            }
++            
++            Glyph glyph = new Glyph(glyphIdToReplace, glyphWidthByIndex[glyphIdToReplace], chars.toString());
++            
++            glyphSubstitutionMap.put(glyph.chars, glyph);
++        }
++        
++        return Collections.unmodifiableMap(glyphSubstitutionMap);
++        
++    }
++    
++    private String getTextFromGlyph(int glyphId, Map<Integer, Character> glyphToCharacterMap) {
++        
++        StringBuilder chars = new StringBuilder(1);
++        
++        Character c = glyphToCharacterMap.get(glyphId);
++        
++        if (c == null) {
++            // it means this represents a compound glyph
++            List<Integer> constituentGlyphs = rawLigatureSubstitutionMap.get(glyphId);
++            
++            if (constituentGlyphs == null || constituentGlyphs.isEmpty()) {
++                throw new IllegalArgumentException("No corresponding character or simple glyphs found for GlyphID=" + glyphId);
++            }
++            
++            for (int constituentGlyphId : constituentGlyphs) {
++                chars.append(getTextFromGlyph(constituentGlyphId, glyphToCharacterMap));
++            }
++            
++        } else {
++            chars.append(c.charValue());
++        }
++        
++        return chars.toString();
++    }
++    
++    private void readGsubTable(int gsubTableLocation) throws IOException {
++
++        rawLigatureSubstitutionMap = new HashMap<Integer, List<Integer>>();
++        
++        rf.seek(gsubTableLocation);
++        // 32 bit signed
++        int version = rf.readInt();
++        // 16 bit unsigned
++        int scriptListOffset = rf.readUnsignedShort();
++        int featureListOffset = rf.readUnsignedShort();
++        int lookupListOffset = rf.readUnsignedShort();
++
++        LOG.debug("version=" + version);
++        LOG.debug("scriptListOffset=" + scriptListOffset);
++        LOG.debug("featureListOffset=" + featureListOffset);
++        LOG.debug("lookupListOffset=" + lookupListOffset);
++
++        LOG.debug("************************************");
++
++        readLookupListTable(gsubTableLocation + lookupListOffset);
++
++        LOG.debug("************************************");
++
++        // Map<String, Integer> scriptRecords =
++        // readScriptListTable(gsubTableLocationOffset + scriptListOffset);
++        //
++        // // read the Script tables
++        // for (String scriptName : scriptRecords.keySet()) {
++        // readScriptTable(scriptRecords.get(scriptName));
++        // }
++
++    }
++
++    private void readLookupListTable(int lookupListTableLocation) throws IOException {
++        rf.seek(lookupListTableLocation);
++        final int lookupCount = rf.readShort();
++        LOG.debug("lookupCount=" + lookupCount);
++
++        List<Integer> lookupTableOffsets = new ArrayList<Integer>();
++
++        for (int i = 0; i < lookupCount; i++) {
++            int lookupTableOffset = rf.readShort();
++            lookupTableOffsets.add(lookupTableOffset);
++        }
++
++        for (int lookupTableOffset : lookupTableOffsets) {
++            LOG.debug("lookupTableOffset=" + lookupTableOffset);
++            LOG.debug("--------------------");
++            readLookupTable(lookupListTableLocation + lookupTableOffset);
++            LOG.debug("--------------------");
++        }
++
++    }
++
++    private void readLookupTable(int lookupTableLocation) throws IOException {
++        rf.seek(lookupTableLocation);
++        int lookupType = rf.readShort();
++        LOG.debug("lookupType=" + lookupType);
++
++        if (lookupType == 1) {// LookupType 1: Single Substitution Subtable
++            
++            int coverage = rf.readShort();
++            LOG.debug("coverage=" + coverage);
++            
++            int deltaGlyphID = rf.readShort();
++            LOG.debug("deltaGlyphID=" + deltaGlyphID);
++            
++            List<Integer> coverageGlyphIds = readCoverageFormat(lookupTableLocation + coverage);
++            
++            for (int coverageGlyphId : coverageGlyphIds) {
++                int substituteGlyphId = coverageGlyphId + deltaGlyphID;
++                rawLigatureSubstitutionMap.put(substituteGlyphId, Arrays.asList(coverageGlyphId)); 
++            }
++            
++        } else if (lookupType == 4) {// LookupType4: Ligature Substitution Subtable
++            
++            int lookupFlag = rf.readShort();
++            LOG.debug("lookupFlag=" + lookupFlag);
++            int subTableCount = rf.readShort();
++            LOG.debug("subTableCount=" + subTableCount);
++
++            List<Integer> subTableOffsets = new ArrayList<Integer>();
++
++            for (int i = 0; i < subTableCount; i++) {
++                int subTableOffset = rf.readShort();
++                subTableOffsets.add(subTableOffset);
++            }
++
++            for (int subTableOffset : subTableOffsets) {
++                LOG.debug("subTableOffset=" + subTableOffset);
++                LOG.debug("^^^^^^^^^^^^^");
++                readLigatureSubstitutionSubtable(lookupTableLocation + subTableOffset);
++                LOG.debug("^^^^^^^^^^^^^");
++            }
++        } else {
++            System.err.println("The lookup type " + lookupType + " is not yet handled");
++        }
++
++    }
++
++    private void readLigatureSubstitutionSubtable(int ligatureSubstitutionSubtableLocation) throws IOException {
++        rf.seek(ligatureSubstitutionSubtableLocation);
++        int substFormat = rf.readShort();
++        LOG.debug("substFormat=" + substFormat);
++
++        if (substFormat != 1) {
++            throw new IllegalArgumentException("The expected SubstFormat is 1");
++        }
++
++        int coverage = rf.readShort();
++        LOG.debug("coverage=" + coverage);
++
++        int ligSetCount = rf.readShort();
++        LOG.debug("^^^^^^^^^^^^^^^^^^^^^^^^^^^^ligSetCount=" + ligSetCount);
++
++        List<Integer> ligatureOffsets = new ArrayList<Integer>(ligSetCount);
++
++        for (int i = 0; i < ligSetCount; i++) {
++            int ligatureOffset = rf.readShort();
++            ligatureOffsets.add(ligatureOffset);
++        }
++
++        LOG.debug("::::::::::::::::::::::::::::::::::");
++
++        List<Integer> coverageGlyphIds = readCoverageFormat(ligatureSubstitutionSubtableLocation + coverage);
++
++        if (ligSetCount != coverageGlyphIds.size()) {
++            throw new IllegalArgumentException("According to the OpenTypeFont specifications, the coverage count should be equal to the no. of LigatureSetTables");
++        }
++
++        for (int i = 0; i < ligSetCount; i++) {
++
++            int coverageGlyphId = coverageGlyphIds.get(i);
++            int ligatureOffset = ligatureOffsets.get(i);
++            LOG.debug("ligatureOffset=" + ligatureOffset);
++            readLigatureSetTable(ligatureSubstitutionSubtableLocation + ligatureOffset, coverageGlyphId);
++        }
++
++    }
++
++    private void readLigatureSetTable(int ligatureSetTableLocation, int coverageGlyphId) throws IOException {
++        rf.seek(ligatureSetTableLocation);
++        int ligatureCount = rf.readShort();
++        LOG.debug("ligatureCount=" + ligatureCount);
++
++        List<Integer> ligatureOffsets = new ArrayList<Integer>(ligatureCount);
++
++        for (int i = 0; i < ligatureCount; i++) {
++            int ligatureOffset = rf.readShort();
++            ligatureOffsets.add(ligatureOffset);
++        }
++
++        for (int ligatureOffset : ligatureOffsets) {
++            readLigatureTable(ligatureSetTableLocation + ligatureOffset, coverageGlyphId);
++        }
++    }
++
++    private void readLigatureTable(int ligatureTableLocation, int coverageGlyphId) throws IOException {
++        rf.seek(ligatureTableLocation);
++        int ligGlyph = rf.readShort();
++        LOG.debug("@@@@@@@@@@@@@@ ligGlyph=" + ligGlyph);
++        int compCount = rf.readShort();
++
++        List<Integer> glyphIdList = new ArrayList<Integer>();
++
++        glyphIdList.add(coverageGlyphId);
++
++        for (int i = 0; i < compCount - 1; i++) {
++            int glyphId = rf.readShort();
++            glyphIdList.add(glyphId);
++            LOG.debug("############################glyphId=" + glyphId);
++        }
++
++        rawLigatureSubstitutionMap.put(ligGlyph, glyphIdList);
++    }
++
++    private List<Integer> readCoverageFormat(int coverageLocation) throws IOException {
++        rf.seek(coverageLocation);
++        int coverageFormat = rf.readShort();
++
++        List<Integer> glyphIds;
++
++        if (coverageFormat == 1) {
++            int glyphCount = rf.readShort();
++
++            LOG.debug("^^^^^^^^^coverageCount=" + glyphCount);
++
++            glyphIds = new ArrayList<Integer>(glyphCount);
++
++            for (int i = 0; i < glyphCount; i++) {
++                int coverageGlyphId = rf.readShort();
++                LOG.debug("############################coverageGlyphId=" + coverageGlyphId);
++                glyphIds.add(coverageGlyphId);
++            }
++
++        } else if (coverageFormat == 2) {
++
++            int rangeCount = rf.readShort();
++
++            LOG.debug("rangeCount=" + rangeCount);
++
++            glyphIds = new ArrayList<Integer>();
++
++            for (int i = 0; i < rangeCount; i++) {
++                readRangeRecord(glyphIds);
++            }
++
++        } else {
++            throw new UnsupportedOperationException("The coverage format " + coverageFormat + " is not yet supported");
++        }
++
++        return Collections.unmodifiableList(glyphIds);
++    }
++
++    private void readRangeRecord(List<Integer> glyphIds) throws IOException {
++        int startGlyphId = rf.readShort();
++        LOG.debug("startGlyphId=" + startGlyphId);
++        int endGlyphId = rf.readShort();
++        LOG.debug("endGlyphId=" + endGlyphId);
++        int startCoverageIndex = rf.readShort();
++        LOG.debug("startCoverageIndex=" + startCoverageIndex);
++
++        for (int glyphId = startGlyphId; glyphId <= endGlyphId; glyphId++) {
++            glyphIds.add(glyphId);
++        }
++
++    }
++
++    // private Map<String, Integer> readScriptListTable(final int
++    // scriptListTableLocationOffset) throws IOException {
++    // rf.seek(scriptListTableLocationOffset);
++    // // Number of ScriptRecords
++    // int scriptCount = rf.readShort();
++    //
++    // Map<String, Integer> scriptRecords = new HashMap<String,
++    // Integer>(scriptCount);
++    //
++    // LOG.debug("scriptCount=" + scriptCount);
++    //
++    // for (int scriptRecord = 1; scriptRecord <= scriptCount; scriptRecord++) {
++    // readScriptRecord(scriptListTableLocationOffset, scriptRecords);
++    // }
++    //
++    // return scriptRecords;
++    //
++    // }
++    //
++    // private void readScriptRecord(final int scriptListTableLocationOffset,
++    // Map<String, Integer> scriptRecords) throws IOException {
++    // String scriptTag = readStandardString(4);
++    // LOG.debug("scriptTag=" + scriptTag);
++    //
++    // int scriptOffset = rf.readShort();
++    // LOG.debug("scriptOffset=" + scriptOffset);
++    //
++    // scriptRecords.put(scriptTag, scriptListTableLocationOffset +
++    // scriptOffset);
++    //
++    // }
++    //
++    // private void readScriptTable(final int scriptTableLocationOffset) throws
++    // IOException {
++    // rf.seek(scriptTableLocationOffset);
++    // int defaultLangSys = rf.readShort();
++    // LOG.debug("defaultLangSys=" + defaultLangSys);
++    // int langSysCount = rf.readShort();
++    // LOG.debug("langSysCount=" + langSysCount);
++    //
++    // for (int langSysRecord = 1; langSysRecord <= langSysCount;
++    // langSysRecord++) {
++    // readLangSysRecord();
++    // }
++    // }
++    //
++    // private void readLangSysRecord() throws IOException {
++    // String langSysTag = readStandardString(4);
++    // LOG.debug("langSysTag=" + langSysTag);
++    // int langSys = rf.readShort();
++    // LOG.debug("langSys=" + langSys);
++    // }
++
++}
+Index: src/main/java/com/itextpdf/text/pdf/TrueTypeFont.java
+===================================================================
+--- src/main/java/com/itextpdf/text/pdf/TrueTypeFont.java	(revision 5617)
++++ src/main/java/com/itextpdf/text/pdf/TrueTypeFont.java	(working copy)
+@@ -190,6 +190,8 @@
+     protected HashMap<Integer, int[]> cmap31;
+ 
+     protected HashMap<Integer, int[]> cmapExt;
++    
++    private Map<String, Glyph> glyphSubstitutionMap;
+ 
+     /** The map containing the kerning information. It represents the content of
+      * table 'kern'. The key is an <CODE>Integer</CODE> where the top 16 bits
+@@ -667,6 +669,27 @@
+                 readCMaps();
+                 readKerning();
+                 readBbox();
++                
++                /////////////////////////////////////////////
++
++                if (tables.get("GSUB") != null) {
++                    
++                    Map<Integer, Character> glyphToCharacterMap = new HashMap<Integer, Character>(cmap31.size());
++
++                    for (Integer charCode : cmap31.keySet()) {
++                        char c = (char) charCode.intValue();
++                        int glyphCode = cmap31.get(charCode)[0];
++                        glyphToCharacterMap.put(glyphCode, c);
++                    }
++                
++                    GlyphSubstitutionTableReader openTypeFontReader = new GlyphSubstitutionTableReader(fileName, tables.get("GSUB")[0], glyphToCharacterMap, GlyphWidths);
++                    
++                    glyphSubstitutionMap = openTypeFontReader.getGlyphSubstitutionMap();
++                    
++                }
++                
++                ////////////////////////////////////////////
++                
+                 GlyphWidths = null;
+             }
+         }
+@@ -1572,4 +1595,9 @@
+             return null;
+         return bboxes[metric[0]];
+     }
++    
++    protected Map<String, Glyph> getGlyphSubstitutionMap() {
++        return glyphSubstitutionMap;
++    }
++    
+ }
+Index: src/main/java/com/itextpdf/text/pdf/languages/IndicCompositeCharacterComparator.java
+===================================================================
+--- src/main/java/com/itextpdf/text/pdf/languages/IndicCompositeCharacterComparator.java	(revision 0)
++++ src/main/java/com/itextpdf/text/pdf/languages/IndicCompositeCharacterComparator.java	(working copy)
+@@ -0,0 +1,39 @@
++package com.itextpdf.text.pdf.languages;
++
++import java.util.Comparator;
++
++/**
++ * <p>
++ * This works on CompositeCharcaters or Juktakshar-s of Indian languages like Bangla, Hindi, etc. CompositeCharcters
++ * are single glyphs consisting of more than one characters.
++ * <p>
++ * <p>
++ * This class works on these CompositeCharacters and places the Strings having higher number
++ * of Characters before the one with lower no. This is necessay to properly display the CompositeCharacters
++ * when they occur side by side.
++ * </p>
++ * <p>
++ * <h3>Examples of CompositeCharactes from Bangla</h3>
++ * <ul>
++ * <li><b>ঙ্গ</b></li>
++ * <li><b>ঙ্</b></li>
++ * <li><b>ক্ষ্ম</b></li>
++ * <li><b>ক্ষ</b></li>
++ * </ul>
++ * </p>
++ *  
++ * @author <a href="mailto:paawak@gmail.com">Palash Ray</a>
++ */
++public class IndicCompositeCharacterComparator implements Comparator<String> {
++    
++    public int compare(String o1, String o2) {
++        if (o2.length() > o1.length()) { 
++            return 1;
++        } else if (o1.length() > o2.length()) { 
++            return -1;
++        } else {
++            return o1.compareTo(o2);
++        }
++    }
++
++}
+Index: src/test/java/com/itextpdf/text/pdf/ArrayBasedStringTokenizerTest.java
+===================================================================
+--- src/test/java/com/itextpdf/text/pdf/ArrayBasedStringTokenizerTest.java	(revision 0)
++++ src/test/java/com/itextpdf/text/pdf/ArrayBasedStringTokenizerTest.java	(working copy)
+@@ -0,0 +1,102 @@
++package com.itextpdf.text.pdf;
++
++import static org.junit.Assert.assertEquals;
++import static org.junit.Assert.assertTrue;
++
++import java.util.Arrays;
++import java.util.List;
++
++import org.junit.Test;
++
++/**
++ *  
++ * @author <a href="mailto:paawak@gmail.com">Palash Ray</a>
++ */
++public class ArrayBasedStringTokenizerTest {
++    
++    @Test
++    public void testTokenize_happyPath() {
++        //given
++        ArrayBasedStringTokenizer tokenizer = new ArrayBasedStringTokenizer(new String[]{"aZx", "b2c", "bc2"});
++        String text = "12345aZxxabbccb2cxxxcfb1245678bc2889000";
++        
++        //when
++        List<String> tokens = Arrays.asList(tokenizer.tokenize(text));
++        
++        //then
++        StringBuilder sb = new StringBuilder();
++        for (String token : tokens) {
++            sb.append(token);
++        }
++        
++        assertEquals(text, sb.toString());
++        assertEquals(tokens, Arrays.asList("12345", "aZx", "xabbcc", "b2c", "xxxcfb1245678", "bc2", "889000"));
++    }
++    
++    @Test
++    public void testTokenize_regexAtStart() {
++        //given
++        ArrayBasedStringTokenizer tokenizer = new ArrayBasedStringTokenizer(new String[]{"aZx", "b2c", "bc2"});
++        String text = "bc2e12345aZxxabbccb2cxxxcfb1245678bc2889000";
++        
++        //when
++        String[] tokens = tokenizer.tokenize(text);
++        
++        //then
++        StringBuilder sb = new StringBuilder();
++        for (String token : tokens) {
++            sb.append(token);
++        }
++        
++        assertEquals(text, sb.toString());
++        
++        List<String> tokenList = Arrays.asList(tokens);
++        
++        assertEquals(0, tokenList.indexOf("bc2")); 
++    }
++    
++    @Test
++    public void testTokenize_regexAtEnd() {
++        //given
++        ArrayBasedStringTokenizer tokenizer = new ArrayBasedStringTokenizer(new String[]{"aZx", "b2c", "bc2"});
++        String text = "bc2e12345aZxxabbccb2cxxxcfb1245678bc2889000aZx";
++        
++        //when
++        List<String> tokens = Arrays.asList(tokenizer.tokenize(text));
++        
++        //then
++        StringBuilder sb = new StringBuilder();
++        for (String token : tokens) {
++            sb.append(token);
++        }
++        
++        assertEquals(text, sb.toString());
++        assertEquals(0, tokens.indexOf("bc2")); 
++        assertEquals(2, tokens.indexOf("aZx"));
++        assertEquals(tokens.size() - 1, tokens.lastIndexOf("aZx"));
++    }
++    
++    @Test
++    public void testTokenize_Bangla() {
++        //given
++        ArrayBasedStringTokenizer tokenizer = new ArrayBasedStringTokenizer(new String[]{"\u0995\u09cd\u09b7", "পু"});
++        String text = "আমি কোন পথে ক্ষীরের ষন্ড পুতুল রুপো গঙ্গা ঋষি";
++        
++        //when
++        String[] tokens = tokenizer.tokenize(text);
++        
++        //then
++        StringBuilder sb = new StringBuilder();
++        for (String token : tokens) {
++            sb.append(token);
++        }
++        
++        assertEquals(text, sb.toString());
++        
++        List<String> tokenList = Arrays.asList(tokens);
++        
++        assertTrue(tokenList.contains("ক্ষ"));
++        assertTrue(tokenList.contains("পু")); 
++    }
++
++}
