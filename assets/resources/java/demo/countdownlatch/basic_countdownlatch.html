@@ -1,0 +1,26 @@
+<!DOCTYPE body PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<style>
+div {color:red;}
+</style>
+<body>
+    <script src="https://www.java.com/js/deployJava.js"></script>
+	<div id="applet_div">
+    <script  language="javascript"> 
+    	//This is called when the applet is started
+	    function hideApplet() {
+	    	document.getElementById('applet_div').style.visibility = 'hidden'; 
+	    }    
+        var attributes = {
+            code:'com.swayam.demo.countdownlatch.CountDownLatchApplet',  width:500, height:300} ; 
+        var parameters = {jnlp_href: 'basic_countdownlatch.jnlp'} ; 
+        deployJava.runApplet(attributes, parameters, '1.7'); 
+    </script>
+    </div>
+    <div id="image_div">
+		Sorry! The Applet cannot be displayed as it is blocked by your security settings. In order to enable it, you should add it to the exception list of your Java Control Panel as shown below:
+		<img src="http://palashray.com/wp-content/uploads/2014/03/JavaControlPanel-283x300.png" alt="Java Control Panel Security Settings" width="283" height="300" class="size-medium wp-image-524" onload="hideApplet()"/>
+    </div>
+</body>
+</html>
