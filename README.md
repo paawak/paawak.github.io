@@ -1,5 +1,5 @@
 # Introduction
-I am using [Jekyll](https://jekyllrb.com/docs/) for blogging.
+This is the repo for my blogs. I am using [Jekyll](https://jekyllrb.com/docs/) for blogging. Earlier, I was using Wordpress, but then, the hosting used to be a real hassle, and I was looking for something very simple. So I switched over to Jekyll, recently. I used their great plugins to import my Wordpress Site into Jekyll.
 
 # Quick Start
 ## Building

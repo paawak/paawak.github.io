@@ -27,6 +27,10 @@ url: "" # the base hostname & protocol for your site, e.g. http://example.com
 twitter_username: paawak
 github_username:  paawak
 
+# Defines the way links to individual blogs are created
+# For more options, look at https://jekyllrb.com/docs/permalinks/
+permalink: /:title/
+
 # Build settings
 theme: minima
 plugins:
