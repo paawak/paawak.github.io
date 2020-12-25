@@ -51,4 +51,100 @@ Well its very simple: you define a *composer.json* in your root folder. A typica
 ```
 
 ## Choosing a framework
-PHP has many mature frameworks.
+PHP has many mature frameworks. I chose [Slim](https://www.slimframework.com/), which is a lightweight, no-frills framework for writing REST services. As of this writing, the latest version is [Slim4](https://www.slimframework.com/docs/v4/). Slim4 supports (PSR-7)[https://www.php-fig.org/psr/psr-7/] interfaces for its Request/Response objects. We would be using PSR7 interfaces wherever possible, so that we are not tightly coupled to Slim framework.
+
+Add the below lines to your *composer.json* to add Slim4 dependency:
+
+```json
+{
+    "name": "paawak-blog/rest-service-with-php-slim4",
+    "description": "Example of a REST Service with PHP Slim4",
+    "license": "proprietary",
+    "require": {
+        "slim/slim": "4.*",
+        "slim/psr7": "^1.1",
+...
+    }
+}
+```
+
+Note that we need to add PSR7 as well.
+
+## Dependency Injection
+Coming from Java background, I started looking for a good Dependency Injection Framework. I found [PHP DI](https://php-di.org/) to be pretty good. To use it with Slim4, we would need the [DI Slim Bridge](https://php-di.org/doc/frameworks/slim.html). We would need to add the below lines to our *composer.json*:
+
+```json
+{
+    "name": "paawak-blog/rest-service-with-php-slim4",
+    "description": "Example of a REST Service with PHP Slim4",
+    "license": "proprietary",
+    "require": {
+...
+        "php-di/php-di": "^6.2",
+        "php-di/slim-bridge": "^3.0"
+    }
+}
+```
+
+### DI Goals
+We would like to achieve the below objectives:
+  1. __Code to interface:__ This is our primary focus. We would like to define an interface and tie it to its implementation class, so that it can either be autowired, or fetched from the *DI Container*, given its interface.
+  2. __Environment configuration details:__ We would like to store our environment specific configuration details like DB username/password, so that we could retrieve it using a *key*.
+
+### Basic concepts of PHP-DI
+At the heart of the *PHP-DI* is the *container*, which is analogous to the *ApplicationContext* in Spring. *PHP-DI* works with PSR's *Psr\Container\ContainerInterface* interface, which ensures that our code is not too much tied to the *PHP-DI Framework*, but more loosely coupled. The *PHP-DI* defines a builder called *ContainerBuilder*, which helps us to create an instance of *ContainerInterface*. The *ContainerBuilder* has an utility method *addDefinitions()*, which takes in an *Associative Array*. This Array (basically *Map* in Java), has the *key* as either a *string* or a *class*, and the *value* as an *Object*.
+
+After we obtain an instance of the *ContainerInterface*, we could pass it around and obtain the various *objects* that we have defined by their respective *keys*. We would also use the *ContainerInterface* to obtain an instance of Slim's *App*, so that autowiring works seamlessly.
+
+We would demo these in the subsequent sections.
+
+### Bean definition
+We define beans as simple *Associative Arrays*. The below file *LocalApplicationConfig.php*, defines environment specific configuration parameters as shown below:
+
+```php
+return [
+    'database.host' => 'localhost',
+    'database.name' => 'rest_service_with_php_slim4',
+    'database.driver' => 'pdo_mysql',
+    'cors.allow-origin' => '*',
+    'logger.fileName' => '../logs/rest-service-with-php-slim4.log',
+    'logger.maxFiles' => 10,
+    'logger.console' => true
+];
+```
+
+We could do a more elegant definition, where we tie an interface to its implementation. This is done in the file *DIConfiguration.php* as shown below:
+
+```php
+return [
+MyAwesomInterface::class => function (ContainerInterface $container) {
+    $awesome = new MyAwesomInterfaceImpl($container->get('myKey_1'), $container->get('myKey_2'));
+    return $awesome;
+}
+];
+```
+
+Note that we are passing in the *ContainerInterface*, and getting our other beans from there as well.
+
+### Creating the DI Container
+We would use the *ContainerBuilder* to obtain an instance of the *ContainerInterface* as shown below:
+
+```php
+$containerBuilder = new ContainerBuilder;
+$containerBuilder->addDefinitions(__DIR__ . '/DIConfiguration.php');
+
+$containerBuilder->addDefinitions(__DIR__ . '/LocalApplicationConfig.php');
+
+$container = $containerBuilder->build();
+
+return $container;
+```
+
+### Creating the Slim App
+The final piece in the puzzle is creating Slim's *App* using the instance of the freshly minted *ContainerInterface*, so that DI works seamlessly with autowiring. This is how it is done:
+
+```php
+use DI\Bridge\Slim\Bridge;
+
+$app = Bridge::create($container);
+```
