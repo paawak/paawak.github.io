@@ -148,3 +148,192 @@ use DI\Bridge\Slim\Bridge;
 
 $app = Bridge::create($container);
 ```
+
+## Configuring a Logger
+We would use [Monolog](https://github.com/Seldaek/monolog) for logging. It is pretty intuitive to use and configure. The nice thing about Monolog is that it works with PSR7's *LoggerInterface*.
+
+The composer dependency is:
+
+```php
+  "monolog/monolog": "^2.1",
+```
+
+We would configure Monolog in our DI definition file as below:
+
+```php
+LoggerInterface::class => function (ContainerInterface $container) {
+    $dateFormat = "Y-m-d\TH:i:sP";
+    $output = "[%datetime%] %level_name%: %message% %context% %extra%\n";
+    $formatter = new LineFormatter($output, $dateFormat);
+
+    $logger = new Logger('ocr-correction-rest');
+    $fileHandler = new RotatingFileHandler($container->get('logger.fileName'), $container->get('logger.maxFiles'));
+    $fileHandler->setFormatter($formatter);
+    $logger->pushHandler($fileHandler);
+
+    if ($container->get('logger.console') === true) {
+        $consoleHandler = new StreamHandler('php://stdout', Logger::DEBUG);
+        $consoleHandler->setFormatter($formatter);
+        $logger->pushHandler($consoleHandler);
+    }
+
+    $logger->pushProcessor(new IntrospectionProcessor());
+
+    ErrorHandler::register($logger);
+
+    return $logger;
+}
+```
+
+The above configuration logs in file as well as console, if enabled.
+
+## Creating a REST service
+Now that we have configured our DI framework, and our logger, we are ready to write our first REST service. In a nutshell, we would need to create an instance of Slim *App* and configure our routing from that instance. We would do these configurations in the *index.php*.
+
+### Getting an App instance
+First, we instantiate the DI Container and obtain an instance of Slim *App*:
+
+```php
+$container = require __DIR__ . '/swayam/config/DIContainerBootstrap.php';
+$app = Bridge::create($container);
+```
+
+### Configure Error Handler
+
+```php
+$callableResolver = $app->getCallableResolver();
+$responseFactory = $app->getResponseFactory();
+$logger = $container->get(LoggerInterface::class);
+$errorHandler = new ErrorHandler($callableResolver, $responseFactory, $logger);
+```
+
+### Configure Routing
+
+```php
+$app->addRoutingMiddleware();
+$app->addBodyParsingMiddleware();
+$errorMiddleware = $app->addErrorMiddleware(true, true, true);
+$errorMiddleware->setDefaultErrorHandler($errorHandler);
+```
+
+### CORS configuration
+In Slim, there are various ways of configuring CORS. The most elegant approach is to write a Middleware that would add the needed CORS Headers in the response.
+
+```php
+use Psr\Container\ContainerInterface;
+use Psr\Log\LoggerInterface;
+use Psr\Http\Message\ServerRequestInterface as Request;
+use Psr\Http\Server\RequestHandlerInterface as RequestHandler;
+use Slim\Psr7\Response;
+
+class RequestInterceptingMiddleware {
+
+    private $container;
+    private $logger;
+
+    public function __construct(ContainerInterface $container, LoggerInterface $logger) {
+        $this->container = $container;
+        $this->logger = $logger;
+    }
+
+    public function __invoke(Request $request, RequestHandler $handler): Response {
+        $this->logger->info("Handling request of type: " . $request->getMethod() . ", with target-uri: " . $request->getRequestTarget());
+
+        if ($request->getRequestTarget() === '/') {
+            return $handler->handle($request);
+        }
+
+        if ($request->getMethod() === 'OPTIONS') {
+            return $this->addCORSHeaders(new Response());
+        }
+
+        //call the actual handler now
+        $response = $handler->handle($request);
+
+        //add CORS before returning
+        return $this->addCORSHeaders($response);
+    }
+
+    private function addCORSHeaders(Response $response): Response {
+        return $response
+                        ->withHeader('Access-Control-Allow-Origin', $this->container->get('cors.allow-origin'))
+                        ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization')
+                        ->withHeader('Access-Control-Allow-Credentials', 'true')
+                        ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    }
+
+}
+```
+
+Then add the below lines in the *index.php*.
+
+```php
+$app->options('/{routes:.+}', function ($request, $response, $args) {
+    return $response;
+});
+
+$app->add($container->get(RequestInterceptingMiddleware::class));
+```
+
+The first line tells *App* to return an empty response when the request type is *OPTIONS*.
+
+The second line adds the *RequestInterceptingMiddleware* as a middleware, to be called upon every request that is handled.
+
+### Define a simple route
+It is very easy to define a simple route. We would define a class *IndexController* that would return a health check status.
+
+```php
+use Psr\Http\Message\ResponseInterface as Response;
+use Psr\Http\Message\ServerRequestInterface as Request;
+
+class IndexController {
+
+    public function get(Request $request, Response $response) {
+        $payload = json_encode(['health' => 'OK'], JSON_PRETTY_PRINT);
+        $response->getBody()->write($payload);
+        return $response->withHeader('Content-Type', 'application/json');
+    }
+
+}
+```
+
+This is how we attach it to a route in *index.php*:
+
+```php
+$app->get('/', [IndexController::class, 'get']);
+```
+
+Here, the *PHP-DI* does its magic.
+
+### Define a route with path parameters
+We define the *AuthorController* as below:
+
+```php
+class AuthorController {
+
+    private $authorRepository;
+    private $logger;
+
+    public function __construct(AuthorRepository $authorRepository, LoggerInterface $logger) {
+        $this->authorRepository = $authorRepository;
+        $this->logger = $logger;
+    }
+
+    public function getAuthorById(Request $request, Response $response, $authorId) {
+        $author = $this->authorRepository->getAuthorById($authorId);
+        $payload = json_encode($author, JSON_PRETTY_PRINT);
+        $response->getBody()->write($payload);
+        return $response->withHeader('Content-Type', 'application/json');
+    }
+...
+```
+
+In the *index.php*, configure the route as below:
+
+```php
+$app->get('/author/{authorId}', [AuthorController::class, 'getAuthorById']);
+```
+
+Note how we expose the path parameter as a variable.
+
+## Doctrine: the PHP ORM Framework
