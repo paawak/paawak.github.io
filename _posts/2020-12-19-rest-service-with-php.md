@@ -86,6 +86,14 @@ Coming from Java background, I started looking for a good Dependency Injection F
 }
 ```
 
+To install all the required packages and their dependencies, run the below command (assuming, of course, that you have already installed *composer.phar*):
+
+    composer.phar install
+
+To update any dependency, use:
+
+    composer.phar update    
+
 ### DI Goals
 We would like to achieve the below objectives:
   1. __Code to interface:__ This is our primary focus. We would like to define an interface and tie it to its implementation class, so that it can either be autowired, or fetched from the *DI Container*, given its interface.
@@ -154,8 +162,16 @@ We would use [Monolog](https://github.com/Seldaek/monolog) for logging. It is pr
 
 The composer dependency is:
 
-```php
-  "monolog/monolog": "^2.1",
+```json
+{
+    "name": "paawak-blog/rest-service-with-php-slim4",
+    "description": "Example of a REST Service with PHP Slim4",
+    "license": "proprietary",
+    "require": {
+        "monolog/monolog": "^2.1",
+    }
+}
+
 ```
 
 We would configure Monolog in our DI definition file as below:
@@ -326,6 +342,7 @@ class AuthorController {
         return $response->withHeader('Content-Type', 'application/json');
     }
 ...
+}
 ```
 
 In the *index.php*, configure the route as below:
@@ -337,3 +354,20 @@ $app->get('/author/{authorId}', [AuthorController::class, 'getAuthorById']);
 Note how we expose the path parameter as a variable.
 
 ## Doctrine: the PHP ORM Framework
+No enterprise grade product is good enough without a good ORM. Developers can no longer be expected to hand-code SQL statements, and map out results into Objects etc. [Doctrine ORM](https://www.doctrine-project.org/projects/orm.html) is a feature rich intuitive framework that works with a wide variety of databases, with little fuss. Moreover, it is semantically pretty close to *Hibernate/JPA* from Java world, so has very little learning curve for someone like me.
+
+This is how we include it in our *composer.json*:
+
+```json
+{
+    "name": "paawak-blog/rest-service-with-php-slim4",
+    "description": "Example of a REST Service with PHP Slim4",
+    "license": "proprietary",
+    "require": {
+        "doctrine/orm": "^2.7",
+    }
+}
+```
+
+### Defining our Entities
+![Library Model UML](../assets/2020/12/library-model.png)
