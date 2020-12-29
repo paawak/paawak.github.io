@@ -15,3 +15,10 @@ Follow the below links:
 
 This is how the Domain configuration on Just Host looks like:
 ![Domain configuration on Just Host](assets/just-host-domain-configuration-for-github-pages.png)
+
+# Convert Markdown to Docx
+Look at this excellent blog <https://mrjoe.uk/convert-markdown-to-word-document/>
+
+This is the command:
+
+    pandoc -o output.docx -f markdown -t docx filename.md
