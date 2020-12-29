@@ -369,5 +369,289 @@ This is how we include it in our *composer.json*:
 }
 ```
 
-### Defining our Entities
+### Defining the EntityManager
+At the heart of Doctrine is the *EntityManager* that helps in doing CRUD operations from the database.
+
+This is how we define it in our DI-Config:
+
+```php
+EntityManager::class => function (ContainerInterface $container) {
+    $dbParams = array(
+        'driver' => $container->get('database.driver'),
+        'user' => $container->get('database.user'),
+        'password' => $container->get('database.password'),
+        'dbname' => $container->get('database.name'),
+        'host' => $container->get('database.host'),
+        'charset' => 'UTF8'
+    );
+
+    $isDevMode = true;
+    $proxyDir = null;
+    $cache = null;
+    $useSimpleAnnotationReader = false;
+    $config = Setup::createAnnotationMetadataConfiguration(array(__DIR__ . "/../model"), $isDevMode, $proxyDir, $cache, $useSimpleAnnotationReader);
+
+    $entityManager = EntityManager::create($dbParams, $config);
+    return $entityManager;
+}
+```
+
+Note that the *Setup::createAnnotationMetadataConfiguration()* takes in an array of locations which contain the Entities.
+
+### Entity Relationship
+This is how our Entities look like:
 ![Library Model UML](../assets/2020/12/library-model.png)
+
+### Defining a simple Entity
+Let us see how *Genre* is defined. This is the schema for *Genre*:
+
+```sql
+CREATE TABLE genre (
+	id BIGINT(20) NOT NULL UNIQUE PRIMARY KEY AUTO_INCREMENT,
+	short_name VARCHAR(10) NOT NULL,
+	name VARCHAR(100) NOT NULL
+);
+```
+
+This is how we would define the entity:
+
+```php
+use Doctrine\ORM\Mapping\Entity;
+use Doctrine\ORM\Mapping\Table;
+use Doctrine\ORM\Mapping\Id;
+use Doctrine\ORM\Mapping\GeneratedValue;
+use Doctrine\ORM\Mapping\Column;
+
+/**
+ * @Entity
+ * @Table(name="genre")
+ */
+class Genre implements \JsonSerializable {
+
+    /**
+     * @Id
+     * @Column(type="integer")
+     * @GeneratedValue(strategy="IDENTITY")
+     */
+    private $id;
+
+    /** @Column(type="string") */
+    private $name;
+
+    /** @Column(name="short_name", type="string") */
+    private $shortName;
+
+}
+```
+
+Note that the annotations are very similar to JPA.
+
+### One to One Association
+Consider the schema for the *book* table:
+
+```sql
+CREATE TABLE book (
+	id BIGINT(20) NOT NULL UNIQUE PRIMARY KEY AUTO_INCREMENT,
+	title TEXT NOT NULL,
+	author_id BIGINT(20) NOT NULL,
+	genre_id BIGINT(20) NOT NULL,
+	FOREIGN KEY (author_id) REFERENCES author(id),
+	FOREIGN KEY (genre_id) REFERENCES genre(id)
+);
+```
+
+We define the *Book* entity as below:
+
+```php
+use Doctrine\ORM\Mapping\Entity;
+use Doctrine\ORM\Mapping\Table;
+use Doctrine\ORM\Mapping\Id;
+use Doctrine\ORM\Mapping\GeneratedValue;
+use Doctrine\ORM\Mapping\Column;
+use Doctrine\ORM\Mapping\OneToOne;
+use Doctrine\ORM\Mapping\JoinColumn;
+
+/**
+ * @Entity
+ * @Table(name="book")
+ */
+class Book implements \JsonSerializable {
+
+    /**
+     * @Id
+     * @Column(type="integer")
+     * @GeneratedValue(strategy="IDENTITY")
+     */
+    private $id;
+
+    /** @Column(type="string") */
+    private $title;
+
+    /**
+     * @OneToOne(targetEntity="Author")
+     * @JoinColumn(name="author_id", referencedColumnName="id")
+     */
+    private $author;
+
+    /**
+     * @OneToOne(targetEntity="Genre")
+     * @JoinColumn(name="genre_id", referencedColumnName="id")
+     */
+    private $genre;
+
+}
+```
+
+### Using Embedded
+It is a common practice to use an *Embedded* class within an Entity to promote reuse.
+
+Consider the below schema of the *author* table:
+
+```sql
+CREATE TABLE author (
+	id BIGINT(20) NOT NULL UNIQUE PRIMARY KEY AUTO_INCREMENT,
+	first_name VARCHAR(200) NOT NULL,
+	last_name VARCHAR(200) NOT NULL,
+        address VARCHAR(200) NOT NULL,
+        city VARCHAR(200) NOT NULL,
+        state VARCHAR(200) NOT NULL,
+        zip_code VARCHAR(50) NOT NULL,
+        country VARCHAR(200) NOT NULL
+);
+```
+
+Here the address fields can be abstracted out into an *Embeddable* as shown below:
+
+```php
+use Doctrine\ORM\Mapping\Embeddable;
+use Doctrine\ORM\Mapping\Column;
+
+/**
+ * @Embeddable
+ */
+class Address implements \JsonSerializable {
+
+    /**
+     * @Column(type="string")
+     */
+    private $address;
+
+    /**
+     * @Column(type="string")
+     */
+    private $city;
+
+    /**
+     * @Column(type="string")
+     */
+    private $state;
+
+    /**
+     * @Column(name = "zip_code", type="string")
+     */
+    private $zipCode;
+
+    /**
+     * @Column(type="string")
+     */
+    private $country;
+}    
+```
+
+We can now use it with the *Author* entity as shown below:
+
+```php
+use Doctrine\ORM\Mapping\Entity;
+use Doctrine\ORM\Mapping\Embedded;
+use Doctrine\ORM\Mapping\Table;
+use Doctrine\ORM\Mapping\Id;
+use Doctrine\ORM\Mapping\GeneratedValue;
+use Doctrine\ORM\Mapping\Column;
+
+/**
+ * @Entity
+ * @Table(name="author")
+ */
+class Author implements \JsonSerializable {
+
+    /**
+     * @Id
+     * @Column(type="integer")
+     * @GeneratedValue(strategy="IDENTITY")
+     */
+    private $id;
+
+    /** @Column(name="first_name", type="string") */
+    private $firstName;
+
+    /** @Column(name="last_name", type="string") */
+    private $lastName;
+
+    /**
+     * @Embedded(class = "Address", columnPrefix=false)
+     */
+    private $address;
+}
+```
+
+### Simple CRUD Operations
+All CRUD operations are done through the *EntityManager*.
+
+The below method would save a new *Author* entity:
+
+```php
+public function addNewAuthor(Author $author): Author {
+    $this->entityManager->persist($author);
+    $this->entityManager->flush();
+    return $author;
+}
+```
+
+The method returns an *Author* having the auto-generated id in it.
+
+The below code would fetch all *Authors*:
+
+```php
+public function getAllAuthors(): Array {
+    return $this->entityManager->getRepository(Author::class)->findAll();
+}
+```
+
+The below code would fetch an *Author*, given its id:
+
+```php
+public function getAuthorById(int $authorId): Author {
+    return $this->entityManager->getRepository(Author::class)->find($authorId);
+}
+```
+
+A slightly tweaked scenario: fetch all *Authors* from a given *country*:
+
+```php
+public function searchAuthorsByCountry(string $country): array {
+    return $this->entityManager->getRepository(Author::class)->findBy(
+                    array(
+                        'address.country' => $country
+                    ),
+                    array('id' => 'DESC')
+    );
+}
+```
+
+### Saving a new Entity having references to existing entities
+Let us consider a scenario where we would like to save a new *Book*. This *Book* refers to a *Genre* and an *Author*. The only twist is that, both the *Genre* and the *Author* already exists in the database. The *Book* just has the IDs of the *Genre* and the *Author*.
+
+This is how the JSON representation of the *Book* looks like:
+```json
+{
+    "title": "Agniswar",
+    "author": {
+        "id": "1"
+    },
+    "genre": {
+        "id": "1"
+    }    
+}
+```
+
+If we try to use the normal *entityManager->persist()*, it will not work as it will try to insert the *Author* and the *Genre*. We could use the deprecated *entityManager->merge()*,
