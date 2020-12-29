@@ -353,6 +353,51 @@ $app->get('/author/{authorId}', [AuthorController::class, 'getAuthorById']);
 
 Note how we expose the path parameter as a variable.
 
+### Converting JSON into a PHP Object
+Consider the below JSON that we use in a *POST* operation to save an *Author*:
+
+```json
+{
+    "firstName": "Balaichand",
+    "lastName": "Mukhopadhyay",
+    "address": {
+        "address": "Manihari Gram",
+        "city": "Poornia",
+        "state": "Bangla",
+        "zipCode": "713876",
+        "country": "India"
+    }
+}
+```
+
+First, we parse the JSON into a PHP Array as shown below:
+
+```php
+$authorRequestAsArray = $request->getParsedBody();
+```
+
+Also, we define a static helper method in our *Author* class:
+
+```php
+public static function fromJsonArray($authorAsArray) {
+    $author = new Author();
+    foreach ($authorAsArray as $fieldName => $value) {            
+        if ($fieldName === 'address') {
+            $author->address = Address::fromJsonArray($value);
+        } else {
+            $author->{$fieldName} = $value;
+        }
+    }
+    return $author;
+}
+```
+
+We then call it from our controller, as shown below:
+
+```php
+$authorEntity = Author::fromJsonArray($authorRequestAsArray);
+```
+
 ## Doctrine: the PHP ORM Framework
 No enterprise grade product is good enough without a good ORM. Developers can no longer be expected to hand-code SQL statements, and map out results into Objects etc. [Doctrine ORM](https://www.doctrine-project.org/projects/orm.html) is a feature rich intuitive framework that works with a wide variety of databases, with little fuss. Moreover, it is semantically pretty close to *Hibernate/JPA* from Java world, so has very little learning curve for someone like me.
 
@@ -638,6 +683,8 @@ public function searchAuthorsByCountry(string $country): array {
 }
 ```
 
+Note that using *columnPrefix=false* as a parameter of the *@Embedded*, in this case the *Address* column, is very important. Otherwise the above query *'address.country' => $country* will not work. Refer to this [section](https://www.doctrine-project.org/projects/doctrine-orm/en/2.7/tutorials/embeddables.html#column-prefixing) for more details.
+
 ### Saving a new Entity having references to existing entities
 Let us consider a scenario where we would like to save a new *Book*. This *Book* refers to a *Genre* and an *Author*. The only twist is that, both the *Genre* and the *Author* already exists in the database. The *Book* just has the IDs of the *Genre* and the *Author*.
 
@@ -654,4 +701,32 @@ This is how the JSON representation of the *Book* looks like:
 }
 ```
 
-If we try to use the normal *entityManager->persist()*, it will not work as it will try to insert the *Author* and the *Genre*. We could use the deprecated *entityManager->merge()*,
+If we try to use the normal *entityManager->persist()*, it will not work as it will try to insert the *Author* and the *Genre*. We could use the deprecated *entityManager->merge()*, but it might be removed in the future. So, what we have done is, converting the *Author* and the *Genre* from *Detatched State* to *Persistant State*. We do this by querying the respective object graphs as shown below:
+
+```php
+public function addNewBook(Book $book): Book {   
+    $authorId = $book->getAuthor()->getId();
+    $authorEntity = $this->authorRepository->getAuthorById($authorId);
+    if ($authorEntity == null) {
+        throw new Exception("No author found for the id" . $authorId);
+    }
+
+    $genreId = $book->getGenre()->getId();
+    $genreEntity = $this->genreRepository->getGenreById($genreId);
+    if ($genreEntity == null) {
+        throw new Exception("No genre found for the id" . $genreId);
+    }
+
+    $book->setAuthor($authorEntity);
+    $book->setGenre($genreEntity);
+
+    $this->entityManager->persist($book);
+    $this->entityManager->flush();
+    return $book;
+}
+```
+
+Note how we replcae the partial objects with *Persistant Entities* in *Book*, and then persist it.
+
+# Sources
+A fully working code can be found here: <https://github.com/paawak/blog/tree/master/code/php/rest-service-with-php-slim4>
