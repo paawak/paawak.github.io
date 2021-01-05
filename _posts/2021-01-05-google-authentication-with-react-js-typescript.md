@@ -32,6 +32,10 @@ In addition to that, the user would also see a logout button on the Menu Bar as 
 
 ![Google logout button](../assets/2021/01/library-ui-google-logout.png)
 
+However, if the Google login fails, an error message is displayed as shown below:
+
+![Google login failure](../assets/2021/01/library-ui-login-failed.png)
+
 
 # Sources
 A fully working code can be found here: <https://github.com/paawak/blog/tree/master/code/reactjs/library-ui-secured-with-google>
