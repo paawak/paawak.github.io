@@ -162,7 +162,13 @@ Boot up the [ReactJS Client](https://github.com/paawak/blog/tree/master/code/rea
 
 As shown above, you would be able to see the *Authorization Header* copy that. The curl command would be:
 
-    curl -v -H "Authorization: MySecretToken" "http://localhost:8000/genre" 
+    curl -v -H "Authorization: MySecretToken" "http://localhost:8000/genre"
+
+# Deploying on Apache
+
+When deployed on Apache Server, the Authorization Headers cannot be read, happened with me. The solution is, in the .htaccess file, put the below lines:
+
+    SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
 
 # Sources
 The Frontend code can be found here: <https://github.com/paawak/blog/tree/master/code/reactjs/library-ui-secured-with-google>.
