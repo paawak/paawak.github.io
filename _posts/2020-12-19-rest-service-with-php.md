@@ -726,7 +726,21 @@ public function addNewBook(Book $book): Book {
 }
 ```
 
-Note how we replcae the partial objects with *Persistant Entities* in *Book*, and then persist it.
+Note how we replace the partial objects with *Persistant Entities* in *Book*, and then persist it.
+
+# Deploying on Apache
+
+When deployed on Apache Server, some service calls fail with HTTP Status 404, Page Not Found. For Example, the below call fails:
+
+    curl -v "http://localhost:8000/author/1"
+
+The issue is that, the Apache server looks for these path inside the directories, instead of delegating it to the Slim container. The solution is to ask Apache to always redirect the calls to the *index.php*. To do that, we would need to edit the *.htaccess* file, and put the below lines:
+
+    RewriteEngine On
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_METHOD} (PUT|DELETE|GET|POST|OPTIONS)
+    RewriteRule ^(.*)$ index.php
 
 # Sources
 A fully working code can be found here: <https://github.com/paawak/blog/tree/master/code/php/rest-service-with-php-slim4>
