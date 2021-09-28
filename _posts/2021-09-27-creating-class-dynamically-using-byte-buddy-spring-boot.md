@@ -25,43 +25,84 @@ There are a number of very powerful libraries that allow you to generate classes
 I am building a trivial Web Application with Spring Boot. It uses versioned REST APIs. Nothing fancy, just that each of the end points starts with its version. For example, the V1 of my API would be <http://localhost:8080/v1/bank-item/>. Similarly, no prizes for guessing, that the V2 of my API would be <http://localhost:8080/v2/bank-item/>.
 
 # The Challenge
-I have already built the V1 of my REST end point. And ofcourse, I have a RestController for that. Now, I am feeling too lazy to build the V2 of the same end point, as I know that would mean I have to write a DAO, a Service, the Model, the entire stack, before I even get to my RestController. And I love taking short cuts. So, can I extend my existing RestController for V1, and create another RestController such that it starts responding to my V2 requests? And can I do this dynamically too?
+I have already built the V1 of my REST end point. And of course, I have a RestController for that. Now, I am feeling too lazy to build the V2 of the same end point, as I know that would mean I have to write a DAO, a Service, the Model, the entire stack, before I even get to my RestController. And I love taking short cuts. So, can I extend my existing RestController for V1, and create another RestController such that it starts responding to my V2 requests? And can I do this dynamically too?
+
+Assuming, we already have an existing RestController called __BankDetailController__, serving the V1 endpoint, basically what we would like to do is, create a class similar to below:
+
+```java
+@RestController
+@RequestMapping("/v2/bank-item")
+public class BankDetailControllerV2 extends BankDetailController {
+
+    public BankDetailControllerV2(BankDetailService bankDetailService) {
+	     super(bankDetailService);
+    }
+
+}
+```
 
 Let's see: well, there are many ways we could achieve this, but for the sake of brevity, we will stick to just 2 approaches.
 
-# Solution 1: 
-As described in my previous post, [Google Authentication with ReactJS and Typescript](http://palashray.com/google-authentication-with-reactjs-and-typescript/), this is how we obtain the *Google Token ID* in our *App.tsx*:
+# First Approach
+We create the class file dynamically using ByteBuddy and save it to the disk, somewhere in my classpath. I do this before Spring starts scanning the classpath and creating beans. When Spring starts scanning my classpath, the newly created classfile is already available to it. If I decorate that class with the correct annotations, Spring will pick it up and do the rest.
 
-```reactjs
-<GoogleSignInComponent loginSuccess={(response: GoogleLoginResponse | GoogleLoginResponseOffline) => {
-      if ('tokenId' in response) {
-        setGoogleAccessToken(response.tokenId);
-      }
-    }} />
+## The right life-cycle hook
+The challenge really is to find the correct life-cycle hook, so that we can create this class in the right phase. I found that the [EnvironmentPostProcessor](https://docs.spring.io/spring-boot/docs/current/api/org/springframework/boot/env/EnvironmentPostProcessor.html) to be the right thing. This is actually used to customize Environment variables, so this is a bit of a hack, but that's OK. It is going to be invoked right after the Environment is created, but before any beans are initialized. Looks like just the thing for us.
+
+So, we go ahead and create our own __DynamicControllerPostProcessor__, which implements __EnvironmentPostProcessor__. Remember to create a __META-INF/spring.factories__ file and put the below entry there for this class to be invoked:
+
+```property
+org.springframework.boot.env.EnvironmentPostProcessor=com.swayam.demo.springbootdemo.dynamicclassesbytebuddy.config.DynamicControllerPostProcessor
 ```
 
-Whenever we make any REST calls, we would use this *googleAccessToken*. For example, the below code fetches the list of *Genres*. Note how we pass the *googleAccessToken* as the *Authorization Header*
+Since our Loggers are not yet initialized, remember to use plain *System.outs* instead of Loggers.
 
-```reactjs
-fetch(`${process.env.REACT_APP_REST_API_BASE_NAME}/genre`, {
-    headers: {
-        'Authorization': this.props.googleAccessToken
+This is how __DynamicControllerPostProcessor__ looks like:
+
+```java
+@Order(Ordered.LOWEST_PRECEDENCE)
+public class DynamicControllerPostProcessor implements EnvironmentPostProcessor {
+
+    @Override
+    public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {
+	     // put the code to create dynamic class here
     }
-}).then(response => response.json())
-    .then(rawGenres => {
-        const genres: ComboBoxItemValue[] = rawGenres.map((rawGenre: any) => {
-            return {
-                itemId: rawGenre.id,
-                displayText: rawGenre.name
-            } as ComboBoxItemValue;
-        });
-
-        this.setState({
-            genres: genres,
-            noGenresFound: genres.length === 0
-        });
-    });
+}    
 ```
+
+## Creating the class dynamically
+Here is the snippet for creating our cool new class:
+
+```java
+private void createDynamicController() {
+
+String className = BankDetailController.class.getName() + "V2";
+
+System.out.println("Creating new class: " + className);
+
+Unloaded<?> generatedClass =
+new ByteBuddy().subclass(BankDetailController.class)
+  .annotateType(AnnotationDescription.Builder.ofType(RestController.class).build(),
+    AnnotationDescription.Builder.ofType(RequestMapping.class)
+      .defineArray("value", new String[] { "/v2/bank-item" }).build())
+  .name(className).make();
+
+Loaded<?> loadedClass =
+generatedClass.load(getClass().getClassLoader(), ClassLoadingStrategy.Default.INJECTION);
+
+try {
+  Map<TypeDescription, File> map = loadedClass.saveIn(new File("target/classes"));
+  System.out.println("Successfully saved the newly created class in: " + map);
+} catch (IOException e) {
+  throw new RuntimeException(e);
+}
+
+}
+```
+
+Notice, how we begin by instructing __ByteBuddy__ to *subclass* the __BankDetailController__. Next, we create the *@RestController* annotation using the __AnnotationDescription.Builder__. Then, we create the *@RequestMapping* annotation, and pass the *String[]* argument by using the *defineArray*. Finally, we add the *className*, which is a fully qualified className with the right package.
+
+This class is then loaded into the ClassLoader and duly saved on the disk. The assumption, of course is that the *target/classes* is on my classpath.
 
 # Testing with CURL
 Boot up the [ReactJS Client](https://github.com/paawak/blog/tree/master/code/reactjs/library-ui-secured-with-google) and browse to <http://localhost:3000/>. You would see the login screen. Proceed to login with Google. Now hit *F12* to open the *Developer Console*. From the Menu, select Book -> Add New.
