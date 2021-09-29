@@ -104,22 +104,72 @@ Notice, how we begin by instructing __ByteBuddy__ to *subclass* the __BankDetail
 
 This class is then loaded into the ClassLoader and duly saved on the disk. The assumption, of course is that the *target/classes* is on my classpath.
 
-# Testing with CURL
-Boot up the [ReactJS Client](https://github.com/paawak/blog/tree/master/code/reactjs/library-ui-secured-with-google) and browse to <http://localhost:3000/>. You would see the login screen. Proceed to login with Google. Now hit *F12* to open the *Developer Console*. From the Menu, select Book -> Add New.
+## Sources
+The source code can be found here: <https://github.com/paawak/spring-boot-demo/tree/master/dynamic-classes-bytebuddy/actual-classfile-example>.
 
-![Google login screen](../assets/2021/01/obtaining-google-access-token.png)
+# Second Approach
+The first approach works reasonably well. There is one hitch though: we have to save the actual classfile on the disk. That might not be ideal in certain circumstances. For example, I am running this inside of a Docker container, and I don't have write permissions.
 
-As shown above, you would be able to see the *Authorization Header* copy that. The curl command would be:
+What if, we could create the class dynamically, but, instead of actually saving it on the disk, just load it into the ClassLoader and use it? Say, create a Spring Bean dynamically?
 
-    curl -v -H "Authorization: MySecretToken" "http://localhost:8000/genre"
+## Dynamically defining a Spring Bean
+Turns out that the [BeanFactoryPostProcessor](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/beans/factory/config/BeanFactoryPostProcessor.html) is just the thing for us. This is primarily used for customizing the beans defined in the BeanFactory. We can also leverage this is to register our custom Spring Bean dynamically.
 
-# Deploying on Apache
+This is how it is done in __DynamicBeanFactoryPostProcessor__:
 
-When deployed on Apache Server, the Authorization Headers cannot be read, happened with me. The solution is, in the .htaccess file, put the below lines:
+```java
+@Configuration
+public class DynamicBeanFactoryPostProcessor implements BeanFactoryPostProcessor {
 
-    SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+    private static final Logger LOG = LoggerFactory.getLogger(DynamicBeanFactoryPostProcessor.class);
 
-# Sources
-The Frontend code can be found here: <https://github.com/paawak/blog/tree/master/code/reactjs/library-ui-secured-with-google>.
+    @Override
+    public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
 
-The PHP Backend code can be found here: <https://github.com/paawak/blog/tree/master/code/php/php-rest-service-google-oauth2>.
+	Class<?> dynamicController = ...//create the class here and load it into the classloader
+
+	BeanDefinitionBuilder beanDefinitionBuilder = BeanDefinitionBuilder.rootBeanDefinition(dynamicController)
+		.addConstructorArgReference("bankDetailServiceImpl");
+
+	((DefaultListableBeanFactory) beanFactory).registerBeanDefinition(className,
+		beanDefinitionBuilder.getBeanDefinition());
+
+    }
+}    
+```
+
+We use the __BeanDefinitionBuilder__ to define our bean. Before that, the first step is to create the class dynamically and then load it into the ClassLoader. You do not need to save it on the disk. We pass in our freshly baked class into the __rootBeanDefinition()__. As our RestController also has a constructor dependency, we would need to define that as well. We use the __addConstructorArgReference()__, which takes in a String instead of the actual Object. This is really convenient, as you do not have to manually resolve all dependency.
+
+Once we are good with our Bean Definition, we can register that in the __DefaultListableBeanFactory__.
+
+## Creating a class in-memory
+Almost forgot: how do we do the first step of creating the class and loading it without actually saving it disk? Very simple:
+
+```java
+private Class<?> createDynamicController(String className) {
+
+LOG.info("Creating new class: {}", className);
+
+Unloaded<?> generatedClass =
+new ByteBuddy().subclass(BankDetailController.class)
+  .annotateType(AnnotationDescription.Builder.ofType(RestController.class).build(),
+    AnnotationDescription.Builder.ofType(RequestMapping.class)
+      .defineArray("value", new String[] { "/v2/bank-item" }).build())
+  .name(className).make();
+
+generatedClass.load(getClass().getClassLoader(), ClassLoadingStrategy.Default.INJECTION);
+
+LOG.info("Loaded the class {} successfully into the classloader {}", className, getClass().getClassLoader());
+
+try {
+  return Class.forName(className);
+} catch (ClassNotFoundException e) {
+  throw new RuntimeException(e);
+}
+
+}
+```
+After the call to __generatedClass.load()__, the class has been loaded into the ClassLoader, so we can do a __Class.forName()__ and return the Class representation with which we can work.
+
+## Sources
+The source code can be found here: <https://github.com/paawak/spring-boot-demo/tree/master/dynamic-classes-bytebuddy/in-memory-example>.
