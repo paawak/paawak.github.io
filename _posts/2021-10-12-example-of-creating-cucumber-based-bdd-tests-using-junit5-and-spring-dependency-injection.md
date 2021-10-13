@@ -231,5 +231,26 @@ Spring Cucumber Reference: <https://github.com/paawak/cucumber-jvm/tree/master/s
 
 JUnit 5 Example: <https://github.com/paawak/cucumber-jvm/tree/master/examples/calculator-java-junit5>
 
+# Addendum: How to define Scenario Outline
+Though a bit off topic, could not resist the temptation of adding this nugget here.
+
+## When to use?
+I have a REST endpoint to search for Authors with partial First Name or Last Name. I would like to try different names and assert the count of Authors returned. Instead of writing various scenarios, each for a name, we could use a *Scenario Outline* as below:
+
+```gherkin
+Scenario Outline: Get authors by name
+  When I search for author by name at "/v1/author/<name>"
+  Then I should find <count> authors
+
+  Examples:
+    | name  | count |
+    | BALAI |     1 |
+    | sara |     1 |
+    | a |     2 |
+    | A |     2 |
+```
+
+What we are doing is putting parameters between *&lt;&gt;*. We have 2 parameters above: *&lt;name&gt;* and *&lt;count&gt;*. Then, in the *Examples* section, we are providing the values for these parameters. The Steps defined under the *Scenario Outline* would be called as many times as the number of rows in the *Examples* with the specified values.
+
 # Sources
 The source code can be found here: <https://github.com/paawak/spring-boot-demo/tree/master/cucumber/cucumber-with-junit5-spring>.
