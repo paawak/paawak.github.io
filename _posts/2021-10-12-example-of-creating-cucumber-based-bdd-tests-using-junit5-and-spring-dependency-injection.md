@@ -116,7 +116,120 @@ public class RunCucumberTest {
 
 }
 ```
-By convention, the feature files are expected to be under the same package as the TestRunner. In case it is different, we can specify that by using the *@SelectClasspathResource("cukes")* annotation.
+By convention, the feature files are expected to be under the same package as the TestRunner. In case it is different, for example, located under the *src/test/resources/cukes*, we can specify that by using the *@SelectClasspathResource("cukes")* annotation.
+
+Various configuration parameters can be passed into it through the *@ConfigurationParameter* annotation.
+
+## Spring Integration
+### Defining a TestConfiguration
+Let us start by defining a TestConfiguration that will do my ComponentScan and also define any Beans that I would need.
+
+```java
+@ComponentScan
+@Configuration
+public class SpringTestConfig {
+
+    @Bean
+    public RestTemplate restTemplate() {
+	return new RestTemplate();
+    }
+
+}
+```
+
+The *@ComponentScan* ensures that any Spring annotated classes defined under this package, will be picked up by Spring DI.
+
+### Integration with Cucumber
+In order to integrate Spring DI with Cucumber glue code or Step Definitions, we would need to do the below:
+
+```java
+import org.springframework.test.context.ContextConfiguration;
+import io.cucumber.spring.CucumberContextConfiguration;
+
+@CucumberContextConfiguration
+@ContextConfiguration(classes = { SpringTestConfig.class })
+public class CucumberSpringContextConfig {
+
+}
+```
+
+Notice how we use the *@ContextConfiguration* to tie the TestConfiguration that we have defined above into Cucumber. This will ensure that all Spring Beans are available for use in our Cucumber Step Definitions.
+
+### Sharing State between Step Definitions
+This is how my *author.feature* file looks like:
+
+```gherkin
+@author
+Feature: Test all author rest endpoints
+
+Background:
+  Given The application is available at "http://localhost:8080"
+  And Health check is fine at "/actuator/health"
+
+Scenario: List all available authors
+  When I fetch authors at "/v1/author"
+  Then I should find 2 authors   
+```
+
+Look closely and you will see that the idea is to define the base URL which is the host name *http://localhost:8080* only once in the *Given* of the *Background*. All subsequent steps just define the rest of the path like */actuator/health* and */v1/author*. This is done to make this more readable and promoting reuse.
+
+But then, we would need the ability to pass on the base URL from the *Given* to all the subsequent steps that needs it.
+
+Another scenario where we would need to share state is, between the *When* and *Then*. In the above example, *When* is expected to fetch the list of authors and *Then* is supposed to verify the number of authors found.
+
+We write the below SharedDTO class that we can use for this.
+
+```java
+@Component
+@ScenarioScope
+@Data
+public class SharedDTO {
+
+    private String baseUrl;
+    private List<Author> authors;
+    private List<Book> books;
+    private int booksAffected;
+
+}
+```
+
+Then, in the *AuthorSteps* step definition, just *@Autowire* this, as you would any other Spring Bean. The @ScenarioScope ensures that this Bean is destroyed and recreated for every scenario.
+
+```java
+public class AuthorSteps {
+
+    @Autowired
+    private RestTemplate restTemplate;
+
+    @Autowired
+    private SharedDTO sharedDto;
+
+    @Given("The application is available at {string}")
+    public void applicationBaseUrl(String baseUrl) {
+	     sharedDto.setBaseUrl(baseUrl);
+    }
+
+    @When("I fetch authors at {string}")
+    public void fetchAuthors(String uri) {
+      List<Author> authors = restTemplate.exchange(sharedDto.getBaseUrl() + uri, HttpMethod.GET, null,
+      new ParameterizedTypeReference<List<Author>>() {}).getBody();
+      sharedDto.setAuthors(authors);
+    }
+
+    @Then("I should find {int} authors")
+    public void fetchAuthors(int authorCount) {
+	     assertEquals(authorCount, sharedDto.getAuthors().size());
+    }    
+
+}
+```    
+
+Note how we are setting the Base URL on the *Given* and the using that in *When*. Also, we are setting the *List&lt;Author&gt;* in *When* and using it in *Then* to verify the count.
+
+### Reference
+Spring Cucumber Reference: <https://github.com/paawak/cucumber-jvm/tree/master/spring>    
+
+JUnit 5 Example: <https://github.com/paawak/cucumber-jvm/tree/master/examples/calculator-java-junit5>
 
 # Sources
 The source code can be found here: <https://github.com/paawak/spring-boot-demo/tree/master/cucumber/cucumber-with-junit5-spring>.
