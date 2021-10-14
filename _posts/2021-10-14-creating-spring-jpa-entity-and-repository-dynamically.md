@@ -203,3 +203,112 @@ public class JpaRepoConfig {
 The sources for the *static-jpa-repo-abstraction* can be found here: <https://github.com/paawak/spring-boot-demo/tree/master/dynamic-jpa/static-jpa-repo-abstraction>.
 
 ## Take the plunge
+We will copy the code from the *static-jpa-repo-abstraction* and rename it to *dynamic-jpa-repo*.
+
+We are finally ready! Lets delete the below classes as a start:
+1.  Book
+1.  BookDao
+1.  JpaRepoConfig
+
+You should not get any compilation error, as these classes are not used by anyone directly.
+
+We will create a helper class *DynamicClassGenerator* to create the Entity and the Dao class dynamically with *ByteBuddy*.
+
+### Generating the Entity
+The below code does the trick:
+
+```java
+Unloaded<?> generatedClass = new ByteBuddy().subclass(BookTemplateImpl.class)
+  .annotateType(AnnotationDescription.Builder.ofType(Entity.class).build(),
+    AnnotationDescription.Builder.ofType(Table.class).define("name", "book").build())
+  .name(entityClassName).make();
+```
+
+As is evident, we start by extending the *BookTemplateImpl*. We then go on to add 2 class level annotation:
+1.  @Entity
+1.  @Table(name = "book")
+
+### Generating the Repository
+This is how the Repository can be generated:
+
+```java
+Generic crudRepo = Generic.Builder.parameterizedType(CrudRepository.class, entityClass, Integer.class).build();
+
+Unloaded<?> generatedClass = new ByteBuddy().makeInterface(crudRepo).implement(BookDaoTemplate.class)
+  .method(ElementMatchers.named("updateAuthor")).withoutCode()
+  .annotateMethod(AnnotationDescription.Builder.ofType(Transactional.class).build())
+  .annotateMethod(AnnotationDescription.Builder.ofType(Modifying.class).build())
+  .annotateMethod(AnnotationDescription.Builder.ofType(Query.class)
+    .define("value",
+      "update " + entityClass.getSimpleName()
+        + " set author.id = :authorId where id = :bookId")
+    .build())
+  .name(repositoryClassName).make();
+```
+
+Relax, don't get intimidated by the above. It is actually quite simple. Let me list down the steps:
+1.  Create the fragment *CrudRepository<Book, Integer>* with the variable *CrudRepository<Book, Integer>*
+1.  Start with that, and extend from the *BookDaoTemplate*
+1.  Define the method *updateAuthor*
+1.  Define the 3 annotations on this method along with their parameters
+
+### Saving the generated classes on disk
+Now, this is really the tricky thing. Since Spring JPA needs these classes to be present as .class files on the classpath, it is absolutely necessary to save this on the disk.
+
+```java
+Loaded<?> loadedClass = unloadedClass.load(getClass().getClassLoader(), ClassLoadingStrategy.Default.INJECTION);
+
+try {
+    loadedClass.saveIn(new File("target/classes"));
+} catch (IOException e) {
+    throw new RuntimeException(e);
+}
+```
+
+I am saving it in a directory, but you can also save it in a jar file.
+
+### Tying it together
+We define a class that implements the *BeanFactoryPostProcessor*.
+
+```java
+@Configuration
+public class DynamicJpaBeanFactoryPostProcessor implements BeanFactoryPostProcessor {
+
+    @Override
+    public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) {
+    }
+
+}  
+```
+
+This is invoked after Spring Beans are registered. We would generate the classes in the *postProcessBeanFactory()*. Also, after our classes are created, we would then, as a last step, register our freshly minted JPA Repository as a Spring Bean using the *JpaRepositoryFactoryBean*.
+
+```java
+private void registerJpaRepositoryFactoryBean(Class<?> jpaRepositoryClass,
+  DefaultListableBeanFactory defaultListableBeanFactory) {
+  String beanName = jpaRepositoryClass.getSimpleName();
+  BeanDefinitionBuilder beanDefinitionBuilder = BeanDefinitionBuilder
+  .rootBeanDefinition(JpaRepositoryFactoryBean.class).addConstructorArgValue(jpaRepositoryClass);
+  defaultListableBeanFactory.registerBeanDefinition(beanName, beanDefinitionBuilder.getBeanDefinition());
+}
+```
+
+This above code is basically just mimicking the below code dynamically:
+
+```java
+@Bean
+public JpaRepositoryFactoryBean<BookDao, Book, Integer> bookRepository() {
+  return new JpaRepositoryFactoryBean<>(BookDao.class);
+}
+```
+
+Since the generic arguments are non mandatory, this works just fine with only the constructor argument.
+
+### Verification
+Run our Test Harness *RunCucumberTest* and ensure all tests pass.
+
+### Sources
+The sources for the *dynamic-jpa-repo* can be found here: <https://github.com/paawak/spring-boot-demo/tree/master/dynamic-jpa/dynamic-jpa-repo>.
+
+# Conclusion
+As we saw, it is certainly possible to generate an Entity and JPA Repository dynamically, it comes with its own set of challenges. The code is hard to test and maintain. So, use with care!
