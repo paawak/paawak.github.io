@@ -15,144 +15,32 @@ tags:
 - java
 - auth
 ---
-# Introduction
-In our previous post, [Google Authentication with ReactJS and Typescript](http://palashray.com/google-authentication-with-reactjs-and-typescript/) we saw how to integrate our Frontend Application with Google Authentication. Today, we will see how to integrate our PHP Backend to authenticate with Google. For this, we will build on top of our previous blog [Creating REST Service with PHP from a Java programmer’s perspective](http://palashray.com/creating-rest-service-with-php-from-a-java-programmers-perspective/). We would be securing all the PHP REST calls, so that each of them would need Google Authentication to work.
+# Background
+I was trying to secure my Spring Boot based REST Endpoints using Google Authentication. I was not able to find a satisfactory example online. Most of the examples I found would use the classic OAuth2 Pattern, wherein, the user is redirected to Google Authentication Page, the user enters the credentials and then, he is redirected back to the actual site. This, in my mind, is very UI-centric.
 
-# Library to use
- There is an excellent article here: [Authenticate with a backend server](https://developers.google.com/identity/sign-in/web/backend-auth). Following its recommendation, I have used the [Google API Client Library for PHP](https://github.com/googleapis/google-api-php-client).
+This is not the pattern I had in mind. I wanted to build a pure REST solution. I wanted to solve the use case where the user has already obtained the OAuth2 token, and now, he is using that token in the Header with each REST call. All the backend needs to do is to validate whether this Header is a valid Oauth2 Token and extract the Name, Email and Roles of the Principal from it. If there is no Token or the Token is invalid, the call with simply fails with a 401 error.
 
- This is the Composer entry:
+If you think about the implementation, from a high level, of course, it has to be some kind of a Filter, which is invoked for a set of REST Endpoints that we are securing. This Filter will do the validation of the Authentication Token. The trick is: how to tie this all up with Spring Boot or rather Spring Security?
 
- ```json
- {
-    "require": {
-        "google/apiclient": "^2.7"
-    }
-}
- ```
+# Getting Started
+You need to do some ground work to register in the Google Credential Console before we can proceed. I have described that in my previous post, [Google Authentication with ReactJS and Typescript](https://palashray.com/google-authentication-with-reactjs-and-typescript/).
+
+Next, we will develop a simple Spring Boot REST application that works with the above Frontend ReactJS Code. The application that we are creating will have the same set of REST Endpoints as the one described here [Google Authentication with PHP REST Server](https://palashray.com/google-authentication-with-php-rest-server/).
 
 # Implementation
-We will write a Slim request interceptor, which, is much like a Java Servlet Filter. It would intercept all requests. It would read the *Authentication Header* from the request, and authenticate that using the *Google API Client Library*. If the authentication is successful, it would then call the actual request handler. If the authentication fails, or the header is absent, it would immediately return a *401* response.
+## Some Concepts
+We need to use a AuthenticationFilter. And then we will customize it. We will use our won AuthenticationManager, which will help us to extract the Principal from the Header Token. We will also use a custom AuthenticationSuccessHandler, which will pretty much do nothing. The SavedRequestAwareAuthenticationSuccessHandler, which is the default for the AuthenticationFilter will not work for us, as it would error out further in the filter chain. We will use the SimpleUrlAuthenticationSuccessHandler instead and then set our own RedirectStrategy, which will, again do nothing.
 
-This is how the interceptor would look like:
-
-```php
-namespace swayam\rest;
-
-use Psr\Container\ContainerInterface;
-use Psr\Log\LoggerInterface;
-use Psr\Http\Message\ServerRequestInterface as Request;
-use Psr\Http\Server\RequestHandlerInterface as RequestHandler;
-use Slim\Psr7\Response;
-use Fig\Http\Message\StatusCodeInterface;
-use \Slim\Psr7\Headers;
-
-class RequestInterceptingMiddleware {
-
-    const AUTH_HEADER_NAME = 'Authorization';
-    const CLIENT_ID = '955630342713-55eu6b3k5hmsg8grojjmk8mj1gi47g37.apps.googleusercontent.com';
-
-    private $container;
-    private $logger;
-
-    public function __construct(ContainerInterface $container, LoggerInterface $logger) {
-        $this->container = $container;
-        $this->logger = $logger;
-    }
-
-    public function __invoke(Request $request, RequestHandler $handler): Response {
-        $this->logger->info("Handling request of type: " . $request->getMethod() . ", with target-uri: " . $request->getRequestTarget());
-
-        if ($request->getRequestTarget() === '/') {
-            return $handler->handle($request);
-        }
-
-        if ($request->getMethod() === 'OPTIONS') {
-            return $this->addCORSHeaders(new Response());
-        }
-
-        if (!$request->hasHeader(self::AUTH_HEADER_NAME)) {
-            return $this->getNotAuthorizedResponse();
-        }
-
-        $idToken = $request->getHeader(self::AUTH_HEADER_NAME)[0];
-
-        if (!$idToken) {
-            return $this->getNotAuthorizedResponse();
-        }
-
-        $this->logger->debug('IdToken from OAuth2: ' . $idToken);
-
-        $client = new \Google_Client(['client_id' => self::CLIENT_ID]);
-        $payload = $client->verifyIdToken($idToken);
-        if ($payload) {
-            $this->logger->debug('User authenticated, payload: ', $payload);
-        } else {
-            return $this->getNotAuthorizedResponse();
-        }
-
-        //call the actual handler now
-        $response = $handler->handle($request);
-
-        //add CORS before returning
-        return $this->addCORSHeaders($response);
-    }
-
-    private function addCORSHeaders(Response $response): Response {
-        return $response
-                        ->withHeader('Access-Control-Allow-Origin', $this->container->get('cors.allow-origin'))
-                        ->withHeader('Access-Control-Allow-Headers', 'X-Requested-With, Content-Type, Accept, Origin, Authorization')
-                        ->withHeader('Access-Control-Allow-Credentials', 'true')
-                        ->withHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-    }
-
-    private function getNotAuthorizedResponse(): Response {
-        $reasonPhrase = 'Not authorised: could not authenticate user';
-        $this->logger->warning($reasonPhrase);
-        $headers = new Headers();
-        $headers->addHeader('Content-Type', 'application/json');
-        $response = new Response(StatusCodeInterface::STATUS_UNAUTHORIZED, $headers);
-
-        $jsonPayload = json_encode(['httpStatusCode' => StatusCodeInterface::STATUS_UNAUTHORIZED, 'error' => $reasonPhrase], JSON_PRETTY_PRINT);
-        $response->getBody()->write($jsonPayload);
-        return $response;
-    }
-
-}
 ```
+2021-10-29 10:46:50.296 ERROR 8420 --- [nio-8000-exec-7] o.a.c.c.C.[.[.[/].[dispatcherServlet]    : Servlet.service() for servlet [dispatcherServlet] in context with path [] threw exception [Request processing failed; nested exception is java.lang.IllegalStateException: Cannot call sendError() after the response has been committed] with root cause
 
-# Integration with React client
-As described in my previous post, [Google Authentication with ReactJS and Typescript](http://palashray.com/google-authentication-with-reactjs-and-typescript/), this is how we obtain the *Google Token ID* in our *App.tsx*:
-
-```reactjs
-<GoogleSignInComponent loginSuccess={(response: GoogleLoginResponse | GoogleLoginResponseOffline) => {
-      if ('tokenId' in response) {
-        setGoogleAccessToken(response.tokenId);
-      }
-    }} />
-```
-
-Whenever we make any REST calls, we would use this *googleAccessToken*. For example, the below code fetches the list of *Genres*. Note how we pass the *googleAccessToken* as the *Authorization Header*
-
-```reactjs
-fetch(`${process.env.REACT_APP_REST_API_BASE_NAME}/genre`, {
-    headers: {
-        'Authorization': this.props.googleAccessToken
-    }
-}).then(response => response.json())
-    .then(rawGenres => {
-        const genres: ComboBoxItemValue[] = rawGenres.map((rawGenre: any) => {
-            return {
-                itemId: rawGenre.id,
-                displayText: rawGenre.name
-            } as ComboBoxItemValue;
-        });
-
-        this.setState({
-            genres: genres,
-            noGenresFound: genres.length === 0
-        });
-    });
+java.lang.IllegalStateException: Cannot call sendError() after the response has been committed
+	at org.apache.catalina.connector.ResponseFacade.sendError(ResponseFacade.java:472) ~[tomcat-embed-core-9.0.53.jar:9.0.53]
+	at javax.servlet.http.HttpServletResponseWrapper.sendError(HttpServletResponseWrapper.java:129) ~[tomcat-embed-core-9.0.53.jar:4.0.FR]
+	at javax.servlet.http.HttpServletResponseWrapper.sendError(HttpServletResponseWrapper.java:129) ~[tomcat-embed-core-9.0.53.jar:4.0.FR]
+	at org.springframework.security.web.util.OnCommittedResponseWrapper.sendError(OnCommittedResponseWrapper.java:116) ~[spring-security-web-5.5.2.jar:5.5.2]
+	at javax.servlet.http.HttpServletResponseWrapper.sendError(HttpServletResponseWrapper.java:129) ~[tomcat-embed-core-9.0.53.jar:4.0.FR]
+	at org.springframework.security.web.util.OnCommittedResponseWrapper.sendError(OnCommittedResponseWrapper.java:116) ~[spring-security-web-5.5.2.jar:5.5.2]
 ```
 
 # Testing with CURL
@@ -164,13 +52,7 @@ As shown above, you would be able to see the *Authorization Header* copy that. T
 
     curl -v -H "Authorization: MySecretToken" "http://localhost:8000/genre"
 
-# Deploying on Apache
-
-When deployed on Apache Server, the Authorization Headers cannot be read, happened with me. The solution is, in the .htaccess file, put the below lines:
-
-    SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
-
 # Sources
-The Frontend code can be found here: <https://github.com/paawak/blog/tree/master/code/reactjs/library-ui-secured-with-google>.
+The sources for this example can be found here: <https://github.com/paawak/spring-boot-demo/tree/master/google-auth-with-spring-boot>
 
-The PHP Backend code can be found here: <https://github.com/paawak/blog/tree/master/code/php/php-rest-service-google-oauth2>.
+The Frontend code can be found here: <https://github.com/paawak/blog/tree/master/code/reactjs/library-ui-secured-with-google>.
