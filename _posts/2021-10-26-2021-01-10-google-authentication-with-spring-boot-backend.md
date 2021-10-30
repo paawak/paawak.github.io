@@ -144,10 +144,30 @@ public class AuthenticationTokenExtractor implements AuthenticationConverter {
 
 The __PreAuthenticatedAuthenticationToken__ takes in the Principal as the first argument and credentials as the second. Since the Principal can only be obtained after Authentication, we can leave that out.
 
-We will also use a custom AuthenticationSuccessHandler, which will pretty much do nothing. The SavedRequestAwareAuthenticationSuccessHandler, which is the default for the AuthenticationFilter will not work for us, as it would error out further in the filter chain. We will use the SimpleUrlAuthenticationSuccessHandler instead and then set our own RedirectStrategy, which will, again do nothing.
+## AuthenticationSuccessHandler
+A [AuthenticationSuccessHandler](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/web/authentication/AuthenticationSuccessHandler.html) defines what to do in case of a successful authentication. The default implementation in a __AuthenticationFilter__ is the __SavedRequestAwareAuthenticationSuccessHandler__, which would redirect to the root context __/__ on successful authentication.
+
+I first started out with the default implementation. However, my request failed, even after successful authentication. This is the stack trace:
+
+```
+2021-10-30 09:19:17.410 DEBUG 3742 --- [nio-8000-exec-7] o.s.security.web.FilterChainProxy        : Secured GET /
+2021-10-30 09:19:17.413 ERROR 3742 --- [nio-8000-exec-7] o.a.c.c.C.[.[.[/].[dispatcherServlet]    : Servlet.service() for servlet [dispatcherServlet] in context with path [] threw exception [Request processing failed; nested exception is java.lang.IllegalStateException: Cannot call sendError() after the response has been committed] with root cause
+
+java.lang.IllegalStateException: Cannot call sendError() after the response has been committed
+	at org.apache.catalina.connector.ResponseFacade.sendError(ResponseFacade.java:472) ~[tomcat-embed-core-9.0.53.jar:9.0.53]
+	at javax.servlet.http.HttpServletResponseWrapper.sendError(HttpServletResponseWrapper.java:129) ~[tomcat-embed-core-9.0.53.jar:4.0.FR]
+	at javax.servlet.http.HttpServletResponseWrapper.sendError(HttpServletResponseWrapper.java:129) ~[tomcat-embed-core-9.0.53.jar:4.0.FR]
+	at org.springframework.security.web.util.OnCommittedResponseWrapper.sendError(OnCommittedResponseWrapper.java:116) ~[spring-security-web-5.5.2.jar:5.5.2]
+	at javax.servlet.http.HttpServletResponseWrapper.sendError(HttpServletResponseWrapper.java:129) ~[tomcat-embed-core-9.0.53.jar:4.0.FR]
+	at org.springframework.security.web.util.OnCommittedResponseWrapper.sendError(OnCommittedResponseWrapper.java:116) ~[spring-security-web-5.5.2.jar:5.5.2]
+	at org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:526) ~[spring-webmvc-5.3.10.jar:5.3.10]
+```
+
+After careful analysis, I figured out that the [ResourceHttpRequestHandler](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/servlet/resource/ResourceHttpRequestHandler.html) cannot find the root context __/__ as I have not defined one, and thats the reason, it sets an error response after redirect, and hence the issue.
+
+I am pasting the below code from __ResourceHttpRequestHandler__:
 
 ```java
-//ResourceHttpRequestHandler
 @Override
 public void handleRequest(HttpServletRequest request, HttpServletResponse response)
     throws ServletException, IOException {
@@ -163,19 +183,18 @@ public void handleRequest(HttpServletRequest request, HttpServletResponse respon
 }
 ```
 
-```
-2021-10-30 09:19:17.410 DEBUG 3742 --- [nio-8000-exec-7] o.s.security.web.FilterChainProxy        : Secured GET /
-2021-10-30 09:19:17.413 ERROR 3742 --- [nio-8000-exec-7] o.a.c.c.C.[.[.[/].[dispatcherServlet]    : Servlet.service() for servlet [dispatcherServlet] in context with path [] threw exception [Request processing failed; nested exception is java.lang.IllegalStateException: Cannot call sendError() after the response has been committed] with root cause
+And the reason for all this is that the default success url is __/__.
 
-java.lang.IllegalStateException: Cannot call sendError() after the response has been committed
-	at org.apache.catalina.connector.ResponseFacade.sendError(ResponseFacade.java:472) ~[tomcat-embed-core-9.0.53.jar:9.0.53]
-	at javax.servlet.http.HttpServletResponseWrapper.sendError(HttpServletResponseWrapper.java:129) ~[tomcat-embed-core-9.0.53.jar:4.0.FR]
-	at javax.servlet.http.HttpServletResponseWrapper.sendError(HttpServletResponseWrapper.java:129) ~[tomcat-embed-core-9.0.53.jar:4.0.FR]
-	at org.springframework.security.web.util.OnCommittedResponseWrapper.sendError(OnCommittedResponseWrapper.java:116) ~[spring-security-web-5.5.2.jar:5.5.2]
-	at javax.servlet.http.HttpServletResponseWrapper.sendError(HttpServletResponseWrapper.java:129) ~[tomcat-embed-core-9.0.53.jar:4.0.FR]
-	at org.springframework.security.web.util.OnCommittedResponseWrapper.sendError(OnCommittedResponseWrapper.java:116) ~[spring-security-web-5.5.2.jar:5.5.2]
-	at org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:526) ~[spring-webmvc-5.3.10.jar:5.3.10]
+So, what we could do is, define our own __AuthenticationSuccessHandler__ where, we will pretty much do nothing. We use the __SimpleUrlAuthenticationSuccessHandler__ and set our own [RedirectStrategy](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/web/RedirectStrategy.html), which will, again do nothing.
+
+```java
+SimpleUrlAuthenticationSuccessHandler successHandler = new SimpleUrlAuthenticationSuccessHandler();
+successHandler.setRedirectStrategy((request, response, url) -> {
+});
 ```
+
+## RequestMatcher
+The default implementation of the [RequestMatcher](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/web/util/matcher/RequestMatcher.html) in the  is to match *any* incoming request. However, that will not work for us, as we would like some endpoints like Swagger UI, H2 Console and Actuator to be available without authentication.
 
 # Testing with CURL
 Boot up the [ReactJS Client](https://github.com/paawak/blog/tree/master/code/reactjs/library-ui-secured-with-google) and browse to <http://localhost:3000/>. You would see the login screen. Proceed to login with Google. Now hit *F12* to open the *Developer Console*. From the Menu, select Book -> Add New.
