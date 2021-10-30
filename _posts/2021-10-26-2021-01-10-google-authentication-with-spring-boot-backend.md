@@ -43,7 +43,7 @@ We would be using the below Google library to verify whether the OAuth2 Token is
 As mentioned, we would have to use a [Filter](https://docs.oracle.com/javaee/6/api/index.html?javax/servlet/Filter.html) of some kind, that provides a hook into Spring Security. After much deliberation, I have decided to use the [AuthenticationFilter](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/web/authentication/AuthenticationFilter.html) as it is both simple and customizable.
 
 ## Customizing the AuthenticationFilter
-The AuthenticationFilter has 2 constructors. We will use the one which takes in a __AuthenticationManager__ and a __AuthenticationConverter__.
+The AuthenticationFilter has two constructors. We will use the one which takes in a __AuthenticationManager__ and a __AuthenticationConverter__.
 
 ## AuthenticationManager
 As the name indicates, the [AuthenticationManager](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/authentication/AuthenticationManager.html) is responsible for authenticating a request. It takes in an [Authentication](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/core/Authentication.html) object and then verifies whether it is a valid OAuth2 token by using the __GoogleTokenVerifier__. After successful verification, it extracts the Name and Email from it. Then, it looks up the __user__ table in the Database and tries to find an entry with that Email.
@@ -81,26 +81,34 @@ public class GoogleAuthenticationManager implements AuthenticationManager {
 
 	UserDetails userDetails = optUserDetails.get();
 
-	UsernamePasswordAuthenticationToken token = new UsernamePasswordAuthenticationToken(userDetails.getName(),
-		"DontBotherBro", Arrays.asList(new SimpleGrantedAuthority(userDetails.getRole().name())));
-	token.setDetails(userDetails);
-	return token;
+	return new UsernamePasswordAuthenticationToken(userDetails, "DontBotherBro",
+		Arrays.asList(new SimpleGrantedAuthority(userDetails.getRole().name())));
     }
 
 }
 ```
 
-Notice how we wrap our own custom class __UserDetails__ into the Authentication object.
+Notice how we wrap our own custom class __UserDetails__ into the Authentication object, as the first constructor argument in the __UsernamePasswordAuthenticationToken__.
+
+Later, in any Service or Controller, the __UserDetails__ can be obtained very easily from the __Authentication__ object using the below code:
 
 ```java
-	token.setDetails(userDetails);
+    @GetMapping
+    public UserDetails applyCorrectionToOcrWords(Authentication authentication) {
+	     LOGGER.debug("Authentication: {}", authentication);
+	     return (UserDetails) authentication.getPrincipal();
+    }
 ```
 
-This can be obtained very easily from the Principal object using the below code:
+This will get the __UserDetails__ as well:
 
 ```java
-	token.setDetails(userDetails);
+Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+LOGGER.debug("Authentication from POST: {}", authentication);
+UserDetails userDetails = (UserDetails) authentication.getPrincipal();
 ```
+
+This code can be found in the __WhoAmIController__.
 
 ## AuthenticationConverter
 The [AuthenticationConverter](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/web/authentication/AuthenticationConverter.html) helps us to extract the Header Token from the HttpServletRequest. It converts the raw token into an [Authentication](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/core/Authentication.html) object for further processing by the AuthenticationManager.
@@ -133,6 +141,8 @@ public class AuthenticationTokenExtractor implements AuthenticationConverter {
 
 }
 ```
+
+The __PreAuthenticatedAuthenticationToken__ takes in the Principal as the first argument and credentials as the second. Since the Principal can only be obtained after Authentication, we can leave that out.
 
 We will also use a custom AuthenticationSuccessHandler, which will pretty much do nothing. The SavedRequestAwareAuthenticationSuccessHandler, which is the default for the AuthenticationFilter will not work for us, as it would error out further in the filter chain. We will use the SimpleUrlAuthenticationSuccessHandler instead and then set our own RedirectStrategy, which will, again do nothing.
 
