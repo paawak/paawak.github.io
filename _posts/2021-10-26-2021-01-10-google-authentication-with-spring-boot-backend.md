@@ -196,6 +196,75 @@ successHandler.setRedirectStrategy((request, response, url) -> {
 ## RequestMatcher
 The default implementation of the [RequestMatcher](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/web/util/matcher/RequestMatcher.html) in the  is to match *any* incoming request. However, that will not work for us, as we would like some endpoints like Swagger UI, H2 Console and Actuator to be available without authentication.
 
+We need to use a custom RequestMatcher. We have some 10 odd URLs that we need to allow without authentication. We use Stream Functions to transform each of these URLs into a [AntPathRequestMatcher](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/web/util/matcher/AntPathRequestMatcher.html). This, we feed into a [OrRequestMatcher](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/web/util/matcher/OrRequestMatcher.html) and then use a [NegatedRequestMatcher](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/web/util/matcher/NegatedRequestMatcher.html) to top it all. At the end, we have defined a RequestMatcher that works only when these given URLs do not match, which means that pretty much every thing else is authenticated.
+
+```java
+String[] URLS_TO_ALLOW_WITHOUT_AUTH = { "/v2/api-docs", "/configuration/**",
+  "/swagger-ui.html", "/swagger*/**", "/webjars/**", "/h2-console/**", "/actuator/**" };
+RequestMatcher requestMatcher =
+  new NegatedRequestMatcher(new OrRequestMatcher(Arrays.stream(URLS_TO_ALLOW_WITHOUT_AUTH)
+    .map(pattern -> new AntPathRequestMatcher(pattern)).collect(Collectors.toList())));
+```
+
+## CORS configuration
+Though CORS is not an absolute necessity for this to get working, it still is an important piece. This is how our CORS configuration looks like:
+
+```java
+private CorsConfigurationSource corsConfigurationSource() {
+CorsConfiguration corsConfiguration = new CorsConfiguration();
+corsConfiguration.setAllowedOrigins(Arrays.asList("http://localhost:3000"));
+corsConfiguration.addAllowedMethod(HttpMethod.GET);
+corsConfiguration.addAllowedMethod(HttpMethod.PUT);
+corsConfiguration.addAllowedMethod(HttpMethod.POST);
+corsConfiguration.addAllowedMethod(HttpMethod.DELETE);
+corsConfiguration.addAllowedMethod(HttpMethod.OPTIONS);
+corsConfiguration.addAllowedHeader("X-Requested-With");
+corsConfiguration.addAllowedHeader("Content-Type");
+corsConfiguration.addAllowedHeader("Accept");
+corsConfiguration.addAllowedHeader("Origin");
+corsConfiguration.addAllowedHeader("Authorization");
+UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+source.registerCorsConfiguration("/**", corsConfiguration);
+return source;
+}
+```
+
+## Putting it all together
+All of this will come together when we extend the [WebSecurityConfigurerAdapter](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/config/annotation/web/configuration/WebSecurityConfigurerAdapter.html) to define our own Configuration as shown below:
+
+```java
+@Configuration
+@EnableWebSecurity
+@EnableGlobalMethodSecurity(prePostEnabled = true, securedEnabled = true, jsr250Enabled = true)
+public class SecurityConfig extends WebSecurityConfigurerAdapter {
+
+    private static final String[] URLS_TO_ALLOW_WITHOUT_AUTH = { "/v2/api-docs", "/configuration/**",
+	    "/swagger-ui.html", "/swagger*/**", "/webjars/**", "/h2-console/**", "/actuator/**" };
+
+    @Autowired
+    private UserDetailsRepository userDetailsRepository;
+
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+	http.cors(config -> config.configurationSource(corsConfigurationSource())).authorizeRequests()
+		.antMatchers(URLS_TO_ALLOW_WITHOUT_AUTH).permitAll().anyRequest().authenticated().and()
+		.addFilterBefore(authenticationFilter(), BasicAuthenticationFilter.class).csrf().disable().headers()
+		.frameOptions().sameOrigin().httpStrictTransportSecurity().disable();
+    }
+
+    @Override
+    protected AuthenticationManager authenticationManager() {
+	return new GoogleAuthenticationManager(userDetailsRepository);
+    }
+    ...
+  }
+```
+
+Notice how we place our AuthenticationFilter with *.addFilterBefore(authenticationFilter(), BasicAuthenticationFilter.class)*.
+
+# Making it work
+Remember, that in order for successful authentication, you would need an entry in the *user* table. You can do that with the H2 Web Console which is available at <http://localhost:8000/h2-console/>. The JDBC URL would be *jdbc:h2:mem:library* and the user name and passwords would be both *sa*.
+
 # Testing with CURL
 Boot up the [ReactJS Client](https://github.com/paawak/blog/tree/master/code/reactjs/library-ui-secured-with-google) and browse to <http://localhost:3000/>. You would see the login screen. Proceed to login with Google. Now hit *F12* to open the *Developer Console*. From the Menu, select Book -> Add New.
 
