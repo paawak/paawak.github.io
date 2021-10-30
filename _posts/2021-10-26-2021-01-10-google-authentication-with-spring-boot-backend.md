@@ -28,11 +28,29 @@ You need to do some ground work to register in the Google Credential Console bef
 Next, we will develop a simple Spring Boot REST application that works with the above Frontend ReactJS Code. The application that we are creating will have the same set of REST Endpoints as the one described here [Google Authentication with PHP REST Server](https://palashray.com/google-authentication-with-php-rest-server/).
 
 # Implementation
-## Some Concepts
-We need to use a AuthenticationFilter. And then we will customize it. We will use our won AuthenticationManager, which will help us to extract the Principal from the Header Token. We will also use a custom AuthenticationSuccessHandler, which will pretty much do nothing. The SavedRequestAwareAuthenticationSuccessHandler, which is the default for the AuthenticationFilter will not work for us, as it would error out further in the filter chain. We will use the SimpleUrlAuthenticationSuccessHandler instead and then set our own RedirectStrategy, which will, again do nothing.
+## The Filter to use
+As mentioned, we would have use a [Filter](https://docs.oracle.com/javaee/6/api/index.html?javax/servlet/Filter.html) of some kind, that provides a hook into Spring Security. We could use the [AuthenticationFilter](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/web/authentication/AuthenticationFilter.html). And then we will customize it. We will use our won AuthenticationManager, which will help us to extract the Principal from the Header Token. We will also use a custom AuthenticationSuccessHandler, which will pretty much do nothing. The SavedRequestAwareAuthenticationSuccessHandler, which is the default for the AuthenticationFilter will not work for us, as it would error out further in the filter chain. We will use the SimpleUrlAuthenticationSuccessHandler instead and then set our own RedirectStrategy, which will, again do nothing.
+
+```java
+//ResourceHttpRequestHandler
+@Override
+public void handleRequest(HttpServletRequest request, HttpServletResponse response)
+    throws ServletException, IOException {
+
+  // For very general mappings (e.g. "/") we need to check 404 first
+  Resource resource = getResource(request);
+  if (resource == null) {
+    logger.debug("Resource not found");
+    response.sendError(HttpServletResponse.SC_NOT_FOUND);
+    return;
+  }
+  ...
+}
+```
 
 ```
-2021-10-29 10:46:50.296 ERROR 8420 --- [nio-8000-exec-7] o.a.c.c.C.[.[.[/].[dispatcherServlet]    : Servlet.service() for servlet [dispatcherServlet] in context with path [] threw exception [Request processing failed; nested exception is java.lang.IllegalStateException: Cannot call sendError() after the response has been committed] with root cause
+2021-10-30 09:19:17.410 DEBUG 3742 --- [nio-8000-exec-7] o.s.security.web.FilterChainProxy        : Secured GET /
+2021-10-30 09:19:17.413 ERROR 3742 --- [nio-8000-exec-7] o.a.c.c.C.[.[.[/].[dispatcherServlet]    : Servlet.service() for servlet [dispatcherServlet] in context with path [] threw exception [Request processing failed; nested exception is java.lang.IllegalStateException: Cannot call sendError() after the response has been committed] with root cause
 
 java.lang.IllegalStateException: Cannot call sendError() after the response has been committed
 	at org.apache.catalina.connector.ResponseFacade.sendError(ResponseFacade.java:472) ~[tomcat-embed-core-9.0.53.jar:9.0.53]
@@ -41,6 +59,7 @@ java.lang.IllegalStateException: Cannot call sendError() after the response has 
 	at org.springframework.security.web.util.OnCommittedResponseWrapper.sendError(OnCommittedResponseWrapper.java:116) ~[spring-security-web-5.5.2.jar:5.5.2]
 	at javax.servlet.http.HttpServletResponseWrapper.sendError(HttpServletResponseWrapper.java:129) ~[tomcat-embed-core-9.0.53.jar:4.0.FR]
 	at org.springframework.security.web.util.OnCommittedResponseWrapper.sendError(OnCommittedResponseWrapper.java:116) ~[spring-security-web-5.5.2.jar:5.5.2]
+	at org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:526) ~[spring-webmvc-5.3.10.jar:5.3.10]
 ```
 
 # Testing with CURL
