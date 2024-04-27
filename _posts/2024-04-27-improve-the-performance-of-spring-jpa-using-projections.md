@@ -16,16 +16,16 @@ tags:
 - jpa
 ---
 # Background
-I was trying to secure my Spring Boot based REST Endpoints using Google Authentication. I was not able to find a satisfactory example online. Most of the examples I found would use the classic OAuth2 Pattern, wherein, the user is redirected to Google Authentication Page, the user enters the credentials and then, he is redirected back to the actual site. This, in my mind, is very UI-centric.
+We have been using Spring JPA quite extensively in our project. We had a dashboard that was displaying around 100-odd JPA Entities, through a REST API. The object graph had, at max, 2 levels of hierarchy. When we ran a performance test we observed that the dashboard API call takes around 8 seconds to return. We started investigating. What we essentially uncovered was the __N+1 problem in Hibernate__. 
 
-This is not the pattern I had in mind. I wanted to build a pure REST solution. I wanted to solve the use case where the user has already obtained the OAuth2 token, and now, he is using that token in the Header with each REST call. All the backend needs to do is to validate whether this Header is a valid Oauth2 Token and extract the Name, Email and Roles of the Principal from it. If there is no Token or the Token is invalid, the call with simply fails with a 401 error.
+What that essentially means is this: suppose the root Entity has a list of __N Child Entities__. When you fetch the root Entity, after the first query is fired, lets say __Query 1__, then Hibernate fires the next __N Queries__ to fetch the children.
 
-If you think about the implementation, from a high level, of course, it has to be some kind of a Filter, which is invoked for a set of REST Endpoints that we are securing. This Filter will do the validation of the Authentication Token. The trick is: how to tie this all up with Spring Boot or rather Spring Security?
+ This can lead to performance problems. I have heard many technologies shun JPA/Hibernate due to the framework's perceived slowness. Though not entirely unfounded, what they do not know is how to improve the performance by using JPA's Projections.
 
-# Getting Started
-You need to do some ground work to register in the Google Credential Console before we can proceed. I have described that in my previous post, [Google Authentication with ReactJS and Typescript](https://palashray.com/google-authentication-with-reactjs-and-typescript/).
+# The problem at hand
+Let's talk about the problem first. We will take an example of a hierarchy of Entities as shown below:
 
-Next, we will develop a simple Spring Boot REST application that works with the above Frontend ReactJS Code. The application that we are creating will have the same set of REST Endpoints as the one described here [Google Authentication with PHP REST Server](https://palashray.com/google-authentication-with-php-rest-server/).
+![JPA Entities Hierarchy](../assets/2024/04/jpa-projections-book-model.png)
 
 # Implementation
 ## Google library to use
