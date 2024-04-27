@@ -6,7 +6,7 @@ author:
   display_name: paawak
   login: paawak
   email: paawak@gmail.com
-  url: ''
+  url: 'https://www.linkedin.com/in/palash-ray/'
 author_login: paawak
 author_email: paawak@gmail.com
 date: '2024-04-27 14:00:00 +0530'
