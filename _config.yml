@@ -32,7 +32,7 @@ github_username:  paawak
 permalink: /:title/
 
 # Build settings
-theme: minima
+theme: jekyll-theme-clean-blog
 plugins:
   - jekyll-feed
   - jekyll-include-cache
