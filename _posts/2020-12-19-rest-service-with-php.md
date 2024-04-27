@@ -8,7 +8,7 @@ author:
   email: paawak@gmail.com
   url: 'https://www.linkedin.com/in/palash-ray/'
 
-author_email: paawak@gmail.com
+
 date: '2020-12-23 23:21:25 +0530'
 categories:
 - php

@@ -8,7 +8,7 @@ author:
   email: paawak@gmail.com
   url: 'https://www.linkedin.com/in/palash-ray/'
 
-author_email: paawak@gmail.com
+
 date: '2021-09-27 23:13:00 +0530'
 categories:
 - java
