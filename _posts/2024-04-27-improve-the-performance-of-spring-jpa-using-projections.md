@@ -27,254 +27,174 @@ Let's talk about the problem first. We will take an example of a hierarchy of En
 
 ![JPA Entities Hierarchy](../assets/2024/04/jpa-projections-book-model.png)
 
-# Implementation
-## Google library to use
-We would be using the below Google library to verify whether the OAuth2 Token is a valid one and extract Name, Email etc. from it.
+## Trivial implementation
+
+We will take a simple Spring Boot project. Add the below dependencies in the __pom.xml__:
 
 ```xml
-<dependency>
-  <groupId>com.google.api-client</groupId>
-  <artifactId>google-api-client</artifactId>
-  <version>1.30.4</version>
-</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-web</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+		</dependency>
 ```
 
-## The Filter to use
-As mentioned, we would have to use a [Filter](https://docs.oracle.com/javaee/6/api/index.html?javax/servlet/Filter.html) of some kind, that provides a hook into Spring Security. After much deliberation, I have decided to use the [AuthenticationFilter](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/web/authentication/AuthenticationFilter.html) as it is both simple and customizable.
-
-## Customizing the AuthenticationFilter
-The AuthenticationFilter has two constructors. We will use the one which takes in a __AuthenticationManager__ and a __AuthenticationConverter__.
-
-## AuthenticationManager
-As the name indicates, the [AuthenticationManager](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/authentication/AuthenticationManager.html) is responsible for authenticating a request. It takes in an [Authentication](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/core/Authentication.html) object and then verifies whether it is a valid OAuth2 token by using the __GoogleTokenVerifier__. After successful verification, it extracts the Name and Email from it. Then, it looks up the __user__ table in the Database and tries to find an entry with that Email.
-
-If the Email is found, the authentication is deemed successful and an Authentication object containing the ID, Name, Email and Roles is returned.
-
-If the Email is not found, the authentication is deemed to have failed. It will throw a __AuthenticationServiceException__.
-
-This is how the code looks like:
+The root Entity is the __Book__.
 
 ```java
-public class GoogleAuthenticationManager implements AuthenticationManager {
+@Data
+@Entity
+@Table(name = "BOOK")
+public class Book implements Serializable {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(GoogleAuthenticationManager.class);
+    private static final long serialVersionUID = 1L;
 
-    private final UserDetailsRepository userDetailsRepository;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    public GoogleAuthenticationManager(UserDetailsRepository userDetailsRepository) {
-	this.userDetailsRepository = userDetailsRepository;
-    }
+    @Column(name = "title")
+    private String title;
 
-    @Override
-    public Authentication authenticate(final Authentication authentication) {
-	LOGGER.info("start authentication...");
+    @OneToOne(fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
+    @JoinColumn(name = "author_id")
+    private Author author;
 
-	Payload payload = new GoogleTokenVerifier().verifyToken((String) authentication.getCredentials());
-
-	String email = payload.getEmail();
-
-	Optional<UserDetails> optUserDetails = userDetailsRepository.findByEmail(email);
-
-	if (optUserDetails.isEmpty()) {
-	    throw new AuthenticationServiceException("User not registered");
-	}
-
-	UserDetails userDetails = optUserDetails.get();
-
-	return new UsernamePasswordAuthenticationToken(userDetails, "DontBotherBro",
-		Arrays.asList(new SimpleGrantedAuthority(userDetails.getRole().name())));
-    }
+    @JsonManagedReference
+    @OneToMany(mappedBy = "book", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<Chapter> chapters;
 
 }
 ```
 
-Notice how we wrap our own custom class __UserDetails__ into the Authentication object, as the first constructor argument in the __UsernamePasswordAuthenticationToken__.
-
-Later, in any Service or Controller, the __UserDetails__ can be obtained very easily from the __Authentication__ object using the below code:
+The __Repository__ class is very simple as well:
 
 ```java
-    @GetMapping
-    public UserDetails applyCorrectionToOcrWords(Authentication authentication) {
-	     LOGGER.debug("Authentication: {}", authentication);
-	     return (UserDetails) authentication.getPrincipal();
-    }
-```
-
-This will get the __UserDetails__ as well:
-
-```java
-Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-LOGGER.debug("Authentication from POST: {}", authentication);
-UserDetails userDetails = (UserDetails) authentication.getPrincipal();
-```
-
-This code can be found in the __WhoAmIController__.
-
-## AuthenticationConverter
-The [AuthenticationConverter](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/web/authentication/AuthenticationConverter.html) helps us to extract the Header Token from the HttpServletRequest. It converts the raw token into an [Authentication](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/core/Authentication.html) object for further processing by the AuthenticationManager.
-
-This is how the code looks like:
-
-```java
-public class AuthenticationTokenExtractor implements AuthenticationConverter {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(AuthenticationTokenExtractor.class);
-
-    public static final String AUTH_TOKEN_NAME = "Authorization";
-
-    @Override
-    public Authentication convert(HttpServletRequest request) {
-
-	String path = request.getServletPath();
-
-	String idToken = request.getHeader(AUTH_TOKEN_NAME);
-
-	if (!StringUtils.hasText(idToken)) {
-	    LOGGER.warn("No auth token found for {}", path);
-	    throw new PreAuthenticatedCredentialsNotFoundException("Auth Token not found");
-	}
-
-	LOGGER.debug("Auth token FOUND for {}", path);
-
-	return new PreAuthenticatedAuthenticationToken("", idToken);
-    }
+@Repository
+public interface BookDao extends JpaRepository<Book, Long> {
 
 }
 ```
 
-The __PreAuthenticatedAuthenticationToken__ takes in the Principal as the first argument and credentials as the second. Since the Principal can only be obtained after Authentication, we can leave that out.
-
-## AuthenticationSuccessHandler
-A [AuthenticationSuccessHandler](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/web/authentication/AuthenticationSuccessHandler.html) defines what to do in case of a successful authentication. The default implementation in a __AuthenticationFilter__ is the __SavedRequestAwareAuthenticationSuccessHandler__, which would redirect to the root context __/__ on successful authentication.
-
-I first started out with the default implementation. However, my request failed, even after successful authentication. This is the stack trace:
-
-```
-2021-10-30 09:19:17.410 DEBUG 3742 --- [nio-8000-exec-7] o.s.security.web.FilterChainProxy        : Secured GET /
-2021-10-30 09:19:17.413 ERROR 3742 --- [nio-8000-exec-7] o.a.c.c.C.[.[.[/].[dispatcherServlet]    : Servlet.service() for servlet [dispatcherServlet] in context with path [] threw exception [Request processing failed; nested exception is java.lang.IllegalStateException: Cannot call sendError() after the response has been committed] with root cause
-
-java.lang.IllegalStateException: Cannot call sendError() after the response has been committed
-	at org.apache.catalina.connector.ResponseFacade.sendError(ResponseFacade.java:472) ~[tomcat-embed-core-9.0.53.jar:9.0.53]
-	at javax.servlet.http.HttpServletResponseWrapper.sendError(HttpServletResponseWrapper.java:129) ~[tomcat-embed-core-9.0.53.jar:4.0.FR]
-	at javax.servlet.http.HttpServletResponseWrapper.sendError(HttpServletResponseWrapper.java:129) ~[tomcat-embed-core-9.0.53.jar:4.0.FR]
-	at org.springframework.security.web.util.OnCommittedResponseWrapper.sendError(OnCommittedResponseWrapper.java:116) ~[spring-security-web-5.5.2.jar:5.5.2]
-	at javax.servlet.http.HttpServletResponseWrapper.sendError(HttpServletResponseWrapper.java:129) ~[tomcat-embed-core-9.0.53.jar:4.0.FR]
-	at org.springframework.security.web.util.OnCommittedResponseWrapper.sendError(OnCommittedResponseWrapper.java:116) ~[spring-security-web-5.5.2.jar:5.5.2]
-	at org.springframework.web.servlet.resource.ResourceHttpRequestHandler.handleRequest(ResourceHttpRequestHandler.java:526) ~[spring-webmvc-5.3.10.jar:5.3.10]
-```
-
-After careful analysis, I figured out that the [ResourceHttpRequestHandler](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/web/servlet/resource/ResourceHttpRequestHandler.html) cannot find the root context __/__ as I have not defined one, and thats the reason, it sets an error response after redirect, and hence the issue.
-
-I am pasting the below code from __ResourceHttpRequestHandler__:
+We have a __Rest Controller__ that exposes the REST endpoints. It directly calls the __Repository__.
 
 ```java
-@Override
-public void handleRequest(HttpServletRequest request, HttpServletResponse response)
-    throws ServletException, IOException {
 
-  // For very general mappings (e.g. "/") we need to check 404 first
-  Resource resource = getResource(request);
-  if (resource == null) {
-    logger.debug("Resource not found");
-    response.sendError(HttpServletResponse.SC_NOT_FOUND);
-    return;
-  }
+@RestController
+@RequestMapping("/books")
+public class BookController {
+
+	private final BookDao bookDao;
+
+	public BookController(BookDao bookDao) {
+		this.bookDao = bookDao;
+	}
+
+	@GetMapping
+	public List<Book> getBooks() {
+		return bookDao.findAll();
+	}
+
   ...
+
+```
+
+## Print the Queries generated by JPA
+In order to print the queries generated by JPA/Hibernate, you need to enable Debugs for as shown below in our __application.yml__:
+
+```yaml
+logging:
+  level:
+    root: INFO
+    org.hibernate.SQL: DEBUG
+```    
+
+## Getting All Books
+
+When we invoke the */books* end-point to fetch all books, we can see many queries getting fired. I am pasting some typical queries that can be seen.
+
+```sql
+
+-- the first query gets the root entity Book
+select b1_0.id,b1_0.author_id,b1_0.title from book b1_0
+
+-- subsequent queries get the children, in this case the author
+-- there will be multiple of these
+-- I am pasting just 2
+select a1_0.id,a1_0.first_name,a1_0.last_name from author a1_0 where a1_0.id=?
+
+select a1_0.id,a1_0.first_name,a1_0.last_name from author a1_0 where a1_0.id=?
+
+-- next comes the queries to fetch the Chapters
+
+select c1_0.book_id,c1_0.id,c1_0.plot_summary,s1_0.chapter_id,s1_0.id,s1_0.section_length,s1_0.section_text,s1_0.style,c1_0.title from chapter c1_0 left join section s1_0 on c1_0.id=s1_0.chapter_id where c1_0.book_id=?
+
+select c1_0.book_id,c1_0.id,c1_0.plot_summary,s1_0.chapter_id,s1_0.id,s1_0.section_length,s1_0.section_text,s1_0.style,c1_0.title from chapter c1_0 left join section s1_0 on c1_0.id=s1_0.chapter_id where c1_0.book_id=?
+
+-- finally comes the queries to fetch Sections
+select s1_0.chapter_id,s1_0.id,s1_0.section_length,s1_0.section_text,s1_0.style from section s1_0 where s1_0.chapter_id=?
+
+select s1_0.chapter_id,s1_0.id,s1_0.section_length,s1_0.section_text,s1_0.style from section s1_0 where s1_0.chapter_id=?
+
+```
+
+Note that the number of queries fired depend on the number of children associated with the parent entities. And this is the performance issue that we are talking about, popularly known as the __N+1 problem in Hibernate__.
+
+# Solution: by the power of Projections
+We use Projections to fetch only a subset of the entire object graph. If done well, we can have just a single query fetch the data we need. While there are many ways to do a Projection, like Class based and Interface based, today, we will see how to use Records to do Projections. Projections, like Spring JPA Query name, works on Bean naming convention.
+
+Let us take a quick example: I have decided to fetch only the below 4 attributes from the entire object graph:
+1. Book ID
+1. Book Title
+1. Author ID
+1. Author First Name
+
+Starting from the root Entity, which in this case is Book, I can intuitively define the below record which would fetch the properties using the Bean naming conventions:
+
+```java
+public record BookView(Long id, String title, Long authorId, String authorFirstName) {
+
 }
 ```
 
-And the reason for all this is that the default success url is __/__.
-
-So, what we could do is, define our own __AuthenticationSuccessHandler__ where, we will pretty much do nothing. We use the __SimpleUrlAuthenticationSuccessHandler__ and set our own [RedirectStrategy](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/web/RedirectStrategy.html), which will, again do nothing.
+Let us now modify our Repository class to take advantage of Projection the just defined.
 
 ```java
-SimpleUrlAuthenticationSuccessHandler successHandler = new SimpleUrlAuthenticationSuccessHandler();
-successHandler.setRedirectStrategy((request, response, url) -> {
-});
-```
+@Repository
+public interface BookDao extends JpaRepository<Book, Long> {
 
-## RequestMatcher
-The default implementation of the [RequestMatcher](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/web/util/matcher/RequestMatcher.html) in the  is to match *any* incoming request. However, that will not work for us, as we would like some endpoints like Swagger UI, H2 Console and Actuator to be available without authentication.
+	List<BookView> findAllByIdNotNull();
 
-We need to use a custom RequestMatcher. We have some 10 odd URLs that we need to allow without authentication. We use Stream Functions to transform each of these URLs into a [AntPathRequestMatcher](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/web/util/matcher/AntPathRequestMatcher.html). This, we feed into a [OrRequestMatcher](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/web/util/matcher/OrRequestMatcher.html) and then use a [NegatedRequestMatcher](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/web/util/matcher/NegatedRequestMatcher.html) to top it all. At the end, we have defined a RequestMatcher that works only when these given URLs do not match, which means that pretty much every thing else is authenticated.
-
-```java
-String[] URLS_TO_ALLOW_WITHOUT_AUTH = { "/v2/api-docs", "/configuration/**",
-  "/swagger-ui.html", "/swagger*/**", "/webjars/**", "/h2-console/**", "/actuator/**" };
-RequestMatcher requestMatcher =
-  new NegatedRequestMatcher(new OrRequestMatcher(Arrays.stream(URLS_TO_ALLOW_WITHOUT_AUTH)
-    .map(pattern -> new AntPathRequestMatcher(pattern)).collect(Collectors.toList())));
-```
-
-## CORS configuration
-Though CORS is not an absolute necessity for this to get working, it still is an important piece. This is how our CORS configuration looks like:
-
-```java
-private CorsConfigurationSource corsConfigurationSource() {
-CorsConfiguration corsConfiguration = new CorsConfiguration();
-corsConfiguration.setAllowedOrigins(Arrays.asList("http://localhost:3000"));
-corsConfiguration.addAllowedMethod(HttpMethod.GET);
-corsConfiguration.addAllowedMethod(HttpMethod.PUT);
-corsConfiguration.addAllowedMethod(HttpMethod.POST);
-corsConfiguration.addAllowedMethod(HttpMethod.DELETE);
-corsConfiguration.addAllowedMethod(HttpMethod.OPTIONS);
-corsConfiguration.addAllowedHeader("X-Requested-With");
-corsConfiguration.addAllowedHeader("Content-Type");
-corsConfiguration.addAllowedHeader("Accept");
-corsConfiguration.addAllowedHeader("Origin");
-corsConfiguration.addAllowedHeader("Authorization");
-UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-source.registerCorsConfiguration("/**", corsConfiguration);
-return source;
 }
 ```
 
-## Putting it all together
-All of this will come together when we extend the [WebSecurityConfigurerAdapter](https://docs.spring.io/spring-security/site/docs/current/api/org/springframework/security/config/annotation/web/configuration/WebSecurityConfigurerAdapter.html) to define our own Configuration as shown below:
+In the method __findAllByIdNotNull()__ that I have defined, I am saying that fetch all Books that have non-null IDs. Essentially this means all records as ID is my Primary Key.
+
+Now let us expose this through our Controller:
 
 ```java
-@Configuration
-@EnableWebSecurity
-@EnableGlobalMethodSecurity(prePostEnabled = true, securedEnabled = true, jsr250Enabled = true)
-public class SecurityConfig extends WebSecurityConfigurerAdapter {
-
-    private static final String[] URLS_TO_ALLOW_WITHOUT_AUTH = { "/v2/api-docs", "/configuration/**",
-	    "/swagger-ui.html", "/swagger*/**", "/webjars/**", "/h2-console/**", "/actuator/**" };
-
-    @Autowired
-    private UserDetailsRepository userDetailsRepository;
-
-    @Override
-    protected void configure(HttpSecurity http) throws Exception {
-	http.cors(config -> config.configurationSource(corsConfigurationSource())).authorizeRequests()
-		.antMatchers(URLS_TO_ALLOW_WITHOUT_AUTH).permitAll().anyRequest().authenticated().and()
-		.addFilterBefore(authenticationFilter(), BasicAuthenticationFilter.class).csrf().disable().headers()
-		.frameOptions().sameOrigin().httpStrictTransportSecurity().disable();
-    }
-
-    @Override
-    protected AuthenticationManager authenticationManager() {
-	return new GoogleAuthenticationManager(userDetailsRepository);
-    }
-    ...
-  }
+	@GetMapping("/view")
+	public List<BookView> getBooksForView() {
+		return bookDao.findAllByIdNotNull();
+	}
 ```
 
-Notice how we place our AuthenticationFilter with *.addFilterBefore(authenticationFilter(), BasicAuthenticationFilter.class)*.
+Lets invoke the */books/view* endpoint, and observe the no. of queries printed on the console: its just this one.
 
-# Making it work
-Remember, that in order for successful authentication, you would need an entry in the *user* table. You can do that with the H2 Web Console which is available at <http://localhost:8000/h2-console/>. The JDBC URL would be *jdbc:h2:mem:library* and the user name and passwords would be both *sa*.
+```sql
+select b1_0.id,b1_0.title,a1_0.id,a1_0.first_name from book b1_0 left join author a1_0 on a1_0.id=b1_0.author_id where b1_0.id is not null
+```
 
-# Testing with CURL
-Boot up the [ReactJS Client](https://github.com/paawak/blog/tree/master/code/reactjs/library-ui-secured-with-google) and browse to <http://localhost:3000/>. You would see the login screen. Proceed to login with Google. Now hit *F12* to open the *Developer Console*. From the Menu, select Book -> Add New.
+If you see, Spring JPA knows exactly the attributes it needs to fetch from the entire object graph, so it has come up with a single *LEFT OUTER JOIN*. 
 
-![Google login screen](../assets/2021/01/obtaining-google-access-token.png)
-
-As shown above, you would be able to see the *Authorization Header* copy that. The curl command would be:
-
-    curl -v -H "Authorization: MySecretToken" "http://localhost:8000/genre"
+That is the power of the Projections!
 
 # Sources
-The sources for this example can be found here: <https://github.com/paawak/spring-boot-demo/tree/master/google-auth-with-spring-boot>
-
-The Frontend code can be found here: <https://github.com/paawak/blog/tree/master/code/reactjs/library-ui-secured-with-google>.
+The sources for this example can be found here: <https://github.com/paawak/spring-boot-demo/tree/master/jpa-projection-demo>
