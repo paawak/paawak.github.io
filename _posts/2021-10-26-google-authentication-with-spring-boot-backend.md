@@ -7,7 +7,7 @@ author:
   login: paawak
   email: paawak@gmail.com
   url: 'https://www.linkedin.com/in/palash-ray/'
-author_login: paawak
+
 author_email: paawak@gmail.com
 date: '2021-10-26 09:44:00 +0530'
 categories:
