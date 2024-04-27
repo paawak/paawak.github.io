@@ -32,10 +32,16 @@ github_username:  paawak
 permalink: /:title/
 
 # Build settings
-theme: minima
+remote_theme: StartBootstrap/startbootstrap-clean-blog-jekyll
+markdown:           kramdown
+paginate:           10
+paginate_path:      "/posts/page:num/"
+
 plugins:
   - jekyll-feed
   - jekyll-include-cache
+  - jekyll-paginate
+  - jekyll-sitemap 
 
 # Exclude from processing.
 # The following items will not be processed, by default.

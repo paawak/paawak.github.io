@@ -1,5 +1,6 @@
 ---
 layout: post
+background: '/assets/banner/HemkutHill_12.jpg'
 title: Google Authentication with PHP REST Server
 author:
   display_name: paawak
