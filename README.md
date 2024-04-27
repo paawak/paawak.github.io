@@ -12,6 +12,11 @@ For live loading, you can use the below command
 
     bundle exec jekyll serve
 
+# Setting Up Custom Theme
+I am using the theme called [jekyll-theme-clean-blog](https://github.com/StartBootstrap/startbootstrap-clean-blog-jekyll).
+
+This is how to configure this, sample repo: <https://github.com/StartBootstrap/startbootstrap-clean-blog-jekyll/blob/master/Gemfile>. I have followed this and setup my theme.
+
 # Setting Up Custom Domain
 Follow the below links:
 1. <https://medium.com/@hossainkhan/using-custom-domain-for-github-pages-86b303d3918a>
