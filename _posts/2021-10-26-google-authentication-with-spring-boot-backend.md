@@ -3,12 +3,12 @@ layout: post
 background: '/assets/banner/HemkutHill_12.jpg'
 title: Google Authentication with Spring Boot Backend
 author:
-  display_name: paawak
-  login: paawak
+  name: Palash Ray
+  
   email: paawak@gmail.com
-  url: ''
-author_login: paawak
-author_email: paawak@gmail.com
+  url: 'https://www.linkedin.com/in/palash-ray/'
+
+
 date: '2021-10-26 09:44:00 +0530'
 categories:
 - java

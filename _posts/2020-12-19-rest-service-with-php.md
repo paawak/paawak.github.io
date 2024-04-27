@@ -3,12 +3,12 @@ layout: post
 background: '/assets/banner/HemkutHill_12.jpg'
 title: Creating REST Service with PHP from a Java programmer's perspective
 author:
-  display_name: paawak
-  login: paawak
+  name: Palash Ray
+  
   email: paawak@gmail.com
-  url: ''
-author_login: paawak
-author_email: paawak@gmail.com
+  url: 'https://www.linkedin.com/in/palash-ray/'
+
+
 date: '2020-12-23 23:21:25 +0530'
 categories:
 - php
