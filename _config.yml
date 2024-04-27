@@ -33,10 +33,15 @@ permalink: /:title/
 
 # Build settings
 remote_theme: StartBootstrap/startbootstrap-clean-blog-jekyll
+markdown:           kramdown
+paginate:           5
+paginate_path:      "/posts/page:num/"
 
 plugins:
   - jekyll-feed
   - jekyll-include-cache
+  - jekyll-paginate
+  - jekyll-sitemap 
 
 # Exclude from processing.
 # The following items will not be processed, by default.
