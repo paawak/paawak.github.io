@@ -8,6 +8,10 @@ This is the repo for my blogs. I am using [Jekyll](https://jekyllrb.com/docs/) f
 
 Now, browse to [http://localhost:4000](http://localhost:4000)    
 
+For live loading, you can use the below command
+
+    bundle exec jekyll serve
+
 # Setting Up Custom Domain
 Follow the below links:
 1. <https://medium.com/@hossainkhan/using-custom-domain-for-github-pages-86b303d3918a>
