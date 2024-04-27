@@ -4,7 +4,7 @@ background: '/assets/banner/HemkutHill_12.jpg'
 title: Creating Spring JPA Entity And Repository Dynamically
 author:
   display_name: paawak
-  login: paawak
+  
   email: paawak@gmail.com
   url: 'https://www.linkedin.com/in/palash-ray/'
 
