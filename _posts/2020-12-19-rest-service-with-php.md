@@ -1,5 +1,6 @@
 ---
 layout: post
+background: '../assets/banner/HemkutHill_12.jpg'
 title: Creating REST Service with PHP from a Java programmer's perspective
 author:
   display_name: paawak
