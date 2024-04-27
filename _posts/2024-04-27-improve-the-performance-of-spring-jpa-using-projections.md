@@ -3,7 +3,7 @@ layout: post
 background: '/assets/banner/HemkutHill_12.jpg'
 title: Improve The Performance of Spring JPA using Projections
 author:
-  display_name: paawak
+  name: Palash Ray
   
   email: paawak@gmail.com
   url: 'https://www.linkedin.com/in/palash-ray/'
