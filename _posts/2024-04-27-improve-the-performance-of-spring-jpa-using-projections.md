@@ -1,6 +1,6 @@
 ---
 layout: post
-background: '../assets/banner/HemkutHill_12.jpg'
+background: '/assets/banner/HemkutHill_12.jpg'
 title: Improve The Performance of Spring JPA using Projections
 author:
   display_name: paawak

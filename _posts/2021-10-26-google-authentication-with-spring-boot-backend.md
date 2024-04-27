@@ -1,6 +1,6 @@
 ---
 layout: post
-background: '../assets/banner/HemkutHill_12.jpg'
+background: '/assets/banner/HemkutHill_12.jpg'
 title: Google Authentication with Spring Boot Backend
 author:
   display_name: paawak
