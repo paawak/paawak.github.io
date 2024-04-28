@@ -10,7 +10,7 @@ Now, browse to [http://localhost:4000](http://localhost:4000)
 
 For live loading, you can use the below command
 
-    bundle exec jekyll serve
+    bundle exec jekyll serve --livereload
 
 # Setting Up Custom Theme
 I am using the theme called [jekyll-theme-clean-blog](https://github.com/StartBootstrap/startbootstrap-clean-blog-jekyll).
