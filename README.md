@@ -17,6 +17,9 @@ I am using the theme called [jekyll-theme-clean-blog](https://github.com/StartBo
 
 This is how to configure this, sample repo: <https://github.com/StartBootstrap/startbootstrap-clean-blog-jekyll/blob/master/Gemfile>. I have followed this and setup my theme.
 
+# Implementing Search
+I followed the below blog: <https://blog.webjeda.com/instant-jekyll-search/>
+
 # Setting Up Custom Domain
 Follow the below links:
 1. <https://medium.com/@hossainkhan/using-custom-domain-for-github-pages-86b303d3918a>
