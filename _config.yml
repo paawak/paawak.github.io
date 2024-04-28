@@ -32,7 +32,7 @@ github_username:  paawak
 permalink: /:title/
 
 # Build settings
-remote_theme: StartBootstrap/startbootstrap-clean-blog-jekyll
+remote_theme: StartBootstrap/startbootstrap-clean-blog-jekyll@1f8996f010afdbdebfbb36c27858e62e3373f34a
 markdown:           kramdown
 paginate:           10
 paginate_path:      "/posts/page:num/"
