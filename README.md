@@ -17,6 +17,15 @@ I am using the theme called [jekyll-theme-clean-blog](https://github.com/StartBo
 
 This is how to configure this, sample repo: <https://github.com/StartBootstrap/startbootstrap-clean-blog-jekyll/blob/master/Gemfile>. I have followed this and setup my theme.
 
+# Code Syntax Highlighter
+After lot of search, I have downloaded the CSS for syntax-highlighter from here <https://github.com/jwarby/jekyll-pygments-themes/tree/master>.
+
+Then, in the __\_include\head.html__, I have manually included the below line:
+
+```html
+<link rel="stylesheet" href="/css/emacs.css">
+```
+
 # Implementing Search
 I followed the below blog: <https://blog.webjeda.com/instant-jekyll-search/>
 
