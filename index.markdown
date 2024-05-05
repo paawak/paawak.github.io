@@ -3,5 +3,4 @@
 # To modify the layout, see https://jekyllrb.com/docs/themes/#overriding-theme-defaults
 
 layout: home
-background: 'assets/banner/HemkutHill_12.jpg'
 ---
